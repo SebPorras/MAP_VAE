@@ -1,12 +1,15 @@
-import evoVAE.loss.checkerboard_train as ck
+from trainer.checkerboard_train import sample2d
 
+
+"""
 from evoVAE.decoders.minimal_decoder import MinDecoder
 from evoVAE.encoders.minimal_encoder import MinEncoder
 from evoVAE.models.standardVAE import StandardVAE
+"""
 
 
 def main():
-
+    """
     inputDim = 2
     bottleNeckDim = 1024
     latentDim = 2
@@ -20,8 +23,10 @@ def main():
         encoder=encoder,
         decoder=decoder,
     )
+    """
 
-    ck.train("checkerboard", model=model, epochs=60000, print_freq=1000)
+    # model = ck.train("checkerboard", model=model, epochs=60000, print_freq=1000)
+    print(sample2d("checkerboard"))
 
 
 if __name__ == "__main__":

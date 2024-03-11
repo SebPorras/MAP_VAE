@@ -1,13 +1,15 @@
 from evoVAE.models.types_ import Any
 import torch
 from models import BaseVAE
-from torch.optim import Adam
+from torch import nn
 from .types_ import *
 from ..loss.standard_loss import KL_divergence, gaussian_likelihood
 
 
 class StandardVAE(BaseVAE):
-    """Base VAE implementation"""
+    """A standard VAE implementatio. Nothing fancy,
+    just regualr ELBO used for loss. Global standard deviation
+    used for estimating the gaussian likelihood."""
 
     def __init__(
         self,
@@ -24,11 +26,7 @@ class StandardVAE(BaseVAE):
         self.latent_dim = latentDim
         self.bottleNeckDim = bottleNeckDim
 
-        # will transform to an initial SD of 1 for gaussian likelihood
-        self.logStandardDeviation = nn.Parameter(Tensor([0.0]))
-
         self.encoder = encoder
-        self.decoder = decoder
 
         # extract Mu and logVar (log variance)
         self.zMuSampler = nn.Linear(bottleNeckDim, latentDim)
@@ -36,6 +34,10 @@ class StandardVAE(BaseVAE):
 
         # restructure latent sample to be passed to decoder
         self.latentUpscaler = nn.Linear(latentDim, bottleNeckDim)
+
+        self.decoder = decoder
+        # will transform to an initial SD of 1 for gaussian likelihood
+        self.logStandardDeviation = nn.Parameter(Tensor([0.0]))
 
     def reparameterise(self, zMu: Tensor, zLogvar: Tensor) -> Tensor:
         """Construct a Gaussian distribution from learnt values of
@@ -79,7 +81,7 @@ class StandardVAE(BaseVAE):
         # construct a gaussian distribution and sample
         zSample = self.reparameterise(zMu, zLogvar)
 
-        # learn q_theta parameters
+        # learn parameters for q_theta P(x|z)
         xHat = self.decode(zSample)
 
         return xHat, zSample, zMu, zLogvar
@@ -97,7 +99,14 @@ class StandardVAE(BaseVAE):
 
         elbo = kl - likelihood
 
-        return elbo, kl, likelihood
+        return elbo, kl.detach(), likelihood.detach()
 
-    def setup_optimiser(self, learningRate: float = 1e-4):
-        return Adam(self.parameters(), lr=learningRate)
+    def generate(self, x: Tensor) -> Tensor:
+        """Return the reconstructed input"""
+
+        xHat, _, _, _ = self.forward(x)
+
+        return xHat
+
+    def configure_optimiser(self, learningRate: float = 1e-4):
+        return torch.optim.Adam(self.parameters(), lr=learningRate)

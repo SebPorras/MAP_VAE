@@ -1,9 +1,5 @@
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.colors as col
 import torch
-import torch.nn.functional as F
-from torch.optim import Adam
+from torch import nn
 
 
 class MinEncoder(nn.Module):
