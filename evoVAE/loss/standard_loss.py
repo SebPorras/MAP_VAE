@@ -1,4 +1,4 @@
-from models.types_ import Tensor
+from ..models.types_ import *
 import torch
 
 

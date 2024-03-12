@@ -1,8 +1,8 @@
 from .types_ import *
 import torch
-from models import BaseVAE
+from .base import BaseVAE
 from torch import nn
-from loss.standard_loss import KL_divergence, gaussian_likelihood
+from ..loss.standard_loss import KL_divergence, gaussian_likelihood
 
 
 class StandardVAE(BaseVAE):
@@ -35,8 +35,9 @@ class StandardVAE(BaseVAE):
         self.latentUpscaler = nn.Linear(latentDim, bottleNeckDim)
 
         self.decoder = decoder
+
         # will transform to an initial SD of 1 for gaussian likelihood
-        self.logStandardDeviation = nn.Parameter(Tensor([0.0]))
+        self.logStandardDeviation = nn.Parameter(torch.tensor([0.0]))
 
     def reparameterise(self, zMu: Tensor, zLogvar: Tensor) -> Tensor:
         """Construct a Gaussian distribution from learnt values of
@@ -75,7 +76,7 @@ class StandardVAE(BaseVAE):
 
     def forward(self, rawInput: Tensor) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
 
-        zMu, zLogvar = self.encode(rawInput)
+        zMu, zLogvar = self.encode(rawInput=rawInput)
 
         # construct a gaussian distribution and sample
         zSample = self.reparameterise(zMu, zLogvar)
@@ -109,5 +110,3 @@ class StandardVAE(BaseVAE):
 
     def configure_optimiser(self, learningRate: float = 1e-4):
         return torch.optim.Adam(self.parameters(), lr=learningRate)
-
-
