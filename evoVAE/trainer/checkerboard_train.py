@@ -17,52 +17,58 @@ def print_progress(time, cur_iter, total_iter) -> str:
     return f"Time Elapsed: {h} hours {m} minutes {s} seconds. Time Remaining: {h2} hours {m2} minutes {s2} seconds.\n"
 
 
-def train(model: BaseVAE, trainLoader, epochs=60000, print_freq=1000) -> BaseVAE:
+def train(model: BaseVAE, trainLoader, epochs=10, print_freq=10) -> BaseVAE:
     """Training cycle for checkboard dataset"""
 
-    print("Cuda available: ", torch.cuda.is_available())
-    print("Num GPUs Available: ", torch.cuda.device_count())
-    if torch.cuda.is_available():
-        model.cuda()
+    use_cuda = torch.cuda.is_available()
+    device = torch.device("cuda:0" if use_cuda else "cpu")
 
-    batchSize = len(trainLoader)
+    # speeds up if input size isn't changing 
+    torch.backends.cudnn.benchmark = True
+
+    model.to(device)
+
 
     start = time.time()
     optimiser = model.configure_optimiser()
-    model.train(True)
     log = ""
 
     for iteration in range(epochs):
 
+        batchSize = len(trainLoader)
         epochLoss = 0
+        model.train(True)
+        
+        log += f"Epoch {iteration+1}\n-------------------------------\n"
 
         for batch in trainLoader:
 
-            input, _ = batch
-            input = input.reshape(-1, 28 * 28)
+            data, _ = batch
+            data = data.reshape(-1, 28 * 28).to(device)
 
             # forward step
-            modelOutputs = model(input)
+            modelOutputs = model(data)
 
             # calculate loss
-            loss, kl, likelihood = model.loss_function(modelOutputs, input)
+            loss, kl, likelihood = model.loss_function(modelOutputs, data)
             epochLoss += loss
 
             optimiser.zero_grad()
             loss.backward()
             optimiser.step()
 
-        if iteration % print_freq == 0:
-            with torch.no_grad():
-                iter = f"Iteration {iteration}, ELBO: {loss}, L_rec: {likelihood}, L_reg: {kl}\n"
-                stats = print_progress(time.time() - start, iteration + 1, epochs)
-                batchLoss = f"Avg batch loss: {epochLoss/batchSize}"
+            if iteration % print_freq == 0:
+                with torch.no_grad():
+                    itera = f"Iteration {iteration}, ELBO: {loss}, L_rec: {likelihood}, L_reg: {kl}\n"
+                    stats = print_progress(time.time() - start, iteration + 1, epochs)
+                    batchLoss = f"Avg batch loss: {epochLoss/batchSize}\n"
 
-                log += iter
-                log += stats
-                log += batchLoss
+                    log += itera
+                    log += stats
+                    log += batchLoss
 
     print(log)
     torch.save(model.state_dict(), "model_weights.pth")
 
     return model
+
