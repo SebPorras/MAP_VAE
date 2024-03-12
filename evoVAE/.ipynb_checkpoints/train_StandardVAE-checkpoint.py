@@ -5,6 +5,8 @@ from encoders.minimal_encoder import MinEncoder
 from models.standardVAE import StandardVAE
 
 
+# ! which python3
+
 def main():
     """
     inputDim = 2
@@ -24,4 +26,5 @@ def main():
 
     # model = ck.train("checkerboard", model=model, epochs=60000, print_freq=1000)
     print(sample2d("checkerboard"))
+
 

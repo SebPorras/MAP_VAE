@@ -1,4 +1,4 @@
-from .base import *
+from .base import BaseVAE
 
 
 vae_models = {}

@@ -1,4 +1,4 @@
-from evoVAE.models.types_ import Tensor
+from models.types_ import Tensor
 import torch
 
 

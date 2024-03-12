@@ -1,3 +1,4 @@
+from __future__ import annotations
 from .types_ import *
 import torch
 from torch import nn

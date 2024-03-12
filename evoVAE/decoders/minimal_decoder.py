@@ -1,7 +1,6 @@
 import torch
 from torch import nn
 
-
 class MinDecoder(nn.Module):
 
     def __init__(self, inputDim: int, bottleNeckDim: int, outputDim: int) -> None:
