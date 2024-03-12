@@ -1,8 +1,8 @@
 #!/bin/bash --login
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=1
-#SBATCH --mem=10G
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=25G
 #SBATCH --job-name=seb_train_vae
 #SBATCH --time=0:30:00
 #SBATCH --partition=gpu_rocm
