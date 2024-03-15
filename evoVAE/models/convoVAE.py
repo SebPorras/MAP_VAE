@@ -24,7 +24,7 @@ class ConvoVAE(BaseVAE):
         self.latentDims = latentDims
 
         if hiddenDims is None:
-            hiddenDims = [4, 8]
+            hiddenDims = [32, 64, 128, 256, 512]
 
         ### ENCODER ###
 
@@ -78,8 +78,8 @@ class ConvoVAE(BaseVAE):
                         stride=1,
                     ),
                     nn.Dropout(0.3),
+                    nn.BatchNorm2d(hiddenDims[i + 1]),
                     nn.LeakyReLU(),
-                    nn.BatchNorm2d(h_dim),
                 )
             )
 
@@ -89,14 +89,18 @@ class ConvoVAE(BaseVAE):
 
         self.final_layer = nn.Sequential(
             nn.ConvTranspose2d(
-                in_channels=hiddenDims[-1],
-                out_channels=hiddenDims[-1],
+                hiddenDims[-1],
+                hiddenDims[-1],
                 kernel_size=3,
-                stride=1,
+                stride=3,
+                padding=1,
+                output_padding=1,
             ),
+            # (Hin −1)×stride[0]−2×padding[0]+dilation[0]×(kernel_size[0]−1)+output_padding[0]+
             nn.BatchNorm2d(hiddenDims[-1]),
             nn.LeakyReLU(),
-            nn.Conv2d(hiddenDims[-1], out_channels=1, kernel_size=3),
+            # use the formula 28 = (20 - Kernal - 2Padding)/ Stride + 1
+            nn.Conv2d(hiddenDims[-1], out_channels=1, kernel_size=2),
             nn.Tanh(),
         )
 
@@ -113,7 +117,7 @@ class ConvoVAE(BaseVAE):
 
         return qPhi.rsample()
 
-    def encode(self, rawInput: Tensor) -> Tensor:
+    def encode(self, rawInput: Tensor) -> Tuple[Tensor, Tensor, torch.Size]:
         """Take the rawInput and encode into a bottle neck dimension
         specified by the encoder. Transform this into Mu and log variance
         values to construct a distribution. i.e. P_phi(Z|X)
@@ -121,34 +125,42 @@ class ConvoVAE(BaseVAE):
 
         # find qPhi encoding of the raw input
         encoderOutput = self.encoder(rawInput)
+        # save this for later so that we can resize out flattened tensor
+        shape = encoderOutput.shape
+
         encoderOutput = torch.flatten(encoderOutput, start_dim=1)
 
         # sample out the gaussian parameters
         zMu = self.zMuSampler(encoderOutput)
         zLogvar = self.zLogvarSampler(encoderOutput)
 
-        return zMu, zLogvar
+        return zMu, zLogvar, shape
 
-    def decode(self, zSample: Tensor) -> Tensor:
+    def decode(self, upscaledZ: Tensor) -> Tensor:
         """Sample a latent vector, Z, and
         learn the parameters from which reconstructions
         can be sampled from. I.e. we are learning P_sigma(X|Z)
         """
-        upscaledZ = self.decoder_input(zSample)
+
         xHat = self.decoder(upscaledZ)
+
         xHat = self.final_layer(xHat)
 
         return xHat
 
     def forward(self, rawInput: Tensor) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
 
-        zMu, zLogvar = self.encode(rawInput=rawInput)
+        zMu, zLogvar, shape = self.encode(rawInput=rawInput)
 
         # construct a gaussian distribution and sample
         zSample = self.reparameterise(zMu, zLogvar)
 
+        upscaledZ = self.decoder_input(zSample)
+
+        upscaledZ = upscaledZ.view(shape)
+
         # learn parameters for q_theta P(x|z)
-        xHat = self.decode(zSample)
+        xHat = self.decode(upscaledZ)
 
         return xHat, zSample, zMu, zLogvar
 

@@ -21,40 +21,42 @@ def train(model: BaseVAE, trainLoader, epochs=10, print_freq=10) -> BaseVAE:
     """Training cycle for checkboard dataset"""
 
     use_cuda = torch.cuda.is_available()
-    device = torch.device("cuda:0" if use_cuda else "cpu")
+    device = torch.device("cuda" if use_cuda else "cpu")
 
-    # speeds up if input size isn't changing 
+    # speeds up if input size isn't changing
     torch.backends.cudnn.benchmark = True
 
-    model.to(device)
-
+    model = model.to(device)
 
     start = time.time()
-    optimiser = model.configure_optimiser()
-    log = ""
+    optimiser = model.configure_optimiser(learningRate=1e-5)
 
     for iteration in range(epochs):
 
         batchSize = len(trainLoader)
         epochLoss = 0
         model.train(True)
-        
-        log += f"Epoch {iteration+1}\n-------------------------------\n"
+
+        print(f"Epoch {iteration+1}\n-------------------------------\n")
 
         for batch in trainLoader:
 
             data, _ = batch
-            data = data.reshape(-1, 28 * 28).to(device)
+            data = data.to(device)
+
+            optimiser.zero_grad()
 
             # forward step
             modelOutputs = model(data)
 
             # calculate loss
             loss, kl, likelihood = model.loss_function(modelOutputs, data)
+            print(loss)
             epochLoss += loss
 
-            optimiser.zero_grad()
             loss.backward()
+            # sets max value for gradient - currently 1.0
+            torch.nn.utils.clip_grad_norm(model.parameters(), 1.0)
             optimiser.step()
 
             if iteration % print_freq == 0:
@@ -63,12 +65,10 @@ def train(model: BaseVAE, trainLoader, epochs=10, print_freq=10) -> BaseVAE:
                     stats = print_progress(time.time() - start, iteration + 1, epochs)
                     batchLoss = f"Avg batch loss: {epochLoss/batchSize}\n"
 
-                    log += itera
-                    log += stats
-                    log += batchLoss
+                    print(itera)
+                    print(stats)
+                    print(batchLoss)
 
-    print(log)
     torch.save(model.state_dict(), "model_weights.pth")
 
     return model
-
