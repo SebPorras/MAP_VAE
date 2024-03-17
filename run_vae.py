@@ -2,7 +2,7 @@
 import torch
 from torchvision import datasets
 from torchvision.transforms import ToTensor
-from evoVAE.trainer.checkerboard_train import train
+from evoVAE.trainer.convo_train import train
 from evoVAE.models.convoVAE import ConvoVAE
 
 
