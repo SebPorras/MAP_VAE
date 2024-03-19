@@ -9,7 +9,6 @@ import numpy as np
 from typing import Tuple
 import pandas as pd
 import torch
-from datasets import MSA_Dataset
 
 AA = [
     "-",
@@ -141,26 +140,3 @@ def encode_and_weight_seqs(
     print(f"The sequence weight array has size: {weights.shape}\n")
 
     return encodings, weights
-
-
-def main():
-
-    THETA = 0.2
-    alns: pd.DataFrame = read_aln_file("./data/alignments/tiny.aln")
-    train, val = train_test_split(alns, test_size=0.2)
-
-    train_encodings, train_weights = encode_and_weight_seqs(train["sequence"], THETA)
-    train_ids = train["id"].values
-
-    train_dataset = MSA_Dataset(train_encodings, train_weights, train_ids)
-    en, _, _ = train_dataset[1]
-    print(one_hot_to_seq(en))
-
-    val_encodings, val_weights = encode_and_weight_seqs(val["sequence"], THETA)
-    val_ids = val["id"].values
-
-    val_dataset = MSA_Dataset(val_encodings, val_weights, val_ids)
-
-
-if __name__ == "__main__":
-    main()
