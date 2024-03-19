@@ -6,9 +6,10 @@ before they are passed to the VAE.
 
 from sklearn.model_selection import train_test_split
 import numpy as np
-import torch.nn.functional as F
+from typing import Tuple
 import pandas as pd
 import torch
+from datasets import MSA_Dataset
 
 AA = [
     "-",
@@ -74,13 +75,26 @@ def read_aln_file(
 
 
 def seq_to_one_hot(seq: str) -> np.ndarray:
+    """Rows are positions in the sequence,
+    the columns are the one hot encodings.
+    """
 
-    encoding = np.zeros((AA_LEN, len(seq)))
+    encoding = np.zeros((len(seq), AA_LEN))
 
     for column, letter in enumerate(seq):
-        encoding[AA_TO_IDX[letter]][column] = 1
+        encoding[column][AA_TO_IDX[letter]] = 1
 
     return encoding
+
+
+def one_hot_to_seq(encoding: torch.Tensor) -> str:
+    """Take a 2D array with shape (SeqLen, AA_LEN)
+    and convert it back to a string."""
+
+    # get the index of the maximum value, which corresponds to a
+    # particular character
+    aa_indices = np.argmax(encoding.numpy(), axis=1)
+    return "".join(IDX_TO_AA[char] for char in aa_indices)
 
 
 def hamming_distance(seq1: str, seq2: str) -> float:
@@ -114,34 +128,38 @@ def reweight_sequences(sequences: np.ndarray, theta: float) -> np.ndarray:
     return np.fromiter((map(lambda x: 1.0 / x, weights)), dtype=float)
 
 
+def encode_and_weight_seqs(
+    seqs: pd.Series, theta: float
+) -> Tuple[torch.tensor, np.ndarray]:
+
+    print("Encoding the sequences and calculating weights")
+
+    encodings = torch.tensor(np.stack(seqs.apply(seq_to_one_hot)), dtype=torch.float32)
+    print(f"The sequence encoding tensor has size: {encodings.size()}")
+
+    weights = reweight_sequences(seqs.values, theta=theta)
+    print(f"The sequence weight array has size: {weights.shape}\n")
+
+    return encodings, weights
+
+
 def main():
 
     THETA = 0.2
     alns: pd.DataFrame = read_aln_file("./data/alignments/tiny.aln")
     train, val = train_test_split(alns, test_size=0.2)
 
-    # create one hot embeddings
-    train_encodings = np.stack(train["sequence"].apply(seq_to_one_hot))
-    # get sequence reweights for this dataset using original seqs
-    train_weights = reweight_sequences(train["sequence"].values, theta=THETA)
-    print(train_encodings.shape)
-    print(train_weights.shape)
+    train_encodings, train_weights = encode_and_weight_seqs(train["sequence"], THETA)
+    train_ids = train["id"].values
 
-    val_encodings = np.stack(val["sequence"].apply(seq_to_one_hot))
-    val_weights = reweight_sequences(val["sequence"].values, theta=THETA)
-    print(val_encodings.shape)
-    print(val_weights.shape)
+    train_dataset = MSA_Dataset(train_encodings, train_weights, train_ids)
+    en, _, _ = train_dataset[1]
+    print(one_hot_to_seq(en))
 
-    indices = torch.tensor([0, 2, 1, 0])
+    val_encodings, val_weights = encode_and_weight_seqs(val["sequence"], THETA)
+    val_ids = val["id"].values
 
-    # Define the number of classes (vocabulary size)
-    num_classes = 3  # Example: A classification task with 3 classes
-
-    # Use torch.nn.functional.one_hot to perform one-hot encoding
-    one_hot_encoded = F.one_hot(indices, num_classes)
-
-    print(one_hot_encoded)
-    print(one_hot_encoded.shape)
+    val_dataset = MSA_Dataset(val_encodings, val_weights, val_ids)
 
 
 if __name__ == "__main__":
