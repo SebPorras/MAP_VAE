@@ -1,5 +1,5 @@
 """
-seqParser.py
+seq_tools.py
 Contains any functions used for general processing of sequences 
 before they are passed to the VAE. 
 """
