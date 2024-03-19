@@ -1,0 +1,20 @@
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+
+#Distribution / packaging
+*.egg
+*.egg-info/
+build/
+
+# Non-important data 
+data/FashionMNIST
+
+# generated version file
+evoVAE/_version.py
+
+# Jupyter Notebook 
+.ipynb_checkpoints
+
+# editor 
+.vscode/

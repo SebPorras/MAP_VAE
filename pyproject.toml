@@ -1,0 +1,28 @@
+# file: pyproject.toml 
+
+[build-system]
+requires = [
+    "setuptools >= 65",
+    "setuptools-scm>=8.0"
+]
+
+[tool.setuptools_scm]
+version_file = "evoVAE/_version.py"
+
+[project]
+name = "evoVAE"
+version = "0.1.0"
+authors = [{name = "Sebastian Porras", email = "s.porras@uq.edu.au" }]
+description = "I like proteins"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "torch ~= 2.2.0",
+    "pandas ~= 2.0.3",
+    "numpy ~= 1.24.3",
+    "scikit-learn ~= 1.3.2"
+
+]
+
+[tool.setuptools.packages.find]
+include = ["evoVAE", "evoVAE.*"]
