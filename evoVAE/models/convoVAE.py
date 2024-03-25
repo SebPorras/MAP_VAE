@@ -1,9 +1,8 @@
-from json import encoder
-from .types_ import *
+from evoVAE.models.types_ import *
 import torch
-from .base import BaseVAE
-from torch import max_pool2d, nn
-from ..loss.standard_loss import KL_divergence, gaussian_likelihood
+from evoVAE.models.base import BaseVAE
+from torch import nn
+from evoVAE.loss.standard_loss import KL_divergence, gaussian_likelihood
 
 
 class ConvoVAE(BaseVAE):
@@ -187,4 +186,7 @@ class ConvoVAE(BaseVAE):
         return xHat
 
     def configure_optimiser(self, learningRate: float = 1e-4):
-        return torch.optim.Adam(self.parameters(), lr=learningRate)
+        return torch.optim.Adam(
+            self.parameters(),
+            lr=learningRate,
+        )

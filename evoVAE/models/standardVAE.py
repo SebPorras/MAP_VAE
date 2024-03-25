@@ -1,8 +1,8 @@
-from .types_ import *
+from evoVAE.models.types_ import *
 import torch
-from .base import BaseVAE
+from evoVAE.models.base import BaseVAE
 from torch import nn
-from ..loss.standard_loss import KL_divergence, gaussian_likelihood
+from evoVAE.loss.standard_loss import KL_divergence, gaussian_likelihood
 
 
 class StandardVAE(BaseVAE):
