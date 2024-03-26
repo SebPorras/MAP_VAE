@@ -7,15 +7,15 @@ from torch.utils.data import Dataset
 class MSA_Dataset(Dataset):
 
     def __init__(
-        self, encodings: torch.Tensor, weights: np.ndarray, ids: np.ndarray
+        self, encodings: np.ndarray, weights: np.ndarray, ids: np.ndarray
     ) -> None:
 
         assert encodings.shape[0] == len(weights)
         assert encodings.shape[0] == len(ids)
 
-        self.encodings = encodings
-        self.weights = weights
-        self.ids = ids
+        self.encodings = torch.tensor(np.stack(encodings))
+        self.weights = torch.tensor(weights.values)
+        self.ids = torch.tensor(ids.values)
 
     def __len__(self):
         return self.encodings.shape[0]

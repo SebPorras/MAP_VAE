@@ -1,5 +1,4 @@
 # %%
-from networkx import ancestors
 from evoVAE.utils.datasets import MSA_Dataset
 import evoVAE.utils.seq_tools as st
 from evoVAE.models.seqVAE import SeqVAE
@@ -49,31 +48,28 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Read in the datasets and create train and validation sets
 ancestors_df = pd.read_pickle("../data/alignments/phoQ_ancestors.pkl")
+anc_encodings, anc_weights = st.encode_and_weight_seqs(
+    ancestors_df["sequence"], theta=config.seq_theta
+)
+ancestors_df["weights"] = anc_weights
+ancestors_df["encodings"] = anc_encodings
+ancestors_df.to_pickle("phoQ_ancestors_weights_encodings.pkl")
 
 # Next, drop N0 and N238 as they come from outgroups
-flt_ancestors = ancestors.loc[(ancestors["id"] != "N0") & (ancestors["id"] != "N238")]
+flt_ancestors = ancestors_df.loc[
+    (ancestors_df["id"] != "N0") & (ancestors_df["id"] != "N238")
+]
 
 # Then remove non-unique sequences
 flt_unique_ancestors = flt_ancestors.drop_duplicates(subset="sequence")
 
 train, val = train_test_split(flt_unique_ancestors, test_size=config.test_split)
 
-# create one-hot encodings and calculate reweightings
-
 # TRAINING
-train_encodings, train_weights = st.encode_and_weight_seqs(
-    train["sequence"], theta=config.seq_theta
-)
-train_ids = train["id"].values  # just the seq identifiers
-train_dataset = MSA_Dataset(train_encodings, train_weights, train_ids)
+train_dataset = MSA_Dataset(train["encodings"], train["weights"], train["id"])
 
 # VALIDATION
-val_encodings, val_weights = st.encode_and_weight_seqs(
-    val["sequence"], theta=config.seq_theta
-)
-val_ids = val["id"].values
-val_dataset = MSA_Dataset(val_encodings, val_weights, val_ids)
-
+val_dataset = MSA_Dataset(val["encodings"], val["weights"], val["id"])
 
 # DATA LOADERS #
 train_loader = torch.utils.data.DataLoader(
@@ -82,7 +78,6 @@ train_loader = torch.utils.data.DataLoader(
 val_loader = torch.utils.data.DataLoader(
     val_dataset, batch_size=config.batch_size, shuffle=False
 )
-# next(iter(train_loader))[0].shape,next(iter(train_loader))[1].shape, next(iter(train_loader))[2]
 
 # %% [markdown]
 # #### Create the model

@@ -21,9 +21,9 @@ def seq_train(
 
     for iteration in range(config.epochs):
 
-        epoch_loss = 0
-        epoch_kl = 0
-        epoch_likelihood = 0
+        epoch_loss = []
+        epoch_kl = []
+        epoch_likelihood = []
         model.train(True)
 
         # ignore seq names for now when training
@@ -42,9 +42,9 @@ def seq_train(
             )
 
             # update epoch metrics
-            epoch_loss += loss.item()
-            epoch_kl += kl.item()
-            epoch_likelihood += likelihood.item()
+            epoch_loss.append(loss.item())
+            epoch_kl.append(kl.item())
+            epoch_likelihood.append(likelihood.item())
 
             # update weights
             loss.backward()
@@ -57,9 +57,9 @@ def seq_train(
 
         # validation metrics
         model.eval()
-        epoch_val_elbo = 0
-        epoch_val_kl = 0
-        epoch_val_likelihood = 0
+        epoch_val_elbo = []
+        epoch_val_kl = []
+        epoch_val_likelihood = []
         with torch.no_grad():
             for encoding_val, weight_val, _ in val_loader:
                 encoding_val = encoding_val.float().to(device)
@@ -71,20 +71,21 @@ def seq_train(
                     outputs_val, torch.flatten(encoding_val, start_dim=1)
                 )
 
-                epoch_val_elbo += loss_val.item()
-                epoch_val_kl += kl_val.item()
-                epoch_val_likelihood += likelihood_val.item()
+                epoch_val_elbo.append(loss_val.item())
+                epoch_val_kl.append(kl_val.item())
+                epoch_val_likelihood.append(likelihood_val.item())
 
                 # wandb.log({"ELBO_val": loss_val.item(), "KLD_val": kl_val.item(), "Gauss_likelihood_val": likelihood_val.item()})
 
         wandb.log(
             {
-                "epoch_ELBO": epoch_loss / len(train_loader),
-                "epoch_KLD": epoch_kl / len(train_loader),
-                "epoch_Gauss_likelihood": epoch_likelihood / len(train_loader),
-                "epoch_val_ELBO": epoch_val_elbo / len(val_loader),
-                "epoch_val_KLD": epoch_val_kl / len(val_loader),
-                "epoch_val_Gauss_likelihood": epoch_val_likelihood / len(val_loader),
+                "epoch_ELBO": epoch_loss / len(epoch_loss),
+                "epoch_KLD": epoch_kl / len(epoch_kl),
+                "epoch_Gauss_likelihood": epoch_likelihood / len(epoch_likelihood),
+                "epoch_val_ELBO": epoch_val_elbo / len(epoch_val_elbo),
+                "epoch_val_KLD": epoch_val_kl / len(epoch_val_kl),
+                "epoch_val_Gauss_likelihood": epoch_val_likelihood
+                / len(epoch_val_likelihood),
             }
         )
 

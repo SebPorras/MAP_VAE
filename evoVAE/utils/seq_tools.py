@@ -129,12 +129,13 @@ def reweight_sequences(sequences: np.ndarray, theta: float) -> np.ndarray:
 
 def encode_and_weight_seqs(
     seqs: pd.Series, theta: float
-) -> Tuple[torch.tensor, np.ndarray]:
+) -> Tuple[np.ndarray, np.ndarray]:
 
     print("Encoding the sequences and calculating weights")
 
-    encodings = torch.tensor(np.stack(seqs.apply(seq_to_one_hot)), dtype=torch.float32)
-    print(f"The sequence encoding tensor has size: {encodings.size()}")
+    # encodings = np.stack(seqs.apply(seq_to_one_hot))
+    encodings = seqs.apply(seq_to_one_hot)
+    print(f"The sequence encoding has size: {encodings.shape}\n")
 
     weights = reweight_sequences(seqs.values, theta=theta)
     print(f"The sequence weight array has size: {weights.shape}\n")
