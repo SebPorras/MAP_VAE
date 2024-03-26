@@ -1,10 +1,10 @@
-from turtle import forward
 from evoVAE.models.types_ import *
 import torch
 from evoVAE.models.base import BaseVAE
 from torch import nn
 from evoVAE.loss.standard_loss import KL_divergence, gaussian_likelihood
 import torch.nn.functional as F
+from typing import Dict
 
 
 class SeqVAE(BaseVAE):
@@ -13,7 +13,7 @@ class SeqVAE(BaseVAE):
     """
 
     def __init__(
-        self, input_dims: int, latent_dims: int, hidden_dims: List[int]
+        self, input_dims: int, latent_dims: int, hidden_dims: List[int], config: Dict
     ) -> None:
         super(SeqVAE, self).__init__()
 
@@ -35,11 +35,12 @@ class SeqVAE(BaseVAE):
                 nn.Sequential(
                     nn.Linear(input_dims, h_dim),
                     nn.LeakyReLU(),
-                    nn.Dropout(0.5),  # mask random units
+                    nn.Dropout(config.dropout),  # mask random units
                     nn.Linear(h_dim, h_dim),
                     nn.LeakyReLU(),
                     nn.BatchNorm1d(
-                        h_dim, momentum=0.9
+                        h_dim,
+                        momentum=config.momentum,
                     ),  # normalise and learn alpha/beta
                 )
             )
@@ -65,11 +66,11 @@ class SeqVAE(BaseVAE):
                 nn.Sequential(
                     nn.Linear(hidden_dims[i], hidden_dims[i + 1]),
                     nn.LeakyReLU(),
-                    nn.Dropout(0.5),  # mask random units
+                    nn.Dropout(config.dropout),  # mask random units
                     nn.Linear(hidden_dims[i + 1], hidden_dims[i + 1]),
                     nn.LeakyReLU(),
                     nn.BatchNorm1d(
-                        hidden_dims[i + 1], momentum=0.9
+                        hidden_dims[i + 1], momentum=config.momentum
                     ),  # normalise and learn alpha/beta
                 )
             )
