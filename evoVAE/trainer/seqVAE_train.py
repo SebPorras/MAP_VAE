@@ -88,6 +88,6 @@ def seq_train(
             }
         )
 
-    # torch.save(model.state_dict(), "seqVAE_weights.pth")
+    torch.save(model.state_dict(), "seqVAE_weights.pth")
 
     return model

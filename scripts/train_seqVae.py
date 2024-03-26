@@ -1,4 +1,5 @@
 # %%
+from networkx import ancestors
 from evoVAE.utils.datasets import MSA_Dataset
 import evoVAE.utils.seq_tools as st
 from evoVAE.models.seqVAE import SeqVAE
@@ -20,6 +21,7 @@ wandb.init(
         "dataset": "PhoQ",
         "seq_theta": 0.2,  # reweighting
         "AA_count": 21,  # standard AA + gap
+        "test_split": 0.2,
         # ADAM
         "learning_rate": 1e-5,  # ADAM
         "weight_decay": 0.01,  # ADAM
@@ -32,8 +34,8 @@ wandb.init(
         "max_norm": 1.0,  # gradient clipping
         # Model info
         "architecture": "SeqVAE",
-        "latent_dims": 2,
-        "hidden_dims": [32, 16],
+        "latent_dims": 4,
+        "hidden_dims": [128, 64],
     },
 )
 
@@ -46,8 +48,15 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # %%
 
 # Read in the datasets and create train and validation sets
-alns: pd.DataFrame = st.read_aln_file("../data/alignments/tiny.aln")
-train, val = train_test_split(alns, test_size=0.2)
+ancestors_df = pd.read_pickle("../data/alignments/phoQ_ancestors.pkl")
+
+# Next, drop N0 and N238 as they come from outgroups
+flt_ancestors = ancestors.loc[(ancestors["id"] != "N0") & (ancestors["id"] != "N238")]
+
+# Then remove non-unique sequences
+flt_unique_ancestors = flt_ancestors.drop_duplicates(subset="sequence")
+
+train, val = train_test_split(flt_unique_ancestors, test_size=config.test_split)
 
 # create one-hot encodings and calculate reweightings
 
@@ -74,13 +83,6 @@ val_loader = torch.utils.data.DataLoader(
     val_dataset, batch_size=config.batch_size, shuffle=False
 )
 # next(iter(train_loader))[0].shape,next(iter(train_loader))[1].shape, next(iter(train_loader))[2]
-
-# %%
-# encoding, weights, id = train_dataset[0]
-# print(encoding.shape, weights, id)
-
-# translation = st.one_hot_to_seq(encoding)
-# print(translation)
 
 # %% [markdown]
 # #### Create the model
