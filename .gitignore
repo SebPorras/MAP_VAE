@@ -7,14 +7,16 @@ __pycache__/
 *.egg-info/
 build/
 
+# Weights and Biases logging 
+notebooks/wandb/
+
 # Non-important data 
 data/FashionMNIST
 
 # generated version file
 evoVAE/_version.py
 
-# Jupyter Notebook 
-.ipynb_checkpoints
-
-# editor 
+# editors /filesystem
 .vscode/
+.DS_Store
+.ipynb_checkpoints

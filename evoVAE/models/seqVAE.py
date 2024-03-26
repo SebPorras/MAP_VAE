@@ -25,7 +25,7 @@ class SeqVAE(BaseVAE):
         self.encoded_seq_len = input_dims  # save this to reconstruct seqs
 
         if hidden_dims is None:
-            hidden_dims = [256, 128, 64]
+            hidden_dims = [128, 64]
 
         ### ENCODER ###
 
@@ -38,7 +38,9 @@ class SeqVAE(BaseVAE):
                     nn.Dropout(0.5),  # mask random units
                     nn.Linear(h_dim, h_dim),
                     nn.LeakyReLU(),
-                    nn.BatchNorm1d(h_dim),  # normalise and learn alpha/beta
+                    nn.BatchNorm1d(
+                        h_dim, momentum=0.9
+                    ),  # normalise and learn alpha/beta
                 )
             )
             input_dims = h_dim
@@ -67,7 +69,7 @@ class SeqVAE(BaseVAE):
                     nn.Linear(hidden_dims[i + 1], hidden_dims[i + 1]),
                     nn.LeakyReLU(),
                     nn.BatchNorm1d(
-                        hidden_dims[i + 1]
+                        hidden_dims[i + 1], momentum=0.9
                     ),  # normalise and learn alpha/beta
                 )
             )
@@ -147,14 +149,16 @@ class SeqVAE(BaseVAE):
 
     def loss_function(
         self, modelOutputs: Tuple[Tensor, Tensor, Tensor, Tensor], input: Tensor
-    ) -> Tensor:
+    ) -> Tuple[Tensor, Tensor, Tensor]:
         """The standard ELBO loss is used in a StandardVAE"""
 
         xHat, zSample, zMu, zLogvar = modelOutputs
         xHat
 
+        # average KL across whole batch
         kl = KL_divergence(zMu, zLogvar, zSample)
 
+        # averaged across the whole batch
         likelihood = gaussian_likelihood(xHat, self.logStandardDeviation, input)
 
         elbo = kl - likelihood
@@ -168,5 +172,9 @@ class SeqVAE(BaseVAE):
 
         return xHat
 
-    def configure_optimiser(self, learning_rate: float = 1e-4):
-        return torch.optim.Adam(self.parameters(), lr=learning_rate)
+    def configure_optimiser(
+        self, learning_rate: float = 1e-4, weight_decay: float = 0.01
+    ):
+        return torch.optim.Adam(
+            self.parameters(), lr=learning_rate, weight_decay=weight_decay
+        )
