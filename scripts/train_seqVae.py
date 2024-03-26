@@ -28,8 +28,8 @@ wandb.init(
         "momentum": 0.9,
         "dropout": 0.5,
         # Training loop
-        "epochs": 1,
-        "batch_size": 2,
+        "epochs": 500,
+        "batch_size": 128,
         "max_norm": 1.0,  # gradient clipping
         # Model info
         "architecture": "SeqVAE",
@@ -47,13 +47,15 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # %%
 
 # Read in the datasets and create train and validation sets
-ancestors_df = pd.read_pickle("../data/alignments/phoQ_ancestors.pkl")
-anc_encodings, anc_weights = st.encode_and_weight_seqs(
-    ancestors_df["sequence"], theta=config.seq_theta
-)
-ancestors_df["weights"] = anc_weights
-ancestors_df["encodings"] = anc_encodings
-ancestors_df.to_pickle("phoQ_ancestors_weights_encodings.pkl")
+#ancestors_df = pd.read_pickle("../data/alignments/phoQ_ancestors.pkl")
+#anc_encodings, anc_weights = st.encode_and_weight_seqs(
+#    ancestors_df["sequence"], theta=config.seq_theta
+#)
+#ancestors_df["weights"] = anc_weights
+#ancestors_df["encodings"] = anc_encodings
+#ancestors_df.to_pickle("phoQ_ancestors_weights_encodings.pkl")
+
+ancestors_df = pd.read_pickle("phoQ_ancestors_weights_encodings.pkl")
 
 # Next, drop N0 and N238 as they come from outgroups
 flt_ancestors = ancestors_df.loc[

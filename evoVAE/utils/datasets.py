@@ -15,7 +15,7 @@ class MSA_Dataset(Dataset):
 
         self.encodings = torch.tensor(np.stack(encodings))
         self.weights = torch.tensor(weights.values)
-        self.ids = torch.tensor(ids.values)
+        self.ids = ids.values
 
     def __len__(self):
         return self.encodings.shape[0]

@@ -79,12 +79,12 @@ def seq_train(
 
         wandb.log(
             {
-                "epoch_ELBO": epoch_loss / len(epoch_loss),
-                "epoch_KLD": epoch_kl / len(epoch_kl),
-                "epoch_Gauss_likelihood": epoch_likelihood / len(epoch_likelihood),
-                "epoch_val_ELBO": epoch_val_elbo / len(epoch_val_elbo),
-                "epoch_val_KLD": epoch_val_kl / len(epoch_val_kl),
-                "epoch_val_Gauss_likelihood": epoch_val_likelihood
+                "epoch_ELBO": sum(epoch_loss) / len(epoch_loss),
+                "epoch_KLD": sum(epoch_kl) / len(epoch_kl),
+                "epoch_Gauss_likelihood": sum(epoch_likelihood) / len(epoch_likelihood),
+                "epoch_val_ELBO": sum(epoch_val_elbo) / len(epoch_val_elbo),
+                "epoch_val_KLD": sum(epoch_val_kl) / len(epoch_val_kl),
+                "epoch_val_Gauss_likelihood": sum(epoch_val_likelihood)
                 / len(epoch_val_likelihood),
             }
         )
