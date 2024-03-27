@@ -37,9 +37,7 @@ def seq_train(
             modelOutputs = model(encoding)
 
             # calculate loss
-            loss, kl, likelihood = model.loss_function(
-                modelOutputs, torch.flatten(encoding, start_dim=1)
-            )
+            loss, kl, likelihood = model.loss_function(modelOutputs, encoding)
 
             # update epoch metrics
             epoch_loss.append(loss.item())
@@ -68,7 +66,7 @@ def seq_train(
                 outputs_val = model(encoding_val)
 
                 loss_val, kl_val, likelihood_val = model.loss_function(
-                    outputs_val, torch.flatten(encoding_val, start_dim=1)
+                    outputs_val, encoding_val
                 )
 
                 epoch_val_elbo.append(loss_val.item())
