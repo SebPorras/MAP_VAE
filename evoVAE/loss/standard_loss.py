@@ -35,5 +35,8 @@ def gaussian_likelihood(xHat: Tensor, globalLogSD: Tensor, x: Tensor) -> Tensor:
 
     log_pxz = qPhi.log_prob(x)
 
+    print(log_pxz)
+    print(log_pxz.shape)
+
     # sum up across all dims and then average
     return log_pxz.sum(dim=tuple(range(1, log_pxz.ndim))).mean(dim=0)
