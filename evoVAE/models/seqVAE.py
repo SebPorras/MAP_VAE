@@ -143,7 +143,7 @@ class SeqVAE(BaseVAE):
         log_p = F.log_softmax(x_hat, dim=-1)
 
         # reflatten our probability distribution
-        # log_p = log_p.view(batch_size + (-1,))
+        log_p = log_p.view(input_shape + (-1,))
 
         return log_p, z_sample, z_mu, z_logvar
 
@@ -158,7 +158,9 @@ class SeqVAE(BaseVAE):
         kl = KL_divergence(zMu, zLogvar, zSample)
 
         # averaged across the whole batch
-        likelihood = gaussian_likelihood(xHat, self.logStandardDeviation, input)
+        likelihood = gaussian_likelihood(
+            xHat, self.logStandardDeviation, torch.flatten(input, start_dim=1)
+        )
 
         elbo = kl - likelihood
 

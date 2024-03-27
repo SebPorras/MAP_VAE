@@ -1,4 +1,4 @@
-from ..models.types_ import *
+from evoVAE.models.types_ import *
 import torch
 
 
@@ -34,9 +34,6 @@ def gaussian_likelihood(xHat: Tensor, globalLogSD: Tensor, x: Tensor) -> Tensor:
     qPhi = torch.distributions.Normal(loc=xHat, scale=globalStd)
 
     log_pxz = qPhi.log_prob(x)
-
-    print(log_pxz)
-    print(log_pxz.shape)
 
     # sum up across all dims and then average
     return log_pxz.sum(dim=tuple(range(1, log_pxz.ndim))).mean(dim=0)
