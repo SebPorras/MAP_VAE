@@ -30,7 +30,8 @@ def gaussian_likelihood(xHat: Tensor, globalLogSD: Tensor, x: Tensor) -> Tensor:
     distribution and return the average across all samples."""
 
     globalStd = globalLogSD.exp()
-    qPhi = torch.distributions.Normal(xHat, globalStd)
+
+    qPhi = torch.distributions.Normal(loc=xHat, scale=globalStd)
 
     log_pxz = qPhi.log_prob(x)
 

@@ -25,7 +25,7 @@ class SeqVAE(BaseVAE):
         self.encoded_seq_len = input_dims  # save this to reconstruct seqs
 
         if hidden_dims is None:
-            hidden_dims = [128, 64]
+            hidden_dims = [256, 128, 64]
 
         ### ENCODER ###
 
@@ -130,19 +130,20 @@ class SeqVAE(BaseVAE):
 
         x_hat = self.decode(z_upscaled)
 
-        # record batch size
-        batch_size = tuple(x_hat.shape[0:-1])
+        # record input shape
+        input_shape = tuple(x_hat.shape[0:-1])
 
         # add on extra dimension
         x_hat = torch.unsqueeze(x_hat, -1)
 
         # reshape back to original one-hot input size
-        x_hat = x_hat.view(batch_size + (-1, self.AA_COUNT))
+        x_hat = x_hat.view(input_shape + (-1, self.AA_COUNT))
 
         # apply the softmax over last dim, i.e the 21 amino acids
         log_p = F.log_softmax(x_hat, dim=-1)
+
         # reflatten our probability distribution
-        log_p = log_p.view(batch_size + (-1,))
+        # log_p = log_p.view(batch_size + (-1,))
 
         return log_p, z_sample, z_mu, z_logvar
 
@@ -152,7 +153,6 @@ class SeqVAE(BaseVAE):
         """The standard ELBO loss is used in a StandardVAE"""
 
         xHat, zSample, zMu, zLogvar = modelOutputs
-        xHat
 
         # average KL across whole batch
         kl = KL_divergence(zMu, zLogvar, zSample)
