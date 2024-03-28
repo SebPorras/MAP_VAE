@@ -141,3 +141,13 @@ def encode_and_weight_seqs(
     print(f"The sequence weight array has size: {weights.shape}\n")
 
     return encodings, weights
+
+def seq_log_probability(one_hot_seq: np.ndarray, pwm: np.ndarray) -> float:
+    """Estimate the likelihood of observing a particular sequence using a 
+    position weight matrix (pwm). Multiply together and then take the trace of the 
+    matrix.
+    """
+    product = np.matmul(one_hot_seq.T, pwm)
+    log_product = np.log(product)
+    trace = np.trace(log_product)
+    return trace 
