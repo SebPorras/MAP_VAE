@@ -12,6 +12,7 @@ notebooks/wandb/
 
 # Non-important data 
 data/FashionMNIST
+data/dms_data
 
 # generated version file
 evoVAE/_version.py
