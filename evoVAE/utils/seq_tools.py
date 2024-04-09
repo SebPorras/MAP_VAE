@@ -4,13 +4,13 @@ Contains any functions used for general processing of sequences
 before they are passed to the VAE. 
 """
 
-from sklearn.model_selection import train_test_split
 import numpy as np
 from typing import Tuple
 import pandas as pd
 import torch
+import evoVAE.utils.metrics as mt
 
-AA = [
+GAPPY_PROTEIN_ALPHABET = [
     "-",
     "R",
     "H",
@@ -33,16 +33,23 @@ AA = [
     "Y",
     "W",
 ]
-AA_LEN = len(AA)
-IDX_TO_AA = dict((idx, acid) for idx, acid in enumerate(AA))
-AA_TO_IDX = dict((acid, idx) for idx, acid in enumerate(AA))
+
+INVALID_PROTEIN_CHARS = ["X"]
+
+AA_LEN = len(GAPPY_PROTEIN_ALPHABET)
+IDX_TO_AA = dict((idx, acid) for idx, acid in enumerate(GAPPY_PROTEIN_ALPHABET))
+AA_TO_IDX = dict((acid, idx) for idx, acid in enumerate(GAPPY_PROTEIN_ALPHABET))
 
 
 def read_aln_file(
     filename: str,
+    encode: bool = True,
 ) -> pd.DataFrame:
     """Read in an alignment file in Fasta format and
-    return a Pandas DataFrame with sequences and IDs"""
+    return a Pandas DataFrame with sequences and IDs. If encode
+    is true, a one-hot encoding will be made."""
+
+    print(f"Reading the alignment: {filename}")
 
     with open(filename, "r") as file:
         lines = file.readlines()
@@ -55,6 +62,7 @@ def read_aln_file(
 
             if line[0] == ">":
                 if saveSeq:
+
                     data.append([id, sequence])
 
                 id = line[1:].strip()
@@ -70,6 +78,23 @@ def read_aln_file(
     columns = ["id", "sequence"]
     df = pd.DataFrame(data, columns=columns)
 
+    # handles at a2m file format
+    to_upper = lambda x: x.upper().replace(".", "-")
+    df["sequence"] = df["sequence"].apply(to_upper)
+
+    # remove sequences with bad characters
+    print("Checking for bad characters: ['X']")
+    orig_size = len(df)
+    df = df[~df["sequence"].str.contains("X")]
+    if orig_size != len(df):
+        print(f"Removed {orig_size - len(df)} sequences")
+
+    if encode:
+        print("Performing one hot encoding")
+        one_hot = df["sequence"].apply(seq_to_one_hot)
+        df["encoding"] = one_hot
+
+    print(f"Number of seqs: {len(df)}")
     return df
 
 
@@ -94,22 +119,6 @@ def one_hot_to_seq(encoding: torch.Tensor) -> str:
     # particular character
     aa_indices = np.argmax(encoding.numpy(), axis=1)
     return "".join(IDX_TO_AA[char] for char in aa_indices)
-
-
-def hamming_distance(seq1: str, seq2: str) -> float:
-    """Take two aligned sequences of the same length
-    and return the Hamming distance between the two."""
-
-    if len(seq1) != len(seq2):
-        raise ValueError("Sequences are the not the same length")
-
-    mutations = 0
-
-    for i, j in zip(seq1, seq2):
-        if i != j:
-            mutations += 1
-
-    return mutations * 1.0
 
 
 def reweight_sequences(sequences: np.ndarray, theta: float) -> np.ndarray:
@@ -141,13 +150,3 @@ def encode_and_weight_seqs(
     print(f"The sequence weight array has size: {weights.shape}\n")
 
     return encodings, weights
-
-def seq_log_probability(one_hot_seq: np.ndarray, pwm: np.ndarray) -> float:
-    """Estimate the likelihood of observing a particular sequence using a 
-    position weight matrix (pwm). Multiply together and then take the trace of the 
-    matrix.
-    """
-    product = np.matmul(one_hot_seq.T, pwm)
-    log_product = np.log(product)
-    trace = np.trace(log_product)
-    return trace 
