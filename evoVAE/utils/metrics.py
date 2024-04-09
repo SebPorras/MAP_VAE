@@ -9,6 +9,35 @@ import numpy as np
 import pandas as pd
 import evoVAE.utils.metrics as mt
 from typing import Union
+from sklearn.metrics import roc_auc_score
+from scipy.stats import spearmanr
+
+
+def summary_stats(
+    predictions: pd.Series,
+    actual: pd.Series,
+    actual_binned: pd.Series,
+    k_top: int = 10,
+) -> float:
+    """
+    Inputs:
+    actual: an array of the true scores where higher score is better
+    predicted: an array of the predicted scores where higher score is better
+    top_k: This is a PERCENTAGE (i.e input 10 for top 10%)
+
+    Returns:
+    spearmans_rank_correlation, top_k_recall, normalised_discounted_cumulative_gain,
+    roc_auc_score,
+
+    Based off the ProteinGym codebase by Notin et al., 2023.
+    """
+
+    k_recall = top_k_recall(predictions, actual, k_top)
+    ndcg = calc_ndcg(actual, predictions, k_top)
+    roc_auc = roc_auc_score(actual_binned, predictions)
+    spear_rho, p_value = spearmanr(predictions, actual)
+
+    return spear_rho, k_recall, ndcg, roc_auc
 
 
 def top_k_recall(
