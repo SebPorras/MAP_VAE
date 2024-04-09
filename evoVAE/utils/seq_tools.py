@@ -9,6 +9,7 @@ from typing import Tuple
 import pandas as pd
 import torch
 import re
+import evoVAE.utils.metrics as mt
 
 GAPPY_PROTEIN_ALPHABET = [
     "-",
@@ -130,7 +131,10 @@ def reweight_sequences(sequences: np.ndarray, theta: float) -> np.ndarray:
 
     for i in range(len(sequences)):
         for j in range(i + 1, len(sequences)):
-            if hamming_distance(sequences[i], sequences[j]) / len(sequences[i]) < theta:
+            if (
+                mt.hamming_distance(sequences[i], sequences[j]) / len(sequences[i])
+                < theta
+            ):
                 weights[i] += 1
                 weights[j] += 1
 
