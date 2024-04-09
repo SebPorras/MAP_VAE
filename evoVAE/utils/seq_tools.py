@@ -8,7 +8,7 @@ import numpy as np
 from typing import Tuple
 import pandas as pd
 import torch
-import evoVAE.utils.metrics as mt
+import re
 
 GAPPY_PROTEIN_ALPHABET = [
     "-",
@@ -35,6 +35,7 @@ GAPPY_PROTEIN_ALPHABET = [
 ]
 
 INVALID_PROTEIN_CHARS = ["X"]
+RE_INVALID_PROTEIN_CHARS = "|".join(map(re.escape, INVALID_PROTEIN_CHARS))
 
 AA_LEN = len(GAPPY_PROTEIN_ALPHABET)
 IDX_TO_AA = dict((idx, acid) for idx, acid in enumerate(GAPPY_PROTEIN_ALPHABET))
@@ -82,10 +83,10 @@ def read_aln_file(
     to_upper = lambda x: x.upper().replace(".", "-")
     df["sequence"] = df["sequence"].apply(to_upper)
 
-    # remove sequences with bad characters
-    print("Checking for bad characters: ['X']")
+    # remove sequences with bad characters using regular expressions
+    print("Checking for bad characters")
     orig_size = len(df)
-    df = df[~df["sequence"].str.contains("X")]
+    df = df[~df["sequence"].str.contains(RE_INVALID_PROTEIN_CHARS)]
     if orig_size != len(df):
         print(f"Removed {orig_size - len(df)} sequences")
 
