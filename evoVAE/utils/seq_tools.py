@@ -7,9 +7,9 @@ before they are passed to the VAE.
 import numpy as np
 from typing import Tuple
 import pandas as pd
-import torch
-import re
+import torch, re, math
 import evoVAE.utils.metrics as mt
+
 
 GAPPY_PROTEIN_ALPHABET = [
     "-",
@@ -35,7 +35,7 @@ GAPPY_PROTEIN_ALPHABET = [
     "W",
 ]
 
-INVALID_PROTEIN_CHARS = ["X"]
+INVALID_PROTEIN_CHARS = ["B", "J", "X", "Z"]
 RE_INVALID_PROTEIN_CHARS = "|".join(map(re.escape, INVALID_PROTEIN_CHARS))
 
 AA_LEN = len(GAPPY_PROTEIN_ALPHABET)
@@ -85,7 +85,7 @@ def read_aln_file(
     df["sequence"] = df["sequence"].apply(to_upper)
 
     # remove sequences with bad characters using regular expressions
-    print("Checking for bad characters")
+    print(f"Checking for bad characters: {INVALID_PROTEIN_CHARS}")
     orig_size = len(df)
     df = df[~df["sequence"].str.contains(RE_INVALID_PROTEIN_CHARS)]
     if orig_size != len(df):
@@ -98,6 +98,67 @@ def read_aln_file(
 
     print(f"Number of seqs: {len(df)}")
     return df
+
+
+def parseDefline(string):
+    """Parse the FASTA defline (see http://en.wikipedia.org/wiki/FASTA_format)
+    GenBank, EMBL, etc                gi|gi-number|gb|accession|locus
+    SWISS-PROT, TrEMBL                sp|accession|name
+    ...
+    Return a tuple with
+    [0] primary search key, e.g. UniProt accession, Genbank GI
+    [1] secondary search key, e.g. UniProt name, Genbank accession
+    [2] source, e.g. 'sp' (SwissProt/UniProt), 'tr' (TrEMBL), 'gb' (Genbank)
+    """
+    if len(string) == 0:
+        return ("", "", "", "")
+    s = string.split()[0]
+    if re.match("^sp\|[A-Z][A-Z0-9]*\|\S+", s):
+        arg = s.split("|")
+        return (arg[1], arg[2], arg[0], "")
+    elif re.match("^tr\|[A-Z][A-Z0-9]*\|\S+", s):
+        arg = s.split("|")
+        return (arg[1], arg[2], arg[0], "")
+    elif re.match("^gi\|[0-9]*\|\S+\|\S+", s):
+        arg = s.split("|")
+        return (arg[1], arg[3], arg[0], arg[2])
+    elif re.match("gb\|\S+\|\S+", s):
+        arg = s.split("|")
+        return (arg[1], arg[2], arg[0], "")
+    elif re.match("emb\|\S+\|\S+", s):
+        arg = s.split("|")
+        return (arg[1], arg[2], arg[0], "")
+    elif re.match("^refseq\|\S+\|\S+", s):
+        arg = s.split("|")
+        return (arg[1], arg[2], arg[0], "")
+    elif re.match("[A-Z][A-Z0-9]*\|\S+", s):
+        arg = s.split("|")
+        return (arg[0], arg[1], "UniProt", "")  # assume this is UniProt
+    else:
+        return (s, "", "", "")
+
+
+def write_fasta(id: str, seq: str) -> str:
+    """Write one sequence in FASTA format to a string and return it."""
+
+    fasta = ">" + id + "\n"
+    nlines = int(math.ceil((len(seq) - 1) / 60 + 1))
+    for i in range(nlines):
+        lineofseq = "".join(seq[i * 60 : (i + 1) * 60]) + "\n"
+        fasta += lineofseq
+    return fasta
+
+
+def write_fasta_file(filename: str, data: pd.DataFrame) -> None:
+    """Apply string FASTA formatting to a DataFrame and write this
+    to a file.
+    """
+
+    formatted = data.apply(lambda row: write_fasta(row["id"], row["sequence"]), axis=1)
+
+    with open(filename, "w") as file:
+        for seq in formatted:
+            file.write(seq)
 
 
 def seq_to_one_hot(seq: str) -> np.ndarray:
