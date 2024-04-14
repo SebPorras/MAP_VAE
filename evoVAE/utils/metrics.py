@@ -5,6 +5,7 @@ Contains any functions used to calculate statistics
 or performance metrics.
 """
 
+from ast import Tuple
 import numpy as np
 import pandas as pd
 import torch
@@ -20,7 +21,7 @@ def summary_stats(
     actual: pd.Series,
     actual_binned: pd.Series,
     k_top: int = 10,
-) -> float:
+) -> Tuple[float, float, float, float]:
     """
     Inputs:
     actual: an array of the true scores where higher score is better

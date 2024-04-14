@@ -214,6 +214,7 @@ def encode_and_weight_seqs(
     encodings = seqs.apply(seq_to_one_hot)
     print(f"The sequence encoding has size: {encodings.shape}\n")
 
+    weights = None
     if reweight:
         weights = reweight_sequences(seqs.values, theta=theta)
         print(f"The sequence weight array has size: {weights.shape}\n")

@@ -1,4 +1,5 @@
 # %%
+from curses import meta
 from evoVAE.utils.datasets import MSA_Dataset
 import evoVAE.utils.seq_tools as st
 from evoVAE.models.seqVAE import SeqVAE
@@ -17,7 +18,7 @@ wandb.init(
     # hyperparameters
     config={
         # Dataset info
-        "dataset": "gfp",
+        "alignment": "CHANGE ME",
         "seq_theta": 0.2,  # reweighting
         "AA_count": 21,  # standard AA + gap
         "test_split": 0.2,
@@ -31,10 +32,14 @@ wandb.init(
         "epochs": 500,
         "batch_size": 128,
         "max_norm": 1.0,  # gradient clipping
-        # Model info
+        # Model info - default settings
         "architecture": "SeqVAE",
         "latent_dims": 4,
         "hidden_dims": [128, 64],
+        # DMS data
+        "dms_file": "CHANGE ME",
+        "dms_metadata": "DMS_substitutions.csv",
+        "dms_id": "GFP_AEQVI_Sarkisyan_2016",
     },
 )
 
@@ -49,11 +54,8 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # Read in the datasets and create train and validation sets
 # Assume that encodings and weights have been calculated.
 # outgroup ancestors have already been removed.
-dataset = f"{config.dataset}_aln.pkl"
-ancestors_df = pd.read_pickle("aln.pkl")
-
-
-train, val = train_test_split(ancestors_df, test_size=config.test_split)
+ancestors_aln = pd.read_pickle(config.alignment)
+train, val = train_test_split(ancestors_aln, test_size=config.test_split)
 
 # TRAINING
 train_dataset = MSA_Dataset(train["encodings"], train["weights"], train["id"])
@@ -69,6 +71,12 @@ val_loader = torch.utils.data.DataLoader(
     val_dataset, batch_size=config.batch_size, shuffle=False
 )
 
+# Load and process the DMS data used for fitness prediction
+dms_data = pd.read_pickle(config.dms_file)
+metadata = pd.read_csv(config.dms_metadata)
+# grab metadata for current experiment
+metadata = metadata[metadata["DMS_id"] == config.dms_id]
+
 # %% [markdown]
 # #### Create the model
 
@@ -80,7 +88,7 @@ SEQ_ZERO = 0
 seq_len = train_dataset[BATCH_ZERO][SEQ_ZERO].shape[SEQ_LEN]
 input_dims = seq_len * config.AA_count
 
-# use preset structure for hidden dimensions
+# instantiate the model
 model = SeqVAE(
     input_dims=input_dims,
     latent_dims=config.latent_dims,
@@ -97,6 +105,8 @@ trained_model = seq_train(
     model,
     train_loader=train_loader,
     val_loader=val_loader,
+    dms_data=dms_data,
+    metadata=metadata,
     device=device,
     config=config,
 )
