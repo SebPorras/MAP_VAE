@@ -140,7 +140,7 @@ class SeqVAE(BaseVAE):
         x_hat = x_hat.view(input_shape + (-1, self.AA_COUNT))
 
         # apply the softmax over last dim, i.e the 21 amino acids
-        log_p = F.log_softmax(x_hat, dim=-1)
+        log_p = F.softmax(x_hat, dim=-1)
 
         # reflatten our probability distribution
         log_p = log_p.view(input_shape + (-1,))

@@ -203,7 +203,9 @@ def reweight_sequences(sequences: np.ndarray, theta: float) -> np.ndarray:
 
 
 def encode_and_weight_seqs(
-    seqs: pd.Series, theta: float
+    seqs: pd.Series,
+    theta: float,
+    reweight=True,
 ) -> Tuple[np.ndarray, np.ndarray]:
 
     print("Encoding the sequences and calculating weights")
@@ -212,7 +214,8 @@ def encode_and_weight_seqs(
     encodings = seqs.apply(seq_to_one_hot)
     print(f"The sequence encoding has size: {encodings.shape}\n")
 
-    weights = reweight_sequences(seqs.values, theta=theta)
-    print(f"The sequence weight array has size: {weights.shape}\n")
+    if reweight:
+        weights = reweight_sequences(seqs.values, theta=theta)
+        print(f"The sequence weight array has size: {weights.shape}\n")
 
     return encodings, weights

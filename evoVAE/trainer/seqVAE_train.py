@@ -24,7 +24,9 @@ def seq_train(
         epoch_loss = []
         epoch_kl = []
         epoch_likelihood = []
+
         # ignore seq names for now when training
+        model.train()
         for encoding, weights, _ in train_loader:
 
             encoding = encoding.float().to(device)

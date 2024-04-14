@@ -17,7 +17,7 @@ wandb.init(
     # hyperparameters
     config={
         # Dataset info
-        "dataset": "PhoQ",
+        "dataset": "gfp",
         "seq_theta": 0.2,  # reweighting
         "AA_count": 21,  # standard AA + gap
         "test_split": 0.2,
@@ -47,25 +47,13 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # %%
 
 # Read in the datasets and create train and validation sets
-# ancestors_df = pd.read_pickle("../data/alignments/phoQ_ancestors.pkl")
-# anc_encodings, anc_weights = st.encode_and_weight_seqs(
-#    ancestors_df["sequence"], theta=config.seq_theta
-# )
-# ancestors_df["weights"] = anc_weights
-# ancestors_df["encodings"] = anc_encodings
-# ancestors_df.to_pickle("phoQ_ancestors_weights_encodings.pkl")
+# Assume that encodings and weights have been calculated.
+# outgroup ancestors have already been removed.
+dataset = f"{config.dataset}_aln.pkl"
+ancestors_df = pd.read_pickle("aln.pkl")
 
-ancestors_df = pd.read_pickle("phoQ_ancestors_weights_encodings.pkl")
 
-# Next, drop N0 and N238 as they come from outgroups
-flt_ancestors = ancestors_df.loc[
-    (ancestors_df["id"] != "N0") & (ancestors_df["id"] != "N238")
-]
-
-# Then remove non-unique sequences
-flt_unique_ancestors = flt_ancestors.drop_duplicates(subset="sequence")
-
-train, val = train_test_split(flt_unique_ancestors, test_size=config.test_split)
+train, val = train_test_split(ancestors_df, test_size=config.test_split)
 
 # TRAINING
 train_dataset = MSA_Dataset(train["encodings"], train["weights"], train["id"])
@@ -85,8 +73,11 @@ val_loader = torch.utils.data.DataLoader(
 # #### Create the model
 
 # %%
-# get the sequence length
-seq_len = train_dataset[0][0].shape[0]
+# get the sequence length from first sequence
+SEQ_LEN = 0
+BATCH_ZERO = 0
+SEQ_ZERO = 0
+seq_len = train_dataset[BATCH_ZERO][SEQ_ZERO].shape[SEQ_LEN]
 input_dims = seq_len * config.AA_count
 
 # use preset structure for hidden dimensions

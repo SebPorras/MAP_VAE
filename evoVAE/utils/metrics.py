@@ -7,6 +7,8 @@ or performance metrics.
 
 import numpy as np
 import pandas as pd
+import torch
+from torch import Tensor
 import evoVAE.utils.metrics as mt
 from typing import Union
 from sklearn.metrics import roc_auc_score
@@ -122,16 +124,15 @@ def minmax(x: np.ndarray) -> np.ndarray:
     return (x - np.min(x)) / (np.max(x) - np.min(x))
 
 
-def seq_log_probability(one_hot_seq: np.ndarray, pwm: np.ndarray) -> float:
+def seq_log_probability(one_hot: Tensor, model_encoding: Tensor) -> float:
     """Estimate the likelihood of observing a particular sequence using a
     position weight matrix (pwm). Multiply together and then take the trace of the
     matrix.
     """
 
-    product = np.matmul(one_hot_seq.T, pwm)
-    log_product = np.log(product)
-
-    return np.trace(log_product)
+    product = torch.matmul(model_encoding, one_hot.T)
+    log_product = torch.log(product)
+    return torch.trace(log_product).item()
 
 
 def hamming_distance(seq1: str, seq2: str) -> float:
