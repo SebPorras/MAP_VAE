@@ -18,7 +18,7 @@ wandb.init(
     # hyperparameters
     config={
         # Dataset info
-        "alignment": "CHANGE ME",
+        "alignment": "../data/GFP_AEQVI_full_04-29-2022_b08_encoded_weighted_ancestors_extants_no_syn.pkl",
         "seq_theta": 0.2,  # reweighting
         "AA_count": 21,  # standard AA + gap
         "test_split": 0.2,
@@ -34,11 +34,11 @@ wandb.init(
         "max_norm": 1.0,  # gradient clipping
         # Model info - default settings
         "architecture": "SeqVAE",
-        "latent_dims": 4,
-        "hidden_dims": [128, 64],
+        "latent_dims": 10,
+        "hidden_dims": [128, 64, 32],
         # DMS data
-        "dms_file": "CHANGE ME",
-        "dms_metadata": "DMS_substitutions.csv",
+        "dms_file": "../data/GFP_AEQVI_Sarkisyan_2016_dms_encoded.pkl",
+        "dms_metadata": "../data/DMS_substitutions.csv",
         "dms_id": "GFP_AEQVI_Sarkisyan_2016",
     },
 )
