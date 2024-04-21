@@ -1,5 +1,4 @@
 # %%
-from curses import meta
 from evoVAE.utils.datasets import MSA_Dataset
 import evoVAE.utils.seq_tools as st
 from evoVAE.models.seqVAE import SeqVAE
@@ -23,11 +22,11 @@ wandb.init(
         "AA_count": 21,  # standard AA + gap
         "test_split": 0.2,
         # ADAM
-        "learning_rate": 1e-5,  # ADAM
+        "learning_rate": 1e-4,  # ADAM
         "weight_decay": 0.01,  # ADAM
         # Hidden units
         "momentum": 0.1,
-        "dropout": 0.5,
+        "dropout": 0.1,
         # Training loop
         "epochs": 500,
         "batch_size": 128,

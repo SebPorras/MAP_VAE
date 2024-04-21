@@ -30,7 +30,8 @@ def seq_train(
         train_loop(model, train_loader, optimiser, device, config)
         validation_loop(model, val_loader, device, dms_data, metadata)
 
-    torch.save(model.state_dict(), "seqVAE_weights.pth")
+    model.cpu()
+    torch.save(model, "seqVAE_weights.pt")
 
     return model
 
@@ -153,6 +154,7 @@ def fitness_prediction(
     # remove first dim which is just 1 for both tensors
     wild_model_encoding = wild_model_encoding.squeeze(0)
     wild_one_hot = wild_one_hot.squeeze(0)
+
     # estimate the log ikelihood of sequence based on model output
     wt_prob = mt.seq_log_probability(wild_one_hot, wild_model_encoding)
 

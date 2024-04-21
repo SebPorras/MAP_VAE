@@ -5,10 +5,12 @@ before they are passed to the VAE.
 """
 
 import numpy as np
-from typing import Tuple
+from typing import Tuple, Dict, List
 import pandas as pd
 import torch, re, math
 import evoVAE.utils.metrics as mt
+from scipy.spatial import distance_matrix
+import matplotlib.pyplot as plt
 
 
 GAPPY_PROTEIN_ALPHABET = [
@@ -38,7 +40,7 @@ GAPPY_PROTEIN_ALPHABET = [
 INVALID_PROTEIN_CHARS = ["B", "J", "X", "Z"]
 RE_INVALID_PROTEIN_CHARS = "|".join(map(re.escape, INVALID_PROTEIN_CHARS))
 
-AA_LEN = len(GAPPY_PROTEIN_ALPHABET)
+GAPPY_ALPHABET_LEN = len(GAPPY_PROTEIN_ALPHABET)
 IDX_TO_AA = dict((idx, acid) for idx, acid in enumerate(GAPPY_PROTEIN_ALPHABET))
 AA_TO_IDX = dict((acid, idx) for idx, acid in enumerate(GAPPY_PROTEIN_ALPHABET))
 
@@ -166,7 +168,7 @@ def seq_to_one_hot(seq: str) -> np.ndarray:
     the columns are the one hot encodings.
     """
 
-    encoding = np.zeros((len(seq), AA_LEN))
+    encoding = np.zeros((len(seq), GAPPY_ALPHABET_LEN))
 
     for column, letter in enumerate(seq):
         encoding[column][AA_TO_IDX[letter]] = 1
@@ -174,13 +176,17 @@ def seq_to_one_hot(seq: str) -> np.ndarray:
     return encoding
 
 
-def one_hot_to_seq(encoding: torch.Tensor) -> str:
+def one_hot_to_seq(encoding: torch.Tensor, is_tensor: True) -> str:
     """Take a 2D array with shape (SeqLen, AA_LEN)
     and convert it back to a string."""
 
     # get the index of the maximum value, which corresponds to a
     # particular character
-    aa_indices = np.argmax(encoding.numpy(), axis=1)
+    if is_tensor:
+        encoding = encoding.numpy()
+
+    aa_indices = np.argmax(encoding, axis=1)
+
     return "".join(IDX_TO_AA[char] for char in aa_indices)
 
 
@@ -220,3 +226,98 @@ def encode_and_weight_seqs(
         print(f"The sequence weight array has size: {weights.shape}\n")
 
     return encodings, weights
+
+
+def calc_mean_seq_embeddings(seqs: pd.DataFrame) -> Dict[str, np.ndarray]:
+    """
+    Read in an alignment or aln file and calculate the distribution
+    of amino acids in each sequence for every sequence in the file.
+
+    Return:
+    A dictionary mapping seq ID to embedding means.
+    """
+
+    aa_means = {}
+
+    for name, seq in zip(seqs["id"], seqs["encoding"]):
+        aa_means[name] = seq.mean(axis=0)
+
+    return aa_means
+
+
+def calc_average_residue_distribution(
+    mean_seq_embeddings: Dict[str, np.ndarray],
+    alphabet: List[str] = GAPPY_PROTEIN_ALPHABET,
+):
+    """Calculate the proportion of amino acids in this group of
+    sequences WITHOUT but this is column invariant."""
+
+    encodings = np.stack(list(mean_seq_embeddings.values()))
+    encoding_mean = encodings.mean(axis=0)
+    encoding_std = np.std(encodings, axis=0)
+
+    averages = {
+        letter: {"mean": mean, "std": std}
+        for letter, mean, std in zip(alphabet, encoding_mean, encoding_std)
+    }
+
+    return averages
+
+
+def calc_position_prob_matrix(seqs: pd.DataFrame):
+
+    encodings = np.stack(seqs["encoding"].values)
+    # position_freq_matrix(pfm)
+    pfm = np.zeros(encodings.shape[1:])
+
+    for seq in seqs["sequence"]:
+        for row, letter in enumerate(seq):
+            index = AA_TO_IDX[letter]
+            pfm[row][index] += 1
+
+    # make a position probability matrix
+    for column in pfm:
+        total = np.sum(column)
+        column /= total
+
+    # makes columns positoins in the sequence
+    return pfm.T
+
+
+def create_euclidean_dist_matrix(
+    embedding_means: Dict[str, np.ndarray]
+) -> pd.DataFrame:
+    """
+    Takes a dictionary mapping of seq ID to the distribution
+    of amino acids in a sequence and calculates the euclidean
+    distance between pairs of sequence distributions.
+
+    Return:
+    A DataFrame of the euclidan matrix.
+    """
+
+    ids = list(embedding_means.keys())
+    embeddings = np.array(list(embedding_means.values()))
+
+    dist_mat = distance_matrix(embeddings, embeddings)
+
+    return pd.DataFrame(dist_mat, index=ids, columns=ids)
+
+
+def plot_residue_distributions(data: Dict[str, np.ndarray]) -> None:
+
+    plot_info = [[] for x in range(GAPPY_ALPHABET_LEN)]
+
+    for residues in data.values():
+        for aa_index in range(GAPPY_ALPHABET_LEN):
+            plot_info[aa_index].append(residues[aa_index])
+
+    # Extract category labels, means, and standard deviations
+    plt.figure(figsize=(10, 6))
+    plt.xlabel("Residue")
+    plt.ylabel("Average Residue Proportion")
+    plt.grid(True)
+    plt.boxplot(plot_info)
+    plt.xticks([i for i in range(1, GAPPY_ALPHABET_LEN + 1)], GAPPY_PROTEIN_ALPHABET)
+
+    plt.show()

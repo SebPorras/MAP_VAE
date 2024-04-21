@@ -5,13 +5,12 @@ Contains any functions used to calculate statistics
 or performance metrics.
 """
 
-from ast import Tuple
 import numpy as np
 import pandas as pd
 import torch
 from torch import Tensor
 import evoVAE.utils.metrics as mt
-from typing import Union
+from typing import Union, Tuple
 from sklearn.metrics import roc_auc_score
 from scipy.stats import spearmanr
 
@@ -33,6 +32,8 @@ def summary_stats(
     roc_auc_score,
 
     Based off the ProteinGym codebase by Notin et al., 2023.
+
+
     """
 
     k_recall = top_k_recall(predictions, actual, k_top)
