@@ -10,6 +10,7 @@ import pandas as pd
 import torch, re, math
 import evoVAE.utils.metrics as mt
 from scipy.spatial import distance_matrix
+from scipy.spatial.distance import euclidean
 import matplotlib.pyplot as plt
 
 
@@ -331,3 +332,26 @@ def plot_residue_distributions(data: Dict[str, np.ndarray]) -> None:
     plt.xticks([i for i in range(1, GAPPY_ALPHABET_LEN + 1)], GAPPY_PROTEIN_ALPHABET)
 
     plt.show()
+
+
+def population_profile_deviation(
+    population: pd.DataFrame, sample: pd.DataFrame
+) -> float:
+
+    # get the average residue proportion across the population
+    pop_means = calc_mean_seq_embeddings(population)
+    pop_means = calc_average_residue_distribution(pop_means)
+
+    # put this in an array to allow comparisons
+    pop_vector = np.array([x["mean"] for x in pop_means.values()])
+
+    sample_means = calc_mean_seq_embeddings(sample)
+    sample_n = len(sample_means)
+
+    total_dist = 0.0
+    for sample_vector in sample_means.values():
+        total_dist += euclidean(pop_vector, sample_vector)
+
+    mean_deviation = total_dist / sample_n
+
+    return mean_deviation
