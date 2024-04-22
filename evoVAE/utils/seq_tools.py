@@ -250,7 +250,7 @@ def calc_average_residue_distribution(
     alphabet: List[str] = GAPPY_PROTEIN_ALPHABET,
 ):
     """Calculate the proportion of amino acids in this group of
-    sequences WITHOUT but this is column invariant."""
+    sequences but this is column invariant."""
 
     encodings = np.stack(list(mean_seq_embeddings.values()))
     encoding_mean = encodings.mean(axis=0)
@@ -285,7 +285,7 @@ def calc_position_prob_matrix(seqs: pd.DataFrame):
 
 
 def create_euclidean_dist_matrix(
-    embedding_means: Dict[str, np.ndarray]
+    embedding_means: Dict[str, np.ndarray], plot: bool = False
 ) -> pd.DataFrame:
     """
     Takes a dictionary mapping of seq ID to the distribution
@@ -300,6 +300,16 @@ def create_euclidean_dist_matrix(
     embeddings = np.array(list(embedding_means.values()))
 
     dist_mat = distance_matrix(embeddings, embeddings)
+
+    if plot:
+        plt.imshow(dist_mat, cmap="viridis", interpolation="nearest")
+        plt.colorbar(label="Distance")
+        plt.title("Euclidean distance matrix")
+        plt.xticks(range(len(embeddings)), ids, rotation=90)
+        plt.yticks(range(len(embeddings)), ids)
+        plt.xlabel("Samples")
+        plt.ylabel("Samples")
+        plt.show()
 
     return pd.DataFrame(dist_mat, index=ids, columns=ids)
 
