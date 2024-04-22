@@ -129,6 +129,26 @@ def validation_loop(
     )
 
 
+def split_by_mutations(dms_data: DataFrame) -> Dict[int, DataFrame]:
+    """
+    Create a subset of the mutation DataFrames based on how many mutations
+    are in the variant.
+
+    Return:
+    A dictionary mapping mutation count to subset dataframe
+    """
+
+    # define a function for counting mutations
+    splitter = lambda x: len(x.split(":"))
+    dms_data["mut_count"] = dms_data["mutant"].apply(splitter)
+
+    subframes = dict()
+    for count in dms_data["mut_count"].unique():
+        subframes[count] = dms_data[dms_data["mut_count"] == count]
+
+    return subframes
+
+
 def fitness_prediction(
     model: SeqVAE,
     dms_data: DataFrame,
