@@ -8,6 +8,7 @@ import torch
 from typing import Dict, Tuple
 from torch.utils.data import DataLoader
 import wandb
+import matplotlib.pyplot as plt
 
 
 def seq_train(
@@ -27,11 +28,14 @@ def seq_train(
     )
 
     for iteration in range(config.epochs):
+        print(f"epoch:{iteration}")
         train_loop(model, train_loader, optimiser, device, config)
-        validation_loop(model, val_loader, device, dms_data, metadata)
+        validation_loop(
+            model, val_loader, device, dms_data, metadata, iteration, config.epochs
+        )
 
-    model.cpu()
-    torch.save(model, "seqVAE_weights.pt")
+    # model.cpu()
+    # torch.save(model, "seqVAE_weights.pt")
 
     return model
 
@@ -87,6 +91,8 @@ def validation_loop(
     device,
     dms_data: DataFrame,
     metadata: DataFrame,
+    current_epoch: int,
+    max_epochs: int,
 ) -> None:
 
     epoch_val_elbo = 0
@@ -113,14 +119,36 @@ def validation_loop(
             epoch_val_likelihood += likelihood_val.item()
             batch_count += 1
 
-    # Predict fitness of DMS variants
-    spear_rho, k_recall, ndcg, roc_auc = fitness_prediction(model, dms_data, metadata)
-
     wandb.log(
         {
             "epoch_val_ELBO": epoch_val_elbo / batch_count,
             "epoch_val_KLD": epoch_val_kl / batch_count,
             "epoch_val_Gauss_likelihood": epoch_val_likelihood / batch_count,
+        }
+    )
+
+    # split variants by how many mutations they have
+    subset_dms = split_by_mutations(dms_data)
+    for count, subset_mutants in subset_dms.items():
+        # Predict fitness of DMS variants with {count} mutations dataset
+        sub_spear_rho, sub_k_recall, sub_ndcg, sub_roc_auc = fitness_prediction(
+            model, subset_mutants, count, metadata, current_epoch, max_epochs
+        )
+        wandb.log(
+            {
+                f"{count}_mutations_spearman_rho": sub_spear_rho,
+                f"{count}_top_k_recall": sub_k_recall,
+                f"{count}_ndcg": sub_ndcg,
+                f"{count}_roc_auc": sub_roc_auc,
+            }
+        )
+
+    # Predict fitness of DMS variants for ENTIRE dataset
+    spear_rho, k_recall, ndcg, roc_auc = fitness_prediction(
+        model, dms_data, None, metadata, current_epoch, max_epochs
+    )
+    wandb.log(
+        {
             "spearman_rho": spear_rho,
             "top_k_recall": k_recall,
             "ndcg": ndcg,
@@ -152,7 +180,10 @@ def split_by_mutations(dms_data: DataFrame) -> Dict[int, DataFrame]:
 def fitness_prediction(
     model: SeqVAE,
     dms_data: DataFrame,
+    mutation_count: int,
     metadata: DataFrame,
+    current_epoch: int,
+    max_epoch: int,
 ) -> Tuple[float, float, float, float]:
     """
     Returns: spear_rho, k_recall, ndcg, roc_auc
@@ -203,5 +234,21 @@ def fitness_prediction(
         actual=dms_data["DMS_score"],
         actual_binned=dms_data["DMS_score_bin"],
     )
+
+    # Plot the correlation but only on final epoch
+    if current_epoch == max_epoch - 1:
+
+        title = "Predicted vs Actual Fitness: "
+        if mutation_count is None:
+            title += "(All variatns)"
+        else:
+            title += f"({mutation_count} mutation variants)"
+        fig, ax = plt.subplots()
+
+        ax.plot(dms_data["DMS_score"], model_scores)
+        plt.title(title)
+        plt.xlabel("Actual")
+        plt.ylabel("Prediction")
+        wandb.log(fig)
 
     return spear_rho, k_recall, ndcg, roc_auc
