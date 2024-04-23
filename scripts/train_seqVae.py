@@ -21,6 +21,7 @@ wandb.init(
         "seq_theta": 0.2,  # reweighting
         "AA_count": 21,  # standard AA + gap
         "test_split": 0.2,
+        "max_mutation": 4,  # how many mutations the model will test up to
         # ADAM
         "learning_rate": 1e-4,  # ADAM
         "weight_decay": 0.01,  # ADAM
@@ -28,7 +29,7 @@ wandb.init(
         "momentum": 0.1,
         "dropout": 0.1,
         # Training loop
-        "epochs": 500,
+        "epochs": 30,
         "batch_size": 128,
         "max_norm": 1.0,  # gradient clipping
         # Model info - default settings
@@ -41,6 +42,7 @@ wandb.init(
         "dms_id": "GFP_AEQVI_Sarkisyan_2016",
     },
 )
+
 
 config = wandb.config
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

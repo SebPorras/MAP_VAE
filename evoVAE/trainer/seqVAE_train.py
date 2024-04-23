@@ -27,11 +27,25 @@ def seq_train(
         learning_rate=config.learning_rate, weight_decay=config.weight_decay
     )
 
+    wandb.define_metric("epoch")
+    wandb.define_metric("ELBO", step_metric="epoch")
+    wandb.define_metric("KLD", step_metric="epoch")
+    wandb.define_metric("Gauss_likelihood", step_metric="epoch")
+
+    wandb.define_metric("val_ELBO", step_metric="epoch")
+    wandb.define_metric("val_KLD", step_metric="epoch")
+    wandb.define_metric("val_Gauss_likelihood", step_metric="epoch")
+
     for iteration in range(config.epochs):
-        print(f"epoch:{iteration}")
-        train_loop(model, train_loader, optimiser, device, config)
+        train_loop(model, train_loader, optimiser, device, config, iteration)
         validation_loop(
-            model, val_loader, device, dms_data, metadata, iteration, config.epochs
+            model,
+            val_loader,
+            device,
+            dms_data,
+            metadata,
+            iteration,
+            config,
         )
 
     # model.cpu()
@@ -41,7 +55,12 @@ def seq_train(
 
 
 def train_loop(
-    model: SeqVAE, train_loader: DataLoader, optimiser, device, config
+    model: SeqVAE,
+    train_loader: DataLoader,
+    optimiser,
+    device,
+    config,
+    epoch,
 ) -> None:
 
     epoch_loss = 0
@@ -78,9 +97,10 @@ def train_loop(
     # log batch results
     wandb.log(
         {
-            "epoch_ELBO": epoch_loss / batch_count,
-            "epoch_KLD": epoch_kl / batch_count,
-            "epoch_Gauss_likelihood": epoch_likelihood / batch_count,
+            "ELBO": epoch_loss / batch_count,
+            "KLD": epoch_kl / batch_count,
+            "Gauss_likelihood": epoch_likelihood / batch_count,
+            "epoch": epoch,
         }
     )
 
@@ -92,7 +112,7 @@ def validation_loop(
     dms_data: DataFrame,
     metadata: DataFrame,
     current_epoch: int,
-    max_epochs: int,
+    config,
 ) -> None:
 
     epoch_val_elbo = 0
@@ -121,9 +141,10 @@ def validation_loop(
 
     wandb.log(
         {
-            "epoch_val_ELBO": epoch_val_elbo / batch_count,
-            "epoch_val_KLD": epoch_val_kl / batch_count,
-            "epoch_val_Gauss_likelihood": epoch_val_likelihood / batch_count,
+            "val_ELBO": epoch_val_elbo / batch_count,
+            "val_KLD": epoch_val_kl / batch_count,
+            "val_Gauss_likelihood": epoch_val_likelihood / batch_count,
+            "epoch": current_epoch,
         }
     )
 
@@ -131,8 +152,12 @@ def validation_loop(
     subset_dms = split_by_mutations(dms_data)
     for count, subset_mutants in subset_dms.items():
         # Predict fitness of DMS variants with {count} mutations dataset
+
+        if count > config.max_mutation:
+            continue
+
         sub_spear_rho, sub_k_recall, sub_ndcg, sub_roc_auc = fitness_prediction(
-            model, subset_mutants, count, metadata, current_epoch, max_epochs
+            model, subset_mutants, count, metadata, current_epoch, config.epochs
         )
         wandb.log(
             {
@@ -140,12 +165,13 @@ def validation_loop(
                 f"{count}_top_k_recall": sub_k_recall,
                 f"{count}_ndcg": sub_ndcg,
                 f"{count}_roc_auc": sub_roc_auc,
+                "epoch": current_epoch,
             }
         )
 
     # Predict fitness of DMS variants for ENTIRE dataset
     spear_rho, k_recall, ndcg, roc_auc = fitness_prediction(
-        model, dms_data, None, metadata, current_epoch, max_epochs
+        model, dms_data, None, metadata, current_epoch, config.epochs
     )
     wandb.log(
         {
@@ -153,6 +179,7 @@ def validation_loop(
             "top_k_recall": k_recall,
             "ndcg": ndcg,
             "roc_auc": roc_auc,
+            "epoch": current_epoch,
         }
     )
 
@@ -245,10 +272,10 @@ def fitness_prediction(
             title += f"({mutation_count} mutation variants)"
         fig, ax = plt.subplots()
 
-        ax.plot(dms_data["DMS_score"], model_scores)
+        ax.scatter(dms_data["DMS_score"], model_scores)
         plt.title(title)
         plt.xlabel("Actual")
         plt.ylabel("Prediction")
-        wandb.log(fig)
+        wandb.log({title: fig})
 
     return spear_rho, k_recall, ndcg, roc_auc
