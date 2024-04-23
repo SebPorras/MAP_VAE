@@ -38,7 +38,13 @@ def summary_stats(
 
     k_recall = top_k_recall(predictions, actual, k_top)
     ndcg = calc_ndcg(actual, predictions, k_top)
-    roc_auc = roc_auc_score(actual_binned, predictions)
+
+    # handle the case where there is only one class due to mutation counts
+    if len(actual_binned.unique()) == 1:
+        roc_auc = None
+    else:
+        roc_auc = roc_auc_score(actual_binned, predictions)
+
     spear_rho, p_value = spearmanr(predictions, actual)
 
     return spear_rho, k_recall, ndcg, roc_auc
