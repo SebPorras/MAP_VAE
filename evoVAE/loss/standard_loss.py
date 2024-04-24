@@ -22,11 +22,15 @@ def KL_divergence(
 
     kl = log_qzx - log_pz
 
+    # sum up across all dims except the first
+    # (https://towardsdatascience.com/variational-autoencoder-demystified-with-pytorch-implementation-3a06bee395ed)
+    kl = kl.sum(dim=tuple(range(1, kl.ndim)))
+
     # reweight seqs
     kl = kl * seq_weights
 
-    # sum over all dimensions get the average
-    return kl.sum(dim=tuple(range(1, kl.ndim))).mean(dim=0)
+    # get the average
+    return kl.mean(dim=0)
 
 
 def gaussian_likelihood(
@@ -42,7 +46,10 @@ def gaussian_likelihood(
 
     log_pxz = qPhi.log_prob(x)
 
+    # sum up across all dims except the first
+    # (https://towardsdatascience.com/variational-autoencoder-demystified-with-pytorch-implementation-3a06bee395ed)
+    log_pxz = log_pxz.sum(dim=tuple(range(1, log_pxz.ndim)))
+
     log_pxz = log_pxz * seq_weights
 
-    # sum up across all dims and then average
-    return log_pxz.sum(dim=tuple(range(1, log_pxz.ndim))).mean(dim=0)
+    return log_pxz.mean(dim=0)

@@ -78,3 +78,31 @@ class SeqVAETest(SeqVAE):
         decoder_modules.append(nn.Linear(hidden_dims[-1], self.encoded_seq_len))
 
         self.decoder = nn.Sequential(*decoder_modules)
+
+    def loss_function(
+        self,
+        modelOutputs: Tuple[Tensor, Tensor, Tensor, Tensor],
+        input: Tensor,
+        seq_weight: float,
+    ) -> Tuple[Tensor, Tensor, Tensor]:
+        """The standard ELBO loss is used in a StandardVAE. Also passes
+        in seq_weight which is a weighting based on how the sequences cluster
+        together.
+        """
+
+        xHat, zSample, zMu, zLogvar = modelOutputs
+
+        # average KL across whole batch
+        kl = KL_divergence(zMu, zLogvar, zSample, seq_weight)
+
+        # averaged across the whole batch
+        likelihood = gaussian_likelihood(
+            xHat,
+            self.logStandardDeviation,
+            torch.flatten(input, start_dim=1),
+            seq_weight,
+        )
+
+        elbo = kl - likelihood
+
+        return elbo, kl.detach(), likelihood.detach()
