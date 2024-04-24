@@ -2,7 +2,9 @@ from evoVAE.models.types_ import *
 import torch
 
 
-def KL_divergence(zMu: Tensor, zLogvar: Tensor, zSample: Tensor) -> Tensor:
+def KL_divergence(
+    zMu: Tensor, zLogvar: Tensor, zSample: Tensor, seq_weights: Tensor
+) -> Tensor:
     """Based off a Monte Carlo estimation of KL divergence.
     Above batch sizes of 128 it is generally fairly accurate."""
 
@@ -20,11 +22,16 @@ def KL_divergence(zMu: Tensor, zLogvar: Tensor, zSample: Tensor) -> Tensor:
 
     kl = log_qzx - log_pz
 
+    # reweight seqs
+    kl = kl * seq_weights
+
     # sum over all dimensions get the average
     return kl.sum(dim=tuple(range(1, kl.ndim))).mean(dim=0)
 
 
-def gaussian_likelihood(xHat: Tensor, globalLogSD: Tensor, x: Tensor) -> Tensor:
+def gaussian_likelihood(
+    xHat: Tensor, globalLogSD: Tensor, x: Tensor, seq_weights: Tensor
+) -> Tensor:
     """Build a distribution from parameters estimated from the decoder and the global log variance
     which is another model parameter. Calculate the log probability of the original input x under this
     distribution and return the average across all samples."""
@@ -34,6 +41,8 @@ def gaussian_likelihood(xHat: Tensor, globalLogSD: Tensor, x: Tensor) -> Tensor:
     qPhi = torch.distributions.Normal(loc=xHat, scale=globalStd)
 
     log_pxz = qPhi.log_prob(x)
+
+    log_pxz = log_pxz * seq_weights
 
     # sum up across all dims and then average
     return log_pxz.sum(dim=tuple(range(1, log_pxz.ndim))).mean(dim=0)

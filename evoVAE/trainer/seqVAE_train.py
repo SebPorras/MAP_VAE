@@ -80,7 +80,7 @@ def train_loop(
         modelOutputs = model(encoding)
 
         # calculate loss
-        loss, kl, likelihood = model.loss_function(modelOutputs, encoding)
+        loss, kl, likelihood = model.loss_function(modelOutputs, encoding, weights)
 
         # update epoch metrics
         epoch_loss += loss.item()
