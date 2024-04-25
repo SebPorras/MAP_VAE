@@ -29,9 +29,9 @@ wandb.init(
         "momentum": 0.1,  # default value
         "dropout": None,
         # Training loop
-        "epochs": 50,
+        "epochs": 60,
         "batch_size": 128,
-        "max_norm": 10,  # gradient clipping
+        "max_norm": 5.0,  # gradient clipping
         # Model info - default settings
         "architecture": "SeqVAE",
         "latent_dims": 10,
