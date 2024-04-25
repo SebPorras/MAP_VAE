@@ -141,7 +141,7 @@ def validation_loop(
             outputs_val = model(encoding_val)
 
             loss_val, kl_val, likelihood_val = model.loss_function(
-                outputs_val, encoding_val, current_epoch, anneal_schedule
+                outputs_val, encoding_val, weight_val, current_epoch, anneal_schedule
             )
 
             epoch_val_elbo += loss_val.item()
