@@ -1,5 +1,6 @@
 from pandas import DataFrame
 from evoVAE.models.seqVAE import SeqVAE
+from evoVAE.loss.standard_loss import frange_cycle_linear
 import evoVAE.utils.metrics as mt
 import evoVAE.utils.seq_tools as st
 import numpy as np
@@ -36,8 +37,12 @@ def seq_train(
     wandb.define_metric("val_KLD", step_metric="epoch")
     wandb.define_metric("val_Gauss_likelihood", step_metric="epoch")
 
+    anneal_schedule = frange_cycle_linear(config.epochs)
+
     for iteration in range(config.epochs):
-        train_loop(model, train_loader, optimiser, device, config, iteration)
+        train_loop(
+            model, train_loader, optimiser, device, config, iteration, anneal_schedule
+        )
         validation_loop(
             model,
             val_loader,
@@ -46,6 +51,7 @@ def seq_train(
             metadata,
             iteration,
             config,
+            anneal_schedule,
         )
 
     # model.cpu()
@@ -58,9 +64,10 @@ def train_loop(
     model: SeqVAE,
     train_loader: DataLoader,
     optimiser,
-    device,
+    device: str,
     config,
-    epoch,
+    epoch: int,
+    anneal_schedule: np.ndarray,
 ) -> None:
 
     epoch_loss = 0
@@ -80,7 +87,9 @@ def train_loop(
         modelOutputs = model(encoding)
 
         # calculate loss
-        loss, kl, likelihood = model.loss_function(modelOutputs, encoding, weights)
+        loss, kl, likelihood = model.loss_function(
+            modelOutputs, encoding, weights, epoch, anneal_schedule
+        )
 
         # update epoch metrics
         epoch_loss += loss.item()
@@ -113,6 +122,7 @@ def validation_loop(
     metadata: DataFrame,
     current_epoch: int,
     config,
+    anneal_schedule: np.ndarray,
 ) -> None:
 
     epoch_val_elbo = 0
@@ -131,7 +141,7 @@ def validation_loop(
             outputs_val = model(encoding_val)
 
             loss_val, kl_val, likelihood_val = model.loss_function(
-                outputs_val, encoding_val
+                outputs_val, encoding_val, current_epoch, anneal_schedule
             )
 
             epoch_val_elbo += loss_val.item()
@@ -151,8 +161,8 @@ def validation_loop(
     # split variants by how many mutations they have
     subset_dms = split_by_mutations(dms_data)
     for count, subset_mutants in subset_dms.items():
-        # Predict fitness of DMS variants with {count} mutations dataset
 
+        # Predict fitness of DMS variants with {count} mutations dataset
         if count > config.max_mutation:
             continue
 
@@ -182,26 +192,6 @@ def validation_loop(
             "epoch": current_epoch,
         }
     )
-
-
-def split_by_mutations(dms_data: DataFrame) -> Dict[int, DataFrame]:
-    """
-    Create a subset of the mutation DataFrames based on how many mutations
-    are in the variant.
-
-    Return:
-    A dictionary mapping mutation count to subset dataframe
-    """
-
-    # define a function for counting mutations
-    splitter = lambda x: len(x.split(":"))
-    dms_data["mut_count"] = dms_data["mutant"].apply(splitter)
-
-    subframes = dict()
-    for count in dms_data["mut_count"].unique():
-        subframes[count] = dms_data[dms_data["mut_count"] == count]
-
-    return subframes
 
 
 def fitness_prediction(
@@ -262,7 +252,7 @@ def fitness_prediction(
         actual_binned=dms_data["DMS_score_bin"],
     )
 
-    # Plot the correlation but only on final epoch
+    # Plot predictions vs actual fitness values but only on final epoch
     if current_epoch == max_epoch - 1:
 
         title = "Predicted vs Actual Fitness: "
@@ -279,3 +269,23 @@ def fitness_prediction(
         wandb.log({title: fig})
 
     return spear_rho, k_recall, ndcg, roc_auc
+
+
+def split_by_mutations(dms_data: DataFrame) -> Dict[int, DataFrame]:
+    """
+    Create a subset of the mutation DataFrames based on how many mutations
+    are in the variant.
+
+    Return:
+    A dictionary mapping mutation count to subset dataframe
+    """
+
+    # define a function for counting mutations
+    splitter = lambda x: len(x.split(":"))
+    dms_data["mut_count"] = dms_data["mutant"].apply(splitter)
+
+    subframes = dict()
+    for count in dms_data["mut_count"].unique():
+        subframes[count] = dms_data[dms_data["mut_count"] == count]
+
+    return subframes

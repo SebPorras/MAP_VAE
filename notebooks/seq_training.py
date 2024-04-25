@@ -2,7 +2,7 @@
 from evoVAE.utils.datasets import MSA_Dataset
 import evoVAE.utils.seq_tools as st
 from evoVAE.models.seqVAE import SeqVAE
-from evoVAE.trainer.seqVAE_train import seq_train
+from evoVAE.trainer.seq_trainer import seq_train
 from sklearn.model_selection import train_test_split
 import pandas as pd
 import torch

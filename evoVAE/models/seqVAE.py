@@ -5,6 +5,7 @@ from torch import nn
 from evoVAE.loss.standard_loss import KL_divergence, gaussian_likelihood
 import torch.nn.functional as F
 from typing import Dict
+import numpy as np
 
 
 class SeqVAE(BaseVAE):
@@ -35,7 +36,7 @@ class SeqVAE(BaseVAE):
                 nn.Sequential(
                     nn.Linear(input_dims, h_dim),
                     nn.LeakyReLU(),
-                    nn.Dropout(config.dropout),  # mask random units
+                    # nn.Dropout(config.dropout),  # mask random units
                     nn.Linear(h_dim, h_dim),
                     nn.LeakyReLU(),
                     nn.BatchNorm1d(
@@ -66,7 +67,7 @@ class SeqVAE(BaseVAE):
                 nn.Sequential(
                     nn.Linear(hidden_dims[i], hidden_dims[i + 1]),
                     nn.LeakyReLU(),
-                    nn.Dropout(config.dropout),  # mask random units
+                    # nn.Dropout(config.dropout),  # mask random units
                     nn.Linear(hidden_dims[i + 1], hidden_dims[i + 1]),
                     nn.LeakyReLU(),
                     nn.BatchNorm1d(hidden_dims[i + 1], momentum=config.momentum),
@@ -81,6 +82,9 @@ class SeqVAE(BaseVAE):
         """
         Construct a Gaussian distribution from learnt values of
         Mu and sigma and sample a vector Z from this distribution
+
+        Returns:
+        Z: Tensor
         """
 
         std = z_logvar.mul(0.5).exp()
@@ -92,7 +96,10 @@ class SeqVAE(BaseVAE):
         """
         Take the rawInput and encode into a bottle neck dimension
         specified by the encoder. Transform this into Mu and log variance
-        values to construct a distribution. i.e. P_phi(Z|X)
+        values to construct a distribution. i.e. P_phi(Z|X).
+
+        Returns:
+        z_mu, z_logvar
         """
 
         encoder_output = self.encoder(raw_input)
@@ -115,6 +122,9 @@ class SeqVAE(BaseVAE):
     def forward(self, raw_input: Tensor) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
         """
         Complete the forward pass.
+
+        Return:
+        log_p, z_sample, z_mu, z_logvar
         """
 
         flat_input = torch.flatten(raw_input, start_dim=1)
@@ -151,39 +161,49 @@ class SeqVAE(BaseVAE):
         self,
         modelOutputs: Tuple[Tensor, Tensor, Tensor, Tensor],
         input: Tensor,
-        seq_weight: float,
+        seq_weight: Tensor,
+        epoch: int,
+        anneal_schedule: np.ndarray,
     ) -> Tuple[Tensor, Tensor, Tensor]:
         """The standard ELBO loss is used in a StandardVAE. Also passes
         in seq_weight which is a weighting based on how the sequences cluster
         together.
+
+        Returns:
+        elbo, kld, recon_loss
         """
 
         xHat, zSample, zMu, zLogvar = modelOutputs
 
         # average KL across whole batch
-        kl = KL_divergence(zMu, zLogvar, zSample, seq_weight)
+        kld = KL_divergence(zMu, zLogvar, zSample, seq_weight)
 
         # averaged across the whole batch
-        likelihood = gaussian_likelihood(
+        recon_loss = gaussian_likelihood(
             xHat,
             self.logStandardDeviation,
             torch.flatten(input, start_dim=1),
             seq_weight,
         )
 
-        elbo = kl - likelihood
+        # vary the strength of KLD to prevent it vanishing
+        elbo = (anneal_schedule[epoch] * kld) - recon_loss
 
-        return elbo, kl.detach(), likelihood.detach()
+        return elbo, kld.detach(), recon_loss.detach()
 
     def generate(self, x: Tensor) -> Tensor:
-        """Return the reconstructed input"""
+        """Return the reconstructed input
+
+        Returns:
+        xHat
+        """
 
         xHat, _, _, _ = self.forward(x)
 
         return xHat
 
     def configure_optimiser(
-        self, learning_rate: float = 1e-4, weight_decay: float = 0.01
+        self, learning_rate: float = 1e-2, weight_decay: float = 1e-4
     ):
         return torch.optim.Adam(
             self.parameters(), lr=learning_rate, weight_decay=weight_decay

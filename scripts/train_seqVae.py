@@ -2,7 +2,7 @@
 from evoVAE.utils.datasets import MSA_Dataset
 import evoVAE.utils.seq_tools as st
 from evoVAE.models.seqVAE import SeqVAE
-from evoVAE.trainer.seqVAE_train import seq_train
+from evoVAE.trainer.seq_trainer import seq_train
 from sklearn.model_selection import train_test_split
 import pandas as pd
 import torch
@@ -23,15 +23,15 @@ wandb.init(
         "test_split": 0.2,
         "max_mutation": 4,  # how many mutations the model will test up to
         # ADAM
-        "learning_rate": 1e-4,  # ADAM
-        "weight_decay": 0.01,  # ADAM
+        "learning_rate": 1e-2,  # ADAM
+        "weight_decay": 1e-4,  # ADAM
         # Hidden units
-        "momentum": 0.1,
-        "dropout": 0.1,
+        "momentum": 0.1,  # default value
+        "dropout": None,
         # Training loop
-        "epochs": 30,
+        "epochs": 50,
         "batch_size": 128,
-        "max_norm": 1.0,  # gradient clipping
+        "max_norm": 10,  # gradient clipping
         # Model info - default settings
         "architecture": "SeqVAE",
         "latent_dims": 10,
