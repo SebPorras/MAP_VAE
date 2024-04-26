@@ -139,8 +139,8 @@ def seq_log_probability(one_hot: Tensor, model_encoding: Tensor) -> float:
     """
 
     product = torch.matmul(model_encoding, one_hot.T)
-    log_product = torch.log(product)
-    return torch.trace(log_product).item()
+    # log_product = torch.log(product)
+    return torch.trace(product).item()
 
 
 def hamming_distance(seq1: str, seq2: str) -> float:
