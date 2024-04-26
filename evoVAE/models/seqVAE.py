@@ -39,10 +39,7 @@ class SeqVAE(BaseVAE):
                     # nn.Dropout(config.dropout),  # mask random units
                     nn.Linear(h_dim, h_dim),
                     nn.LeakyReLU(),
-                    nn.BatchNorm1d(
-                        h_dim,
-                        momentum=config.momentum,
-                    ),  # normalise and learn alpha/beta
+                    # nn.BatchNorm1d(h_dim,momentum=config.momentum,),  # normalise and learn alpha/beta
                 )
             )
             input_dims = h_dim
@@ -70,7 +67,7 @@ class SeqVAE(BaseVAE):
                     # nn.Dropout(config.dropout),  # mask random units
                     nn.Linear(hidden_dims[i + 1], hidden_dims[i + 1]),
                     nn.LeakyReLU(),
-                    nn.BatchNorm1d(hidden_dims[i + 1], momentum=config.momentum),
+                    # nn.BatchNorm1d(hidden_dims[i + 1], momentum=config.momentum),
                 )
             )
         # add a final layer to get back to length of seq * AA_Count

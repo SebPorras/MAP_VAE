@@ -26,7 +26,7 @@ wandb.init(
         "learning_rate": 1e-2,  # ADAM
         "weight_decay": 1e-4,  # ADAM
         # Hidden units
-        "momentum": 0.1,  # default value
+        "momentum": None,
         "dropout": None,
         # Training loop
         "epochs": 60,
