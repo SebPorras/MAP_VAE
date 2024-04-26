@@ -23,7 +23,7 @@ wandb.init(
         "test_split": 0.2,
         "max_mutation": 4,  # how many mutations the model will test up to
         # ADAM
-        "learning_rate": 1e-2,  # ADAM
+        "learning_rate": 1e-3,  # ADAM
         "weight_decay": 1e-4,  # ADAM
         # Hidden units
         "momentum": None,
