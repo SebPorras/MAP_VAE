@@ -203,7 +203,17 @@ def fitness_prediction(
     max_epoch: int,
 ) -> Tuple[float, float, float, float]:
     """
-    Returns: spear_rho, k_recall, ndcg, roc_auc
+    Briefly, the model produces the representation of the
+    wild type and the variant to produce a log odds score.
+
+    The model outputs a position probability matrix which can
+    estimate the likelihood of a sequence according to the model.
+    This is then compared to true fitness values, specifically how
+    well the rankings of variants align using a number of metrics.
+
+    log(variant_fitness / wild_type_fitness) = log odds score
+
+    Returns: spear_rho, k_recall, ndcg, roc_auc.
     """
 
     # encode the wild type
@@ -241,7 +251,7 @@ def fitness_prediction(
 
         log_prob = mt.seq_log_probability(var_one_hot, var_model_encoding)
 
-        # log(variant_fitness / wild_type_fitness) - log odds score
+        # log(variant_fitness / wild_type_fitness) = log odds score
         model_scores.append(log_prob - wt_prob)
 
     # compare to ground truth
@@ -289,3 +299,30 @@ def split_by_mutations(dms_data: DataFrame) -> Dict[int, DataFrame]:
         subframes[count] = dms_data[dms_data["mut_count"] == count]
 
     return subframes
+
+
+### EARLY STOPPING ###
+class EarlyStopper:
+    """
+    Will trigger when validation loss increases
+
+    """
+
+    def __init__(self, patience=3) -> None:
+
+        self.patience = patience
+        self.counter = 0
+        self.min_val_loss = float("inf")
+
+    def early_stop(self, val_loss: float):
+
+        if val_loss < self.min_val_loss:
+            self.counter = 0
+            self.min_val_loss = val_loss
+
+        elif val_loss > self.min_val_loss:
+            self.counter += 1
+            if self.counter >= self.patience:
+                return True
+
+        return False
