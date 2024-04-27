@@ -17,25 +17,25 @@ wandb.init(
     # hyperparameters
     config={
         # Dataset info
-        "alignment": "../data/GFP_AEQVI_full_04-29-2022_b08_encoded_weighted_ancestors_extants_no_syn.pkl",
+        "alignment": "../data/GFP_AEQVI_full_04-29-2022_b08_encoded_weighted_extants_no_syn.pkl",
         "seq_theta": 0.2,  # reweighting
         "AA_count": 21,  # standard AA + gap
         "test_split": 0.2,
         "max_mutation": 4,  # how many mutations the model will test up to
         # ADAM
-        "learning_rate": 1e-3,  # ADAM
+        "learning_rate": 1e-2,  # ADAM
         "weight_decay": 1e-4,  # ADAM
         # Hidden units
         "momentum": None,
         "dropout": None,
         # Training loop
-        "epochs": 60,
+        "epochs": 100,
         "batch_size": 128,
-        "max_norm": 5.0,  # gradient clipping
+        "max_norm": 10,  # gradient clipping
         # Model info - default settings
         "architecture": "SeqVAE",
         "latent_dims": 10,
-        "hidden_dims": [128, 64, 32],
+        "hidden_dims": [256, 128, 64],
         # DMS data
         "dms_file": "../data/GFP_AEQVI_Sarkisyan_2016_dms_encoded.pkl",
         "dms_metadata": "../data/DMS_substitutions.csv",
