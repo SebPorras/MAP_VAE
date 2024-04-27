@@ -12,6 +12,34 @@ import wandb
 import matplotlib.pyplot as plt
 
 
+### EARLY STOPPING ###
+class EarlyStopper:
+    """
+    Will trigger when validation loss increases
+
+    """
+
+    def __init__(self, patience=3) -> None:
+
+        self.patience = patience
+        self.counter = 0
+        self.min_val_loss = float("inf")
+
+    def early_stop(self, val_loss: float):
+
+        if val_loss < self.min_val_loss:
+            self.counter = 0
+            self.min_val_loss = val_loss
+
+        elif val_loss > self.min_val_loss:
+            self.counter += 1
+            if self.counter >= self.patience:
+                return True
+
+        return False
+
+### TRAINING SCRIPTS ###
+
 def seq_train(
     model: SeqVAE,
     train_loader: DataLoader,
@@ -38,12 +66,13 @@ def seq_train(
     wandb.define_metric("val_Gauss_likelihood", step_metric="epoch")
 
     anneal_schedule = frange_cycle_linear(config.epochs)
+    early_stopper = EarlyStopper()
 
     for iteration in range(config.epochs):
         train_loop(
             model, train_loader, optimiser, device, config, iteration, anneal_schedule
         )
-        validation_loop(
+        stop_early = validation_loop(
             model,
             val_loader,
             device,
@@ -52,7 +81,11 @@ def seq_train(
             iteration,
             config,
             anneal_schedule,
+            early_stopper,
         )
+        
+        if stop_early:
+            break
 
     # model.cpu()
     # torch.save(model, "seqVAE_weights.pt")
@@ -123,7 +156,16 @@ def validation_loop(
     current_epoch: int,
     config,
     anneal_schedule: np.ndarray,
-) -> None:
+    early_stopper: EarlyStopper,
+) -> bool:
+    """
+    Calculate loss on validation set. Will also evaluate how well 
+    the model can predict fitness for unseen variants. 
+
+    Returns:
+    True if the model should stop early if validation loss is 
+    increasing, otherwise False. 
+    """
 
     epoch_val_elbo = 0
     epoch_val_kl = 0
@@ -157,6 +199,17 @@ def validation_loop(
             "epoch": current_epoch,
         }
     )
+    
+    stop_early = early_stopper.early_stop(epoch_val_elbo / batch_count)
+
+    # predict variant fitnesses 
+    zero_shot_prediction(model, dms_data, metadata, config, current_epoch, stop_early)
+
+    return stop_early
+
+    
+
+def zero_shot_prediction(model: SeqVAE, dms_data: pd.DataFrame, metadata: pd.DataFrame, config, current_epoch: int, stop_early: bool):
 
     # split variants by how many mutations they have
     subset_dms = split_by_mutations(dms_data)
@@ -167,7 +220,7 @@ def validation_loop(
             continue
 
         sub_spear_rho, sub_k_recall, sub_ndcg, sub_roc_auc = fitness_prediction(
-            model, subset_mutants, count, metadata, current_epoch, config.epochs
+            model, subset_mutants, count, metadata, current_epoch, config.epochs, stop_early,
         )
         wandb.log(
             {
@@ -181,7 +234,7 @@ def validation_loop(
 
     # Predict fitness of DMS variants for ENTIRE dataset
     spear_rho, k_recall, ndcg, roc_auc = fitness_prediction(
-        model, dms_data, None, metadata, current_epoch, config.epochs
+        model, dms_data, None, metadata, current_epoch, config.epochs, stop_early,
     )
     wandb.log(
         {
@@ -201,6 +254,7 @@ def fitness_prediction(
     metadata: DataFrame,
     current_epoch: int,
     max_epoch: int,
+    stop_early: bool,
 ) -> Tuple[float, float, float, float]:
     """
     Briefly, the model produces the representation of the
@@ -222,23 +276,25 @@ def fitness_prediction(
     wild_one_hot = torch.Tensor(st.seq_to_one_hot(wild_type)).unsqueeze(0)
 
     # get model representation of the wild type
-    wild_model_encoding, _, _, _ = model(wild_one_hot)
+    with torch.no_grad():
+        wild_model_encoding, _, _, _ = model(wild_one_hot)
 
-    # reshape into (1, seq_len, AA_count)
-    orig_shape = wild_model_encoding.shape[0:-1]
-    wild_model_encoding = torch.unsqueeze(wild_model_encoding, -1)
-    wild_model_encoding = wild_model_encoding.view(orig_shape + (-1, model.AA_COUNT))
+        # reshape into (1, seq_len, AA_count)
+        orig_shape = wild_model_encoding.shape[0:-1]
+        wild_model_encoding = torch.unsqueeze(wild_model_encoding, -1)
+        wild_model_encoding = wild_model_encoding.view(orig_shape + (-1, model.AA_COUNT))
 
-    # remove first dim which is just 1 for both tensors
-    wild_model_encoding = wild_model_encoding.squeeze(0)
-    wild_one_hot = wild_one_hot.squeeze(0)
+        # remove first dim which is just 1 for both tensors
+        wild_model_encoding = wild_model_encoding.squeeze(0)
+        wild_one_hot = wild_one_hot.squeeze(0)
 
-    # estimate the log ikelihood of sequence based on model output
-    wt_prob = mt.seq_log_probability(wild_one_hot, wild_model_encoding)
+        # estimate the log ikelihood of sequence based on model output
+        wt_prob = mt.seq_log_probability(wild_one_hot, wild_model_encoding)
 
-    # pass all variants through the model
-    variant_encodings = torch.Tensor(np.stack(dms_data["encoding"].values))
-    variant_model_outputs, _, _, _ = model(variant_encodings)
+        # pass all variants through the model
+        variant_encodings = torch.Tensor(np.stack(dms_data["encoding"].values))
+        variant_model_outputs, _, _, _ = model(variant_encodings)
+
 
     # now make fitness estimates
     model_scores = []
@@ -263,7 +319,8 @@ def fitness_prediction(
     )
 
     # Plot predictions vs actual fitness values but only on final epoch
-    if current_epoch == max_epoch - 1:
+    # or if early stopping has been triggered.
+    if (current_epoch == max_epoch - 1) or stop_early:
 
         title = "Predicted vs Actual Fitness: "
         if mutation_count is None:
@@ -301,28 +358,3 @@ def split_by_mutations(dms_data: DataFrame) -> Dict[int, DataFrame]:
     return subframes
 
 
-### EARLY STOPPING ###
-class EarlyStopper:
-    """
-    Will trigger when validation loss increases
-
-    """
-
-    def __init__(self, patience=3) -> None:
-
-        self.patience = patience
-        self.counter = 0
-        self.min_val_loss = float("inf")
-
-    def early_stop(self, val_loss: float):
-
-        if val_loss < self.min_val_loss:
-            self.counter = 0
-            self.min_val_loss = val_loss
-
-        elif val_loss > self.min_val_loss:
-            self.counter += 1
-            if self.counter >= self.patience:
-                return True
-
-        return False
