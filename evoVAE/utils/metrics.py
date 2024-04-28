@@ -139,7 +139,7 @@ def seq_log_probability(one_hot: Tensor, model_encoding: Tensor) -> float:
     """
 
     product = torch.matmul(model_encoding, one_hot.T)
-    # log_product = torch.log(product)
+    #log_product = torch.log(product)
     return torch.trace(product).item()
 
 

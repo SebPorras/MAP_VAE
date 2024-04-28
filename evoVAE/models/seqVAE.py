@@ -36,6 +36,8 @@ class SeqVAE(BaseVAE):
                 nn.Sequential(
                     nn.Linear(input_dims, h_dim),
                     nn.LeakyReLU(),
+                    nn.Linear(h_dim, h_dim),
+                    nn.LeakyReLU(),
                 )
             )
             input_dims = h_dim
@@ -59,6 +61,8 @@ class SeqVAE(BaseVAE):
             decoder_modules.append(
                 nn.Sequential(
                     nn.Linear(hidden_dims[i], hidden_dims[i + 1]),
+                    nn.LeakyReLU(),
+                    nn.Linear(hidden_dims[i + 1], hidden_dims[i + 1]),
                     nn.LeakyReLU(),
                 )
             )
@@ -140,6 +144,7 @@ class SeqVAE(BaseVAE):
 
         # apply the softmax over last dim, i.e the 21 amino acids
         log_p = F.log_softmax(x_hat, dim=-1)
+        #log_p = F.softmax(x_hat, dim=-1)
 
         # reflatten our probability distribution
         log_p = log_p.view(input_shape + (-1,))

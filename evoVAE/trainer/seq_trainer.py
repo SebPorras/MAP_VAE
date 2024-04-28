@@ -66,7 +66,7 @@ def seq_train(
     wandb.define_metric("val_Gauss_likelihood", step_metric="epoch")
 
     anneal_schedule = frange_cycle_linear(config.epochs)
-    early_stopper = EarlyStopper()
+    early_stopper = EarlyStopper(patience=config.patience)
 
     for iteration in range(config.epochs):
         train_loop(
@@ -133,7 +133,7 @@ def train_loop(
         # update weights
         loss.backward()
         # sets max value for gradient - currently 1.0
-        #torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=config.max_norm)
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=config.max_norm)
         optimiser.step()
 
     # log batch results
