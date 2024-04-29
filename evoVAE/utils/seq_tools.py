@@ -12,6 +12,7 @@ import evoVAE.utils.metrics as mt
 from scipy.spatial import distance_matrix
 from scipy.spatial.distance import euclidean
 import matplotlib.pyplot as plt
+from Bio import Align
 
 
 GAPPY_PROTEIN_ALPHABET = [
@@ -46,15 +47,7 @@ IDX_TO_AA = dict((idx, acid) for idx, acid in enumerate(GAPPY_PROTEIN_ALPHABET))
 AA_TO_IDX = dict((acid, idx) for idx, acid in enumerate(GAPPY_PROTEIN_ALPHABET))
 
 
-def read_aln_file(
-    filename: str,
-    encode: bool = True,
-) -> pd.DataFrame:
-    """Read in an alignment file in Fasta format and
-    return a Pandas DataFrame with sequences and IDs. If encode
-    is true, a one-hot encoding will be made."""
-
-    print(f"Reading the alignment: {filename}")
+def read_fasta_file(filename: str):
 
     with open(filename, "r") as file:
         lines = file.readlines()
@@ -80,6 +73,20 @@ def read_aln_file(
         # add the last sequence
         data.append([id, sequence])
 
+    return data
+
+
+def read_aln_file(
+    filename: str,
+    encode: bool = True,
+) -> pd.DataFrame:
+    """Read in an alignment file in Fasta format and
+    return a Pandas DataFrame with sequences and IDs. If encode
+    is true, a one-hot encoding will be made."""
+
+    print(f"Reading the alignment: {filename}")
+
+    data = read_fasta_file(filename)
     columns = ["id", "sequence"]
     df = pd.DataFrame(data, columns=columns)
 
