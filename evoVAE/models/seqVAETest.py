@@ -68,10 +68,10 @@ class SeqVAETest(SeqVAE):
                 nn.Sequential(
                     nn.Linear(hidden_dims[i], hidden_dims[i + 1]),
                     nn.LeakyReLU(),
-                    nn.Dropout(config["dropout"]),  # mask random units
+                    # nn.Dropout(config["dropout"]),  # mask random units
                     nn.Linear(hidden_dims[i + 1], hidden_dims[i + 1]),
                     nn.LeakyReLU(),
-                    nn.BatchNorm1d(hidden_dims[i + 1], momentum=config["momentum"]),
+                    # nn.BatchNorm1d(hidden_dims[i + 1], momentum=config["momentum"]),
                 )
             )
         # add a final layer to get back to length of seq * AA_Count
@@ -99,10 +99,49 @@ class SeqVAETest(SeqVAE):
         likelihood = gaussian_likelihood(
             xHat,
             self.logStandardDeviation,
-            torch.flatten(input, start_dim=1),
+            input,
+            # torch.flatten(input, start_dim=1),
             seq_weight,
         )
 
         elbo = kl - likelihood
 
         return elbo, kl.detach(), likelihood.detach()
+
+    def forward(self, raw_input: Tensor) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
+        """
+        Complete the forward pass.
+
+        Return:
+        log_p, z_sample, z_mu, z_logvar
+        """
+
+        flat_input = torch.flatten(raw_input, start_dim=1)
+
+        # encode for q_phi mu and log variance
+        z_mu, z_logvar = self.encode(flat_input)
+
+        # sample from the distribution
+        z_sample = self.reparameterise(z_mu, z_logvar)
+
+        # upscale from latent dims to the decoder
+        z_upscaled = self.upscale_z(z_sample)
+
+        x_hat = self.decode(z_upscaled)
+
+        # record input shape
+        input_shape = tuple(x_hat.shape[0:-1])
+
+        # add on extra dimension
+        x_hat = torch.unsqueeze(x_hat, -1)
+
+        # reshape back to original one-hot input size
+        x_hat = x_hat.view(input_shape + (-1, self.AA_COUNT))
+
+        # apply the softmax over last dim, i.e the 21 amino acids
+        log_p = F.log_softmax(x_hat, dim=-1)
+
+        # reflatten our probability distribution
+        # log_p = log_p.view(input_shape + (-1,))
+
+        return log_p, z_sample, z_mu, z_logvar
