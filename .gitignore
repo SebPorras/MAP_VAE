@@ -9,6 +9,7 @@ build/
 
 # Weights and Biases logging 
 notebooks/wandb/
+scripts/wandb
 
 # Non-important data 
 data/FashionMNIST
