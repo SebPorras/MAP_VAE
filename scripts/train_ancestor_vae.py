@@ -7,40 +7,20 @@ from sklearn.model_selection import train_test_split
 import pandas as pd
 import torch
 import wandb
+import sys, yaml
 
 # %% [markdown]
 # #### Config
+CONFIG_FILE = 1
+
+with open(sys.argv[CONFIG_FILE], "r") as stream:
+    settings = yaml.safe_load(stream)
 
 # %%
 wandb.init(
-    project="SeqVAE_training",
+    project="SeqVAE_ancestor_sampling",
     # hyperparameters
-    config={
-        # Dataset info
-        "alignment": "../data/GFP_AEQVI_full_04-29-2022_b08_encoded_weighted_ancestors_extants_no_syn.pkl",
-        "seq_theta": 0.2,  # reweighting
-        "AA_count": 21,  # standard AA + gap
-        "test_split": 0.2,
-        "max_mutation": 4,  # how many mutations the model will test up to
-        # ADAM
-        "learning_rate": 1e-2,  # ADAM
-        "weight_decay": 1e-4,  # ADAM
-        # Hidden units
-        "momentum": None,
-        "dropout": None,
-        # Training loop
-        "epochs": 500,
-        "batch_size": 128,
-        "max_norm": 10,  # gradient clipping
-        # Model info - default settings
-        "architecture": "SeqVAE_reg_softmax",
-        "latent_dims": 10,
-        "hidden_dims": [256, 128, 64],
-        # DMS data
-        "dms_file": "../data/GFP_AEQVI_Sarkisyan_2016_dms_encoded.pkl",
-        "dms_metadata": "../data/DMS_substitutions.csv",
-        "dms_id": "GFP_AEQVI_Sarkisyan_2016",
-    },
+    config=settings,
 )
 
 
@@ -59,10 +39,10 @@ ancestors_aln = pd.read_pickle(config.alignment)
 train, val = train_test_split(ancestors_aln, test_size=config.test_split)
 
 # TRAINING
-train_dataset = MSA_Dataset(train["encodings"], train["weights"], train["id"])
+train_dataset = MSA_Dataset(train["encoding"], train["weights"], train["id"])
 
 # VALIDATION
-val_dataset = MSA_Dataset(val["encodings"], val["weights"], val["id"])
+val_dataset = MSA_Dataset(val["encoding"], val["weights"], val["id"])
 
 # DATA LOADERS #
 train_loader = torch.utils.data.DataLoader(
@@ -97,6 +77,7 @@ model = SeqVAE(
     config=config,
 )
 # model
+print(model)
 
 # %% [markdown]
 # #### Training Loop

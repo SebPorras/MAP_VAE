@@ -14,11 +14,11 @@ import sys, yaml
 CONFIG_FILE = 1
 
 with open(sys.argv[CONFIG_FILE], "r") as stream:
-    settings = yaml.load(stream)
+    settings = yaml.safe_load(stream)
 
 # %%
 wandb.init(
-    project="SeqVAE_training",
+    project="SeqVAE_ancestor_sampling",
     # hyperparameters
     config=settings,
 )
@@ -40,10 +40,10 @@ ancestors_aln = pd.read_pickle(config.alignment)
 train, val = train_test_split(ancestors_aln, test_size=config.test_split)
 
 # TRAINING
-train_dataset = MSA_Dataset(train["encodings"], train["weights"], train["id"])
+train_dataset = MSA_Dataset(train["encoding"], train["weights"], train["id"])
 
 # VALIDATION
-val_dataset = MSA_Dataset(val["encodings"], val["weights"], val["id"])
+val_dataset = MSA_Dataset(val["encoding"], val["weights"], val["id"])
 
 # DATA LOADERS #
 train_loader = torch.utils.data.DataLoader(
