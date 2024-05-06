@@ -1,0 +1,26 @@
+# Dataset info
+alignment: ../data/gb1/SPG1_STRSG_full_b0.1_filt_encoded_weighted.pkl
+seq_theta: 0.2  # reweighting
+AA_count: 21  # standard AA + gap
+test_split: 0.2
+max_mutation: 4 # how many mutations the model will test up to
+# ADAM
+learning_rate: 0.01 # ADAM
+weight_decay: 0.0001 # ADAM
+# Hidden units
+momentum: None
+dropout: None
+# Training loop
+epochs: 500
+batch_size: 128
+patience: 5
+max_norm: 1.5  # gradient clipping
+# Model info - default settings
+architecture: SeqVAE_reg_softmax
+latent_dims: 10
+hidden_dims: [256, 128, 64]
+# DMS data
+dms_file: ../data/gb1/SPG1_STRSG_Wu_2016.pkl
+dms_metadata: ../data/DMS_substitutions.csv
+dms_id: SPG1_STRSG_Wu_2016
+

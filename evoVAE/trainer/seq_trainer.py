@@ -87,8 +87,8 @@ def seq_train(
         if stop_early:
             break
 
-    # model.cpu()
-    # torch.save(model, "seqVAE_weights.pt")
+    model.cpu()
+    torch.save(model, "gb1_model_an_ex.pt")
 
     return model
 
