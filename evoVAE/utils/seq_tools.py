@@ -275,14 +275,8 @@ def calc_average_residue_distribution(
 
 def calc_position_prob_matrix(seqs: pd.DataFrame):
 
-    encodings = np.stack(seqs["encoding"].values)
     # position_freq_matrix(pfm)
-    pfm = np.zeros(encodings.shape[1:])
-
-    for seq in seqs["sequence"]:
-        for row, letter in enumerate(seq):
-            index = AA_TO_IDX[letter]
-            pfm[row][index] += 1
+    pfm = calc_position_freq_matrix(seqs)
 
     # make a position probability matrix
     for column in pfm:
@@ -291,6 +285,20 @@ def calc_position_prob_matrix(seqs: pd.DataFrame):
 
     # makes columns positoins in the sequence
     return pfm.T
+
+
+def calc_position_freq_matrix(seqs: pd.DataFrame) -> np.ndarray:
+
+    encodings = np.stack(seqs["encoding"].values)
+
+    pfm = np.zeros(encodings.shape[1:])
+
+    for seq in seqs["sequence"]:
+        for row, letter in enumerate(seq):
+            index = AA_TO_IDX[letter]
+            pfm[row][index] += 1
+
+    return pfm
 
 
 def create_euclidean_dist_matrix(
