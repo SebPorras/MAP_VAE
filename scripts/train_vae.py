@@ -47,10 +47,10 @@ val_dataset = MSA_Dataset(val["encoding"], val["weights"], val["id"])
 
 # DATA LOADERS #
 train_loader = torch.utils.data.DataLoader(
-    train_dataset, batch_size=config.batch_size, shuffle=False
+    train_dataset, batch_size=config.batch_size, shuffle=True
 )
 val_loader = torch.utils.data.DataLoader(
-    val_dataset, batch_size=config.batch_size, shuffle=False
+    val_dataset, batch_size=config.batch_size, shuffle=True
 )
 
 # Load and process the DMS data used for fitness prediction

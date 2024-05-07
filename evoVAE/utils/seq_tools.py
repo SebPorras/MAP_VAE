@@ -417,6 +417,8 @@ def sample_ancestor_trees(
         sampled_names += names
 
     sampled_ancestors = pd.read_pickle(ancestor_pkl_path)
-    sampled_ancestors = sampled_ancestors.loc[sampled_ancestors["id"].isin(sampled_names)]
+    sampled_ancestors = sampled_ancestors.loc[
+        sampled_ancestors["id"].isin(sampled_names)
+    ]
 
     return sampled_ancestors

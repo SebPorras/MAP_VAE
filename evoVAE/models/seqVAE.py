@@ -101,12 +101,15 @@ class SeqVAE(BaseVAE):
 
         return z_mu, z_logvar
 
-    def decode(self, z_upscaled: Tensor) -> Tensor:
+    def decode(self, z_sample: Tensor) -> Tensor:
         """
         Sample a latent vector, Z, and
         learn the parameters from which reconstructions
         can be sampled from. I.e. we are learning P_sigma(X|Z)
         """
+
+        # upscale from latent dims to the decoder
+        z_upscaled = self.upscale_z(z_sample)
 
         xHat = self.decoder(z_upscaled)
 
@@ -128,10 +131,7 @@ class SeqVAE(BaseVAE):
         # sample from the distribution
         z_sample = self.reparameterise(z_mu, z_logvar)
 
-        # upscale from latent dims to the decoder
-        z_upscaled = self.upscale_z(z_sample)
-
-        x_hat = self.decode(z_upscaled)
+        x_hat = self.decode(z_sample)
 
         # record input shape
         input_shape = tuple(x_hat.shape[0:-1])
@@ -144,7 +144,7 @@ class SeqVAE(BaseVAE):
 
         # apply the softmax over last dim, i.e the 21 amino acids
         log_p = F.log_softmax(x_hat, dim=-1)
-        #log_p = F.softmax(x_hat, dim=-1)
+        # log_p = F.softmax(x_hat, dim=-1)
 
         # reflatten our probability distribution
         log_p = log_p.view(input_shape + (-1,))

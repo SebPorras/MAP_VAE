@@ -38,7 +38,9 @@ class EarlyStopper:
 
         return False
 
+
 ### TRAINING SCRIPTS ###
+
 
 def seq_train(
     model: SeqVAE,
@@ -83,12 +85,12 @@ def seq_train(
             anneal_schedule,
             early_stopper,
         )
-        
+
         if stop_early:
             break
 
     model.cpu()
-    torch.save(model, "gb1_model_an_ex.pt")
+    torch.save(model.state_dict(), "gb1_model_an_ex.pt")
 
     return model
 
@@ -159,12 +161,12 @@ def validation_loop(
     early_stopper: EarlyStopper,
 ) -> bool:
     """
-    Calculate loss on validation set. Will also evaluate how well 
-    the model can predict fitness for unseen variants. 
+    Calculate loss on validation set. Will also evaluate how well
+    the model can predict fitness for unseen variants.
 
     Returns:
-    True if the model should stop early if validation loss is 
-    increasing, otherwise False. 
+    True if the model should stop early if validation loss is
+    increasing, otherwise False.
     """
 
     epoch_val_elbo = 0
@@ -199,17 +201,23 @@ def validation_loop(
             "epoch": current_epoch,
         }
     )
-    
+
     stop_early = early_stopper.early_stop(epoch_val_elbo / batch_count)
 
-    # predict variant fitnesses 
+    # predict variant fitnesses
     zero_shot_prediction(model, dms_data, metadata, config, current_epoch, stop_early)
 
     return stop_early
 
-    
 
-def zero_shot_prediction(model: SeqVAE, dms_data: pd.DataFrame, metadata: pd.DataFrame, config, current_epoch: int, stop_early: bool):
+def zero_shot_prediction(
+    model: SeqVAE,
+    dms_data: pd.DataFrame,
+    metadata: pd.DataFrame,
+    config,
+    current_epoch: int,
+    stop_early: bool,
+):
 
     # split variants by how many mutations they have
     subset_dms = split_by_mutations(dms_data)
@@ -220,7 +228,13 @@ def zero_shot_prediction(model: SeqVAE, dms_data: pd.DataFrame, metadata: pd.Dat
             continue
 
         sub_spear_rho, sub_k_recall, sub_ndcg, sub_roc_auc = fitness_prediction(
-            model, subset_mutants, count, metadata, current_epoch, config.epochs, stop_early,
+            model,
+            subset_mutants,
+            count,
+            metadata,
+            current_epoch,
+            config.epochs,
+            stop_early,
         )
         wandb.log(
             {
@@ -234,7 +248,13 @@ def zero_shot_prediction(model: SeqVAE, dms_data: pd.DataFrame, metadata: pd.Dat
 
     # Predict fitness of DMS variants for ENTIRE dataset
     spear_rho, k_recall, ndcg, roc_auc = fitness_prediction(
-        model, dms_data, None, metadata, current_epoch, config.epochs, stop_early,
+        model,
+        dms_data,
+        None,
+        metadata,
+        current_epoch,
+        config.epochs,
+        stop_early,
     )
     wandb.log(
         {
@@ -282,7 +302,9 @@ def fitness_prediction(
         # reshape into (1, seq_len, AA_count)
         orig_shape = wild_model_encoding.shape[0:-1]
         wild_model_encoding = torch.unsqueeze(wild_model_encoding, -1)
-        wild_model_encoding = wild_model_encoding.view(orig_shape + (-1, model.AA_COUNT))
+        wild_model_encoding = wild_model_encoding.view(
+            orig_shape + (-1, model.AA_COUNT)
+        )
 
         # remove first dim which is just 1 for both tensors
         wild_model_encoding = wild_model_encoding.squeeze(0)
@@ -294,7 +316,6 @@ def fitness_prediction(
         # pass all variants through the model
         variant_encodings = torch.Tensor(np.stack(dms_data["encoding"].values))
         variant_model_outputs, _, _, _ = model(variant_encodings)
-
 
     # now make fitness estimates
     model_scores = []
@@ -356,5 +377,3 @@ def split_by_mutations(dms_data: DataFrame) -> Dict[int, DataFrame]:
         subframes[count] = dms_data[dms_data["mut_count"] == count]
 
     return subframes
-
-
