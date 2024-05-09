@@ -29,12 +29,13 @@ class EarlyStopper:
 
         if val_loss < self.min_val_loss:
             self.counter = 0
-            self.min_val_loss = val_loss
 
         elif val_loss > self.min_val_loss:
             self.counter += 1
             if self.counter >= self.patience:
                 return True
+
+        self.min_val_loss = val_loss
 
         return False
 
