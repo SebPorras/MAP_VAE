@@ -7,16 +7,16 @@ AA_count: 21  # standard AA + gap
 test_split: 0.2
 max_mutation: 4 # how many mutations the model will test up to
 # ADAM
-learning_rate: 0.01 # ADAM
+learning_rate: 0.0001 # ADAM
 weight_decay: 0.0001 # ADAM
 # Hidden units
 momentum: None
 dropout: None
 # Training loop
-epochs: 40
+epochs: 500
 batch_size: 128
-patience: 20
-max_norm: 20  # gradient clipping
+patience: 20000
+max_norm: 1.5  # gradient clipping
 # Model info - default settings
 architecture: SeqVAE_reg_softmax
 latent_dims: 3

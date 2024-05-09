@@ -2,7 +2,7 @@ from evoVAE.models.types_ import *
 import torch
 from evoVAE.models.seqVAE import SeqVAE
 from torch import nn
-from evoVAE.loss.standard_loss import KL_divergence, gaussian_likelihood
+from evoVAE.loss.standard_loss import KL_divergence, sequence_likelihood
 import torch.nn.functional as F
 from typing import Dict
 
@@ -74,6 +74,7 @@ class SeqVAETest(SeqVAE):
 
     def loss_function(
         self,
+        x: Tensor,
         modelOutputs: Tuple[Tensor, Tensor, Tensor, Tensor],
         input: Tensor,
         seq_weight: float,
@@ -84,25 +85,20 @@ class SeqVAETest(SeqVAE):
         """
 
         xHat, zSample, zMu, zLogvar = modelOutputs
+    
+        # KLD across whole all dimensions for each x
+        KLD = KL_divergence(zMu, zLogvar, zSample, weights)
 
-        # average KL across whole batch
-        KLD = KL_divergence(zMu, zLogvar, zSample, seq_weight)
+        # estimate likelihood of each input sequence 
+        log_PxGz = sequence_likelihood(x, xHat)
 
-        input_shape = tuple(xHat.shape[0:-1])
-        xHat = torch.unsqueeze(xHat, -1)
-        xHat = xHat.view(input_shape + (-1, self.AA_COUNT))
-
-        log_PxGz = torch.sum(input * xHat, -1)
-
-        # no weighting yet on KLD or recon
-        print(log_PxGz[:, :2])
+        # remove KLD and then use normalised sequence weights
         elbo = log_PxGz - KLD
-        print(elbo.shape)
-        print(elbo[:, :2])
-
-        elbo = 0 #kl - likelihood
+        norm_weight = weights / torch.sum(weights)
+        elbo = torch.sum(elbo * norm_weight)
 
         return elbo, KLD.detach(), log_PxGz.detach()
+
 
     def forward(self, raw_input: Tensor) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
         """

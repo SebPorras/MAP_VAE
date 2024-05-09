@@ -2,7 +2,7 @@ from evoVAE.models.types_ import *
 import torch
 from evoVAE.models.base import BaseVAE
 from torch import nn
-from evoVAE.loss.standard_loss import KL_divergence, gaussian_likelihood
+from evoVAE.loss.standard_loss import KL_divergence, sequence_likelihood
 import torch.nn.functional as F
 from typing import Dict
 import numpy as np
@@ -154,7 +154,7 @@ class SeqVAE(BaseVAE):
     def loss_function(
         self,
         modelOutputs: Tuple[Tensor, Tensor, Tensor, Tensor],
-        input: Tensor,
+        x: Tensor,
         seq_weight: Tensor,
         epoch: int,
         anneal_schedule: np.ndarray,
@@ -166,24 +166,25 @@ class SeqVAE(BaseVAE):
         Returns:
         elbo, kld, recon_loss
         """
-
+        
         xHat, zSample, zMu, zLogvar = modelOutputs
-
-        # average KL across whole batch
+    
+        # KLD across whole all dimensions for each x
         kld = KL_divergence(zMu, zLogvar, zSample, seq_weight)
 
-        # averaged across the whole batch
-        recon_loss = gaussian_likelihood(
-            xHat,
-            self.logStandardDeviation,
-            torch.flatten(input, start_dim=1),
-            seq_weight,
-        )
+        # Recon loss: estimate likelihood of each input sequence 
+        log_PxGz = sequence_likelihood(x, xHat)
 
-        # vary the strength of KLD to prevent it vanishing
-        elbo = (anneal_schedule[epoch] * kld) - recon_loss
+        # remove KLD and then use normalised sequence weights
+        elbo = log_PxGz - (kld * anneal_schedule[epoch])
+        norm_weight = seq_weight / torch.sum(seq_weight)
 
-        return elbo, kld.detach(), recon_loss.detach()
+        # reweight 
+        elbo = torch.sum(elbo * norm_weight)
+        recon_weighted = torch.sum(log_PxGz * norm_weight)
+        reg_weighted = torch.sum(kld * norm_weight)
+        
+        return elbo, reg_weighted.detach(), recon_weighted.detach()
 
     def generate(self, x: Tensor) -> Tensor:
         """Return the reconstructed input
