@@ -180,7 +180,7 @@ class SeqVAE(BaseVAE):
         norm_weight = seq_weight / torch.sum(seq_weight)
 
         # reweight 
-        elbo = torch.sum(elbo * norm_weight)
+        elbo = (-1) * torch.sum(elbo * norm_weight)
         recon_weighted = torch.sum(log_PxGz * norm_weight)
         reg_weighted = torch.sum(kld * norm_weight)
         
