@@ -1,26 +1,28 @@
 # Dataset info
-alignment: ../data/GFP_AEQVI_full_04-29-2022_b08_ancestors_extants_no_syn.pkl
+alignment: ../data/gfp/GFP_AEQVI_full_04-29-2022_b08_extants_no_syn_no_dupes.pkl
+info: gfp_extants_no_duplicates
+project: SeqVAE_training
 seq_theta: 0.2  # reweighting
 AA_count: 21  # standard AA + gap
 test_split: 0.2
-max_mutation: 4  # how many mutations the model will test up to
+max_mutation: 4 # how many mutations the model will test up to
 # ADAM
-learning_rate: 0.001 # ADAM
+learning_rate: 0.01 # ADAM
 weight_decay: 0.0001 # ADAM
 # Hidden units
 momentum: None
 dropout: None
 # Training loop
-epochs: 500
+epochs: 40
 batch_size: 128
-max_norm: 1.5  # gradient clipping
-patience: 5
+patience: 20
+max_norm: 20  # gradient clipping
 # Model info - default settings
 architecture: SeqVAE_reg_softmax
-latent_dims: 10
+latent_dims: 3
 hidden_dims: [256, 128, 64]
 # DMS data
-dms_file: ../data/GFP_AEQVI_Sarkisyan_2016_dms_encoded.pkl
+dms_file: ../data/gfp/GFP_AEQVI_Sarkisyan_2016_dms_encoded.pkl
 dms_metadata: ../data/DMS_substitutions.csv
 dms_id: GFP_AEQVI_Sarkisyan_2016
 

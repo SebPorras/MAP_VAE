@@ -18,7 +18,7 @@ with open(sys.argv[CONFIG_FILE], "r") as stream:
 
 # %%
 wandb.init(
-    project="GB1_SeqVAE",
+    project=settings["project"],
     # hyperparameters
     config=settings,
 )
@@ -35,8 +35,8 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Read in the datasets and create train and validation sets
 # Assume that encodings and weights have been calculated.
-# outgroup ancestors have already been removed.
 ancestors_aln = pd.read_pickle(config.alignment)
+
 train, val = train_test_split(ancestors_aln, test_size=config.test_split)
 
 # TRAINING

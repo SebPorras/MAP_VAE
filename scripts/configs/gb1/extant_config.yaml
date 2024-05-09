@@ -1,5 +1,7 @@
 # Dataset info
-alignment: ../data/gb1/SPG1_STRSG_full_b0.1_filt_encoded_weighted.pkl
+alignment: ../data/gb1/SPG1_STRSG_full_b0.1_filt_encoded_weighted_no_dupes.pkl
+info: gb1_extants_no_dupes
+project: GB1_SeqVAE
 seq_theta: 0.2  # reweighting
 AA_count: 21  # standard AA + gap
 test_split: 0.2
@@ -11,10 +13,10 @@ weight_decay: 0.0001 # ADAM
 momentum: None
 dropout: None
 # Training loop
-epochs: 500
+epochs: 15
 batch_size: 128
-patience: 5
-max_norm: 1.5  # gradient clipping
+patience: 20
+max_norm: 20  # gradient clipping
 # Model info - default settings
 architecture: SeqVAE_reg_softmax
 latent_dims: 10
