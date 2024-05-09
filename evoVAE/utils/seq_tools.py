@@ -430,3 +430,60 @@ def sample_ancestor_trees(
     ]
 
     return sampled_ancestors
+
+def convert_msa_numpy_array(aln: pd.DataFrame):
+    sequence_pattern_dict = {}
+    seq_msa = []
+    seq_key = []
+    seq_label = []
+
+    lb = 0
+
+    for id, seq in zip(aln["id"], aln["sequence"]):
+        seq_trns = [AA_TO_IDX[s] for s in seq]
+        seq_trns_m = "".join([str(x) for x in seq_trns])
+        seq_msa.append(seq_trns)
+        seq_key.append(id)
+
+        if seq_trns_m not in sequence_pattern_dict:
+            sequence_pattern_dict.update({seq_trns_m: lb})
+            lb = lb + 1
+
+        seq_label.append(sequence_pattern_dict[seq_trns_m])
+
+    seq_msa = np.array(seq_msa)
+
+    print("Sequence converted to numpy array with shape", seq_msa.shape)
+    return seq_msa, seq_key, seq_label
+
+def sequence_weight(seq_msa):
+    """
+    Alternative way of reweighting based off 
+    https://www.nature.com/articles/s41467-019-13633-0#Sec9 and implemented 
+    originally by Sanjana Tule.
+    """
+
+    seq_weight = np.zeros(seq_msa.shape)
+    NUM_SEQS = 0
+    SEQ_LEN = 1
+    for j in range(seq_msa.shape[SEQ_LEN]):
+        aa_type, aa_counts = np.unique(seq_msa[:, j], return_counts=True)
+
+        num_type = len(aa_type)
+        aa_dict = {}
+        for a in aa_type:
+            aa_dict[a] = aa_counts[list(aa_type).index(a)]
+
+        for i in range(seq_msa.shape[NUM_SEQS]):
+
+            seq_weight[i, j] = (1.0 / num_type) * (
+                1.0 / aa_dict[seq_msa[i, j]]
+            )  
+
+    tot_weight = np.sum(seq_weight)
+    seq_weight = seq_weight.sum(axis=1) / tot_weight
+    print("Sequence weight numpy array created with shape", seq_weight.shape)
+    return seq_weight
+
+
+

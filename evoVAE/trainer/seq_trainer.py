@@ -90,7 +90,7 @@ def seq_train(
             break
 
     model.cpu()
-    torch.save(model.state_dict(), "gb1_model_an_ex.pt")
+    torch.save(model.state_dict(), f"{config.info}_model_state.pt")
 
     return model
 

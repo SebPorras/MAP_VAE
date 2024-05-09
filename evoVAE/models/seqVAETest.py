@@ -86,16 +86,57 @@ class SeqVAETest(SeqVAE):
         xHat, zSample, zMu, zLogvar = modelOutputs
 
         # average KL across whole batch
-        kl = KL_divergence(zMu, zLogvar, zSample, seq_weight)
+        KLD = KL_divergence(zMu, zLogvar, zSample, seq_weight)
 
-        # averaged across the whole batch
-        likelihood = gaussian_likelihood(
-            xHat,
-            self.logStandardDeviation,
-            torch.flatten(input, start_dim=1),
-            seq_weight,
-        )
+        input_shape = tuple(xHat.shape[0:-1])
+        xHat = torch.unsqueeze(xHat, -1)
+        xHat = xHat.view(input_shape + (-1, self.AA_COUNT))
 
-        elbo = kl - likelihood
+        log_PxGz = torch.sum(input * xHat, -1)
 
-        return elbo, kl.detach(), likelihood.detach()
+        # no weighting yet on KLD or recon
+        print(log_PxGz[:, :2])
+        elbo = log_PxGz - KLD
+        print(elbo.shape)
+        print(elbo[:, :2])
+
+        elbo = 0 #kl - likelihood
+
+        return elbo, KLD.detach(), log_PxGz.detach()
+
+    def forward(self, raw_input: Tensor) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
+        """
+        Complete the forward pass.
+
+        Return:
+        log_p, z_sample, z_mu, z_logvar
+        """
+
+        flat_input = torch.flatten(raw_input, start_dim=1)
+
+        # encode for q_phi mu and log variance
+        z_mu, z_logvar = self.encode(flat_input)
+
+        # sample from the distribution
+        z_sample = self.reparameterise(z_mu, z_logvar)
+
+        x_hat = self.decode(z_sample)
+
+        # record input shape
+        input_shape = tuple(x_hat.shape[0:-1])
+
+        # add on extra dimension
+        x_hat = torch.unsqueeze(x_hat, -1)
+
+        # reshape back to original one-hot input size
+        x_hat = x_hat.view(input_shape + (-1, self.AA_COUNT))
+
+        # apply the softmax over last dim, i.e the 21 amino acids
+        log_p = F.log_softmax(x_hat, dim=-1)
+        # log_p = F.softmax(x_hat, dim=-1)
+
+        # reflatten our probability distribution
+        log_p = log_p.view(input_shape + (-1,))
+
+        return log_p, z_sample, z_mu, z_logvar
+
