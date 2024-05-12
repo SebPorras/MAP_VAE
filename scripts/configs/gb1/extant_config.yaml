@@ -13,9 +13,9 @@ weight_decay: 0.0001 # ADAM
 momentum: None
 dropout: None
 # Training loop
-epochs: 400
+epochs: 350
 batch_size: 128
-patience: 3
+patience: 5
 max_norm: 5  # gradient clipping
 # Model info - default settings
 architecture: SeqVAE_reg_softmax

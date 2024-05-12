@@ -15,7 +15,7 @@ dropout: None
 # Training loop
 epochs: 250
 batch_size: 128
-max_norm: 20  # gradient clipping
+max_norm: 10  # gradient clipping
 patience: 5
 # Model info - default settings
 architecture: SeqVAE_reg_softmax

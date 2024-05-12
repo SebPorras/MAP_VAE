@@ -38,6 +38,8 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 ancestors_aln = pd.read_pickle(config.alignment)
 
 train, val = train_test_split(ancestors_aln, test_size=config.test_split)
+print(f"Train shape: {train.shape}")
+print(f"Validation shape: {val.shape}")
 
 # TRAINING
 train_dataset = MSA_Dataset(train["encoding"], train["weights"], train["id"])
@@ -69,6 +71,7 @@ BATCH_ZERO = 0
 SEQ_ZERO = 0
 seq_len = train_dataset[BATCH_ZERO][SEQ_ZERO].shape[SEQ_LEN]
 input_dims = seq_len * config.AA_count
+print(f"Seq length: {seq_len}")
 
 # instantiate the model
 model = SeqVAE(

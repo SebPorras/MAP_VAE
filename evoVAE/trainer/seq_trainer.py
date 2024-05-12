@@ -129,7 +129,7 @@ def train_loop(
         loss, kl, likelihood = model.loss_function(
             modelOutputs, encoding, weights, epoch, anneal_schedule
         )
-        print(loss, kl, likelihood)
+        #print(loss, kl, likelihood)
 
         # update epoch metrics
         epoch_loss += loss.item()
