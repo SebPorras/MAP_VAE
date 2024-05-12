@@ -16,25 +16,27 @@ import matplotlib.pyplot as plt
 class EarlyStopper:
     """
     Will trigger when validation loss increases
-
     """
 
     def __init__(self, patience=3) -> None:
 
         self.patience = patience
         self.counter = 0
-        self.min_val_loss = float("inf")
+        self.min_val_loss = None
 
     def early_stop(self, val_loss: float):
 
-        if val_loss < self.min_val_loss:
-            self.counter = 0
+        if self.min_val_loss is None:
+            self.min_val_loss = val_loss
 
-        elif val_loss > self.min_val_loss:
+        if val_loss > self.min_val_loss:
             self.counter += 1
+
             if self.counter >= self.patience:
                 return True
-
+        else:
+            self.counter = 0
+        
         self.min_val_loss = val_loss
 
         return False
@@ -75,6 +77,7 @@ def seq_train(
         train_loop(
             model, train_loader, optimiser, device, config, iteration, anneal_schedule
         )
+
         stop_early = validation_loop(
             model,
             val_loader,
@@ -204,7 +207,7 @@ def validation_loop(
         }
     )
 
-    stop_early = early_stopper.early_stop(epoch_val_elbo / batch_count)
+    stop_early = early_stopper.early_stop((epoch_val_elbo / batch_count))
 
     # predict variant fitnesses
     zero_shot_prediction(model, dms_data, metadata, config, current_epoch, stop_early)
