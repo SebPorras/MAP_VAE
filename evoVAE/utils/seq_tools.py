@@ -274,31 +274,93 @@ def calc_average_residue_distribution(
 
 
 def calc_position_prob_matrix(seqs: pd.DataFrame):
+    """
+    Take in a DataFrame and create a position probabilty matrix.
+
+    Source:
+    https://github.com/loschmidt/vae-dehalogenases
+
+    Returns:
+    An array of size (Alphabet_len, seq_len)
+    """
 
     # position_freq_matrix(pfm)
     pfm = calc_position_freq_matrix(seqs)
 
-    # make a position probability matrix
-    for column in pfm:
-        total = np.sum(column)
-        column /= total
+    # normalise
+    SEQ_COUNT = 0
+    ppm = pfm / seqs.shape[SEQ_COUNT]
 
     # makes columns positoins in the sequence
-    return pfm.T
+    return ppm
 
 
 def calc_position_freq_matrix(seqs: pd.DataFrame) -> np.ndarray:
+    """
+    Take in a DataFrame and create a position frequence matrix.
 
-    encodings = np.stack(seqs["encoding"].values)
+    Source:
+    https://github.com/loschmidt/vae-dehalogenases
 
-    pfm = np.zeros(encodings.shape[1:])
+    Returns:
+    An array of size (Alphabet_len, seq_len)
+    """
 
-    for seq in seqs["sequence"]:
-        for row, letter in enumerate(seq):
-            index = AA_TO_IDX[letter]
-            pfm[row][index] += 1
+    msa, _, _ = convert_msa_numpy_array(seqs)
+
+    SEQ_COUNT = 0
+    COLS = 1
+
+    # shape (21, seq_len)
+    pfm = np.zeros((GAPPY_ALPHABET_LEN, msa.shape[COLS]))
+
+    for j in range(msa.shape[COLS]):
+        col_j = msa[:, j]
+        for residue in range(GAPPY_ALPHABET_LEN):
+            pfm[residue, j] = np.where(col_j == residue)[0].shape[SEQ_COUNT]
 
     return pfm
+
+
+def safe_log(x, eps=1e-10):
+    """
+    Calculate numerically stable log.
+
+    Source:
+    https://github.com/loschmidt/vae-dehalogenases/
+    """
+
+    # return -10 if x is less than eps
+    result = np.where(x > eps, x, -10)
+
+    # save the result, avoiding zeros or negatives
+    np.log(result, out=result, where=result > 0)
+    return result
+
+
+def calc_shannon_entropy(seqs: pd.DataFrame) -> np.ndarray:
+
+    msa, _, _ = convert_msa_numpy_array(seqs)
+
+    SEQ_COUNT = 0
+    COLS = 1
+    # find entropy for each column
+    entropy = np.zeros(msa.shape[COLS])
+
+    # shape (21, seq_len)
+    pfm = np.zeros((GAPPY_ALPHABET_LEN, msa.shape[COLS]))
+
+    for j in range(msa.shape[COLS]):
+        col_j = msa[:, j]
+        for residue in range(GAPPY_ALPHABET_LEN):
+            pfm[residue, j] = np.where(col_j == residue)[0].shape[SEQ_COUNT]
+
+        col_prob = pfm[:, j] / seqs.shape[SEQ_COUNT]
+
+        # -SUM(p(x) * log(p(x)))
+        entropy[j] = -np.sum(col_prob * safe_log(col_prob))
+
+    return entropy
 
 
 def create_euclidean_dist_matrix(
@@ -431,6 +493,7 @@ def sample_ancestor_trees(
 
     return sampled_ancestors
 
+
 def convert_msa_numpy_array(aln: pd.DataFrame):
     sequence_pattern_dict = {}
     seq_msa = []
@@ -456,10 +519,11 @@ def convert_msa_numpy_array(aln: pd.DataFrame):
     print("Sequence converted to numpy array with shape", seq_msa.shape)
     return seq_msa, seq_key, seq_label
 
+
 def sequence_weight(seq_msa):
     """
-    Alternative way of reweighting based off 
-    https://www.nature.com/articles/s41467-019-13633-0#Sec9 and implemented 
+    Alternative way of reweighting based off
+    https://www.nature.com/articles/s41467-019-13633-0#Sec9 and implemented
     originally by Sanjana Tule.
     """
 
@@ -476,14 +540,9 @@ def sequence_weight(seq_msa):
 
         for i in range(seq_msa.shape[NUM_SEQS]):
 
-            seq_weight[i, j] = (1.0 / num_type) * (
-                1.0 / aa_dict[seq_msa[i, j]]
-            )  
+            seq_weight[i, j] = (1.0 / num_type) * (1.0 / aa_dict[seq_msa[i, j]])
 
     tot_weight = np.sum(seq_weight)
     seq_weight = seq_weight.sum(axis=1) / tot_weight
     print("Sequence weight numpy array created with shape", seq_weight.shape)
     return seq_weight
-
-
-
