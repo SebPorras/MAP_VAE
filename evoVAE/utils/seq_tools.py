@@ -5,15 +5,10 @@ before they are passed to the VAE.
 """
 
 import numpy as np
-from typing import Tuple, Dict, List
+from typing import Tuple
 import pandas as pd
 import evoVAE.utils.metrics as mt
-from scipy.spatial import distance_matrix
-from scipy.spatial.distance import euclidean
-import matplotlib.pyplot as plt
-from ete3 import Tree
-
-import torch, re, math, random
+import torch, re, math
 
 
 GAPPY_PROTEIN_ALPHABET = [
@@ -199,24 +194,6 @@ def one_hot_to_seq(encoding: torch.Tensor, is_tensor: True) -> str:
     return "".join(IDX_TO_AA[char] for char in aa_indices)
 
 
-def reweight_sequences(sequences: np.ndarray, theta: float) -> np.ndarray:
-    """Take in a Series of sequences and calculate the new weights. Sequences
-    are deemed to be clustered if (mutation_count/seq_len) < theta."""
-
-    weights = np.ones(len(sequences))
-
-    for i in range(len(sequences)):
-        for j in range(i + 1, len(sequences)):
-            if (
-                mt.hamming_distance(sequences[i], sequences[j]) / len(sequences[i])
-                < theta
-            ):
-                weights[i] += 1
-                weights[j] += 1
-
-    return np.fromiter((map(lambda x: 1.0 / x, weights)), dtype=float)
-
-
 def encode_and_weight_seqs(
     seqs: pd.Series,
     theta: float,
@@ -231,267 +208,10 @@ def encode_and_weight_seqs(
 
     weights = None
     if reweight:
-        weights = reweight_sequences(seqs.values, theta=theta)
+        weights = reweight_by_seq_similarity(seqs.values, theta=theta)
         print(f"The sequence weight array has size: {weights.shape}\n")
 
     return encodings, weights
-
-
-def calc_mean_seq_embeddings(seqs: pd.DataFrame) -> Dict[str, np.ndarray]:
-    """
-    Read in an alignment or aln file and calculate the distribution
-    of amino acids in each sequence for every sequence in the file.
-
-    Return:
-    A dictionary mapping seq ID to embedding means.
-    """
-
-    aa_means = {}
-
-    for name, seq in zip(seqs["id"], seqs["encoding"]):
-        aa_means[name] = seq.mean(axis=0)
-
-    return aa_means
-
-
-def calc_average_residue_distribution(
-    mean_seq_embeddings: Dict[str, np.ndarray],
-    alphabet: List[str] = GAPPY_PROTEIN_ALPHABET,
-):
-    """Calculate the proportion of amino acids in this group of
-    sequences but this is column invariant."""
-
-    encodings = np.stack(list(mean_seq_embeddings.values()))
-    encoding_mean = encodings.mean(axis=0)
-    encoding_std = np.std(encodings, axis=0)
-
-    averages = {
-        letter: {"mean": mean, "std": std}
-        for letter, mean, std in zip(alphabet, encoding_mean, encoding_std)
-    }
-
-    return averages
-
-
-def calc_position_prob_matrix(seqs: pd.DataFrame):
-    """
-    Take in a DataFrame and create a position probabilty matrix.
-
-    Source:
-    https://github.com/loschmidt/vae-dehalogenases
-
-    Returns:
-    An array of size (Alphabet_len, seq_len)
-    """
-
-    # position_freq_matrix(pfm)
-    pfm = calc_position_freq_matrix(seqs)
-
-    # normalise
-    SEQ_COUNT = 0
-    ppm = pfm / seqs.shape[SEQ_COUNT]
-
-    # makes columns positoins in the sequence
-    return ppm
-
-
-def calc_position_freq_matrix(seqs: pd.DataFrame) -> np.ndarray:
-    """
-    Take in a DataFrame and create a position frequence matrix.
-
-    Source:
-    https://github.com/loschmidt/vae-dehalogenases
-
-    Returns:
-    An array of size (Alphabet_len, seq_len)
-    """
-
-    msa, _, _ = convert_msa_numpy_array(seqs)
-
-    SEQ_COUNT = 0
-    COLS = 1
-
-    # shape (21, seq_len)
-    pfm = np.zeros((GAPPY_ALPHABET_LEN, msa.shape[COLS]))
-
-    for j in range(msa.shape[COLS]):
-        col_j = msa[:, j]
-        for residue in range(GAPPY_ALPHABET_LEN):
-            pfm[residue, j] = np.where(col_j == residue)[0].shape[SEQ_COUNT]
-
-    return pfm
-
-
-def safe_log(x, eps=1e-10):
-    """
-    Calculate numerically stable log.
-
-    Source:
-    https://github.com/loschmidt/vae-dehalogenases/
-    """
-
-    # return -10 if x is less than eps
-    result = np.where(x > eps, x, -10)
-
-    # save the result, avoiding zeros or negatives
-    np.log(result, out=result, where=result > 0)
-    return result
-
-
-def calc_shannon_entropy(seqs: pd.DataFrame) -> np.ndarray:
-
-    msa, _, _ = convert_msa_numpy_array(seqs)
-
-    SEQ_COUNT = 0
-    COLS = 1
-    # find entropy for each column
-    entropy = np.zeros(msa.shape[COLS])
-
-    # shape (21, seq_len)
-    pfm = np.zeros((GAPPY_ALPHABET_LEN, msa.shape[COLS]))
-
-    for j in range(msa.shape[COLS]):
-        col_j = msa[:, j]
-        for residue in range(GAPPY_ALPHABET_LEN):
-            pfm[residue, j] = np.where(col_j == residue)[0].shape[SEQ_COUNT]
-
-        col_prob = pfm[:, j] / seqs.shape[SEQ_COUNT]
-
-        # -SUM(p(x) * log(p(x)))
-        entropy[j] = -np.sum(col_prob * safe_log(col_prob))
-
-    return entropy
-
-
-def create_euclidean_dist_matrix(
-    embedding_means: Dict[str, np.ndarray], plot: bool = False
-) -> pd.DataFrame:
-    """
-    Takes a dictionary mapping of seq ID to the distribution
-    of amino acids in a sequence and calculates the euclidean
-    distance between pairs of sequence distributions.
-
-    Return:
-    A DataFrame of the euclidan matrix.
-    """
-
-    ids = list(embedding_means.keys())
-    embeddings = np.array(list(embedding_means.values()))
-
-    dist_mat = distance_matrix(embeddings, embeddings)
-
-    if plot:
-        plt.imshow(dist_mat, cmap="viridis", interpolation="nearest")
-        plt.colorbar(label="Distance")
-        plt.title("Euclidean distance matrix")
-        plt.xticks(range(len(embeddings)), ids, rotation=90)
-        plt.yticks(range(len(embeddings)), ids)
-        plt.xlabel("Samples")
-        plt.ylabel("Samples")
-        plt.show()
-
-    return pd.DataFrame(dist_mat, index=ids, columns=ids)
-
-
-def plot_residue_distributions(data: Dict[str, np.ndarray]) -> None:
-
-    plot_info = [[] for x in range(GAPPY_ALPHABET_LEN)]
-
-    for residues in data.values():
-        for aa_index in range(GAPPY_ALPHABET_LEN):
-            plot_info[aa_index].append(residues[aa_index])
-
-    # Extract category labels, means, and standard deviations
-    plt.figure(figsize=(10, 6))
-    plt.xlabel("Residue")
-    plt.ylabel("Average Residue Proportion")
-    plt.grid(True)
-    plt.boxplot(plot_info)
-    plt.xticks([i for i in range(1, GAPPY_ALPHABET_LEN + 1)], GAPPY_PROTEIN_ALPHABET)
-
-    plt.show()
-
-
-def population_profile_deviation(
-    population: pd.DataFrame, sample: pd.DataFrame
-) -> float:
-
-    # get the average residue proportion across the population
-    pop_means = calc_mean_seq_embeddings(population)
-    pop_means = calc_average_residue_distribution(pop_means)
-
-    # put this in an array to allow comparisons
-    pop_vector = np.array([x["mean"] for x in pop_means.values()])
-
-    sample_means = calc_mean_seq_embeddings(sample)
-    sample_n = len(sample_means)
-
-    total_dist = 0.0
-    for sample_vector in sample_means.values():
-        total_dist += euclidean(pop_vector, sample_vector)
-
-    mean_deviation = total_dist / sample_n
-
-    return mean_deviation
-
-
-def sample_ancestor_nodes(
-    rejection_threshold: float, tree: Tree, tree_run: int
-) -> Tuple[List[str], int]:
-    """Do a level order traversal of a tree, at each ancestor, only sample if a random number
-    between 0 and 1 is below 1 - rejection_threshold.
-
-    Returns:
-    list of node names, the number of nodes sampled
-    """
-
-    sampled_nodes = []
-    for node in tree.traverse():
-
-        # we're only interested in sampling ancestors
-        if node.is_leaf():
-            continue
-
-        if random.random() <= 1 - rejection_threshold:
-            # pkl file format
-            sampled_nodes.append(node.name + f"_tree_{tree_run}")
-
-    return sampled_nodes, len(sampled_nodes)
-
-
-def sample_ancestor_trees(
-    tree_count: int,
-    rejection_threshold: float,
-    invalid_trees: List[int],
-    tree_path: str,
-    ancestor_pkl_path: str,
-    ete_read_setting: int = 1,
-):
-    """
-    Take a path to where all trees are stored. For each tree, sample the ancestor nodes, only taking ancestors and only sampling
-    when a random number is less than 1 - rejection_threshold.
-
-    Returns:
-    A dataframe with all the sampled_ancestors.
-    """
-
-    sampled_names = []
-    for iteration in range(1, tree_count + 1):
-
-        if iteration in invalid_trees:
-            continue
-
-        # default read setting is 1, to allow internal nodes to be read
-        t = Tree(tree_path + f"run_{iteration}_ancestors.nwk", ete_read_setting)
-        names, _ = sample_ancestor_nodes(rejection_threshold, t, iteration)
-        sampled_names += names
-
-    sampled_ancestors = pd.read_pickle(ancestor_pkl_path)
-    sampled_ancestors = sampled_ancestors.loc[
-        sampled_ancestors["id"].isin(sampled_names)
-    ]
-
-    return sampled_ancestors
 
 
 def convert_msa_numpy_array(aln: pd.DataFrame):
@@ -518,6 +238,27 @@ def convert_msa_numpy_array(aln: pd.DataFrame):
 
     print("Sequence converted to numpy array with shape", seq_msa.shape)
     return seq_msa, seq_key, seq_label
+
+
+####### SEQUENCE REWEIGHTING #######
+
+
+def reweight_by_seq_similarity(sequences: np.ndarray, theta: float) -> np.ndarray:
+    """Take in a Series of sequences and calculate the new weights. Sequences
+    are deemed to be clustered if (mutation_count/seq_len) < theta."""
+
+    weights = np.ones(len(sequences))
+
+    for i in range(len(sequences)):
+        for j in range(i + 1, len(sequences)):
+            if (
+                mt.hamming_distance(sequences[i], sequences[j]) / len(sequences[i])
+                < theta
+            ):
+                weights[i] += 1
+                weights[j] += 1
+
+    return np.fromiter((map(lambda x: 1.0 / x, weights)), dtype=float)
 
 
 def sequence_weight(seq_msa):
