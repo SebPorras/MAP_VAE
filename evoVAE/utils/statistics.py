@@ -135,6 +135,9 @@ def calc_shannon_entropy(seqs: pd.DataFrame) -> np.ndarray:
     return entropy
 
 
+###### VISUALISATION FUNCTIONS #######
+
+
 def create_euclidean_dist_matrix(
     embedding_means: Dict[str, np.ndarray], plot: bool = False
 ) -> pd.DataFrame:

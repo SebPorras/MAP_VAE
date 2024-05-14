@@ -236,7 +236,10 @@ def convert_msa_numpy_array(aln: pd.DataFrame):
 
     seq_msa = np.array(seq_msa)
 
-    print("Sequence converted to numpy array with shape", seq_msa.shape)
+    print(
+        "Sequence weight numpy array created with shape (num_seqs, columns): ",
+        seq_msa.shape,
+    )
     return seq_msa, seq_key, seq_label
 
 
@@ -261,7 +264,7 @@ def reweight_by_seq_similarity(sequences: np.ndarray, theta: float) -> np.ndarra
     return np.fromiter((map(lambda x: 1.0 / x, weights)), dtype=float)
 
 
-def sequence_weight(seq_msa):
+def reweight_by_col_frequences(seq_msa: np.ndarray):
     """
     Alternative way of reweighting based off
     https://www.nature.com/articles/s41467-019-13633-0#Sec9 and implemented
@@ -285,5 +288,8 @@ def sequence_weight(seq_msa):
 
     tot_weight = np.sum(seq_weight)
     seq_weight = seq_weight.sum(axis=1) / tot_weight
-    print("Sequence weight numpy array created with shape", seq_weight.shape)
+    print(
+        "Sequence weight numpy array created with shape (num_seqs, columns): ",
+        seq_weight.shape,
+    )
     return seq_weight
