@@ -76,7 +76,7 @@ def pair_wise_covariances(msa):
 
 aln_file = "../data/pair_test.aln"
 orig_aln = pd.read_pickle(aln_file)
-aln = orig_aln.sample(n=3000, random_state=42)
+#aln = orig_aln.sample(n=3000, random_state=42)
 
 
 train_dataset = MSA_Dataset(aln["encoding"], aln["weights"], aln["id"])

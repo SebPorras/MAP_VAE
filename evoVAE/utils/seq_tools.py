@@ -35,7 +35,7 @@ GAPPY_PROTEIN_ALPHABET = [
     "W",
 ]
 
-INVALID_PROTEIN_CHARS = ["B", "J", "X", "Z"]
+INVALID_PROTEIN_CHARS = ["B", "J", "X", "Z", "U"]
 RE_INVALID_PROTEIN_CHARS = "|".join(map(re.escape, INVALID_PROTEIN_CHARS))
 
 GAPPY_ALPHABET_LEN = len(GAPPY_PROTEIN_ALPHABET)
@@ -215,6 +215,10 @@ def encode_and_weight_seqs(
 
 
 def convert_msa_numpy_array(aln: pd.DataFrame):
+    """
+    Returns:
+    seq_msa, seq_key, seq_label
+    """
     sequence_pattern_dict = {}
     seq_msa = []
     seq_key = []
@@ -240,7 +244,7 @@ def convert_msa_numpy_array(aln: pd.DataFrame):
         "Sequence weight numpy array created with shape (num_seqs, columns): ",
         seq_msa.shape,
     )
-    return seq_msa, seq_key, seq_label
+    return seq_msa, seq_label, seq_key
 
 
 ####### SEQUENCE REWEIGHTING #######
