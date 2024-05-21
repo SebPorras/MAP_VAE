@@ -7,6 +7,9 @@ import numpy as np
 from evoVAE.utils.datasets import MSA_Dataset
 from evoVAE.models.seqVAETest import SeqVAETest
 import torch
+import time
+
+start = time.time()
 
 
 def pair_wise_covariances(msa):
@@ -74,9 +77,13 @@ def pair_wise_covariances(msa):
     return covariances
 
 
-aln_file = "../data/pair_test.aln"
+aln_file = "../../data/gb1/gb1_extants_encoded_weighted.pkl"
 orig_aln = pd.read_pickle(aln_file)
 #aln = orig_aln.sample(n=3000, random_state=42)
+<<<<<<< Updated upstream
+=======
+aln = orig_aln
+>>>>>>> Stashed changes
 
 
 train_dataset = MSA_Dataset(aln["encoding"], aln["weights"], aln["id"])
@@ -126,8 +133,9 @@ input_dims = seq_len * 21
 
 
 model_weights = (
-    "../data/gfp/model_weights/ancestors_extants_no_duplicates_gfp_model_state.pt"
+    "../../data/gb1/model_weights/gb1_ancestors_no_dupes_model_state.pt"
 )
+
 model = SeqVAETest(input_dims, 2, hidden_dims=config["hidden_dims"], config=config)
 model.load_state_dict(torch.load(model_weights))
 model.eval()
@@ -190,4 +198,6 @@ actual = pair_wise_covariances(msa)
 
 
 df = pd.DataFrame({"actual": actual, "prediction": predicted})
-df.to_csv("gb1_3000_corv.csv")
+df.to_csv("ancestors_gb1_msa_cov.csv")
+
+print(f"elapsed minutes: {(time.time() - start) / 60}")

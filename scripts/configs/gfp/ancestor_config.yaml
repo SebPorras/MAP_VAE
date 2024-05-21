@@ -1,6 +1,6 @@
 # Dataset info
-alignment: ../data/gfp/GFP_AEQVI_full_04-29-2022_b08_ancestors_no_syn.pkl
-info: gfp_ancestors_no_duplicates
+alignment: ../data/gfp/random_seqs_GFP_AEQVI_full_04-29-2022_b08_ancestors_no_syn_no_dupes.pkl
+info: gfp_random_seqs_size_ancestors_no_duplicates
 project: SeqVAE_training
 seq_theta: 0.2  # reweighting
 AA_count: 21  # standard AA + gap

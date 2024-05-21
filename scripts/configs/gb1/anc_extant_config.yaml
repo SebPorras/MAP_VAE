@@ -1,6 +1,6 @@
 # Dataset info
-alignment: ../data/gb1/gb1_ancestors_extants_encoded_weighted_no_dupes.pkl
-info: gb1_ancestors_extants_no_dupes
+alignment: ../data/gb1/random_seqs_gb1_ancestors_extants_encoded_weighted_no_dupes.pkl
+info: gb1_random_seqs_size_ancestors_extants_no_dupes
 project: GB1_SeqVAE
 seq_theta: 0.2  # reweighting
 AA_count: 21  # standard AA + gap
@@ -13,9 +13,9 @@ weight_decay: 0.0001 # ADAM
 momentum: None
 dropout: None
 # Training loop
-epochs: 350
-batch_size: 128
-patience: 5
+epochs: 300
+batch_size: 64
+patience: 3
 max_norm: 5 # gradient clipping
 # Model info - default settings
 architecture: SeqVAE_reg_softmax
