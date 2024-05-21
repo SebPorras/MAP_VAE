@@ -13,6 +13,7 @@ scripts/wandb
 
 # Non-important data 
 data/FashionMNIST
+data/
 data/dms_data
 data/alignments
 
