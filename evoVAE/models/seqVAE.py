@@ -36,8 +36,6 @@ class SeqVAE(BaseVAE):
                 nn.Sequential(
                     nn.Linear(input_dims, h_dim),
                     nn.LeakyReLU(),
-                    nn.Linear(h_dim, h_dim),
-                    nn.LeakyReLU(),
                 )
             )
             input_dims = h_dim
@@ -61,8 +59,6 @@ class SeqVAE(BaseVAE):
             decoder_modules.append(
                 nn.Sequential(
                     nn.Linear(hidden_dims[i], hidden_dims[i + 1]),
-                    nn.LeakyReLU(),
-                    nn.Linear(hidden_dims[i + 1], hidden_dims[i + 1]),
                     nn.LeakyReLU(),
                 )
             )

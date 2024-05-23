@@ -78,6 +78,7 @@ def seq_train(
             model, train_loader, optimiser, device, config, iteration, anneal_schedule
         )
 
+        stop_early = False
         stop_early = validation_loop(
             model,
             val_loader,
@@ -93,8 +94,8 @@ def seq_train(
         if stop_early:
             break
 
-    model.cpu()
-    torch.save(model.state_dict(), f"{config.info}_model_state.pt")
+    #model.cpu()
+    #torch.save(model.state_dict(), f"{config.info}_model_state.pt")
 
     return model
 
