@@ -55,6 +55,7 @@ def seq_train(
     metadata: DataFrame,
     device,
     config: Dict,
+    unique_id: str,
 ) -> SeqVAE:
 
     model = model.to(device)
@@ -90,6 +91,7 @@ def seq_train(
             config,
             anneal_schedule,
             early_stopper,
+            unique_id,
         )
 
         if stop_early:
@@ -168,6 +170,7 @@ def validation_loop(
     config,
     anneal_schedule: np.ndarray,
     early_stopper: EarlyStopper,
+    unique_id: str,
 ) -> bool:
     """
     Calculate loss on validation set. Will also evaluate how well
@@ -214,7 +217,9 @@ def validation_loop(
     stop_early = early_stopper.early_stop((epoch_val_elbo / batch_count))
 
     # predict variant fitnesses
-    zero_shot_prediction(model, dms_data, metadata, config, current_epoch, stop_early)
+    zero_shot_prediction(
+        model, dms_data, metadata, config, current_epoch, stop_early, unique_id
+    )
 
     return stop_early
 
@@ -226,6 +231,7 @@ def zero_shot_prediction(
     config,
     current_epoch: int,
     stop_early: bool,
+    unique_id: str,
 ):
 
     # split variants by how many mutations they have
@@ -244,6 +250,7 @@ def zero_shot_prediction(
             current_epoch,
             config.epochs,
             stop_early,
+            unique_id,
         )
         wandb.log(
             {
@@ -264,6 +271,7 @@ def zero_shot_prediction(
         current_epoch,
         config.epochs,
         stop_early,
+        unique_id,
     )
     wandb.log(
         {
@@ -284,6 +292,7 @@ def fitness_prediction(
     current_epoch: int,
     max_epoch: int,
     stop_early: bool,
+    unique_id: str,
 ) -> Tuple[float, float, float, float]:
     """
     Briefly, the model produces the representation of the
@@ -352,17 +361,39 @@ def fitness_prediction(
     # or if early stopping has been triggered.
     if (current_epoch == max_epoch - 1) or stop_early:
 
-        title = "Predicted vs Actual Fitness: "
+        # save the final metrics to file.
+        final_metrics = pd.DataFrame(
+            {
+                "run_id": unique_id,
+                "spearman_rho": spear_rho,
+                "top_k_recall": k_recall,
+                "ndcg": ndcg,
+                "roc_auc": roc_auc,
+            }
+        )
+        final_metrics.to_csv(unique_id + "zero_shot.csv")
+
+        # construct a plot of all the predictions
+        title = "predicted_vs_actual_fitness"
         if mutation_count is None:
-            title += "(All variatns)"
+            title += "_all_variants"
         else:
-            title += f"({mutation_count} mutation variants)"
+            title += f"_{mutation_count}_mutation_variants"
         fig, ax = plt.subplots()
 
+        raw_data = pd.DataFrame(
+            {
+                "mutant": dms_data["mutant"],
+                "actual": dms_data["DMS_score"],
+                "predicted": model_scores,
+            }
+        )
+        raw_data.to_csv(unique_id + title + ".csv")
         ax.scatter(dms_data["DMS_score"], model_scores)
         plt.title(title)
         plt.xlabel("Actual")
         plt.ylabel("Prediction")
+        plt.savefig(unique_id + title + ".png")
         wandb.log({title: fig})
 
     return spear_rho, k_recall, ndcg, roc_auc
@@ -389,7 +420,10 @@ def split_by_mutations(dms_data: DataFrame) -> Dict[int, DataFrame]:
 
 
 def calc_reconstruction_accuracy(
-    model: SeqVAE, aln: pd.DataFrame, num_samples: int = 50
+    model: SeqVAE,
+    aln: pd.DataFrame,
+    outfile: "str",
+    num_samples: int = 50,
 ):
 
     train_dataset = MSA_Dataset(aln["encoding"], aln["weights"], aln["id"])
@@ -467,6 +501,9 @@ def calc_reconstruction_accuracy(
 
     # Plot regression line
     plt.plot(x, regression_line, color="red")
+    plt.title("Reconstruction_vs_Actual_MSA_Covariance")
 
-    title = "Reconstruction_vs_Actual_MSA_Covariance"
-    wandb.log({title: fig})
+    filename = outfile + "_covar.png"
+    plt.savefig(filename)
+
+    wandb.log({"pearson_correlation": correlation_coefficient})

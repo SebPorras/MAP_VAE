@@ -11,10 +11,18 @@ import sys, yaml, time
 # %% [markdown]
 # #### Config
 CONFIG_FILE = 1
+ALIGN_FILE = -2
 start = time.time()
 
 with open(sys.argv[CONFIG_FILE], "r") as stream:
     settings = yaml.safe_load(stream)
+
+# example file name would look like  eg. /data/gb1_ancestors.aln
+training_aln = settings["alignment"].split("/")[-1].split(".")[ALIGN_FILE]
+# alignment to calculate covariances on. eg. /data/gb1_extants.pkl
+covar_aln = settings["extant_aln"].split("/")[-1].split(".")[ALIGN_FILE]
+unique_id = f"lr_{settings["learning_rate"]}_b_{settings["batch_size"]}_wdecay_{settings["weight_decay"]}_train_{training_aln}_dms_{settings["dms_id"]}_covar_{covar_aln}"
+
 
 # %%
 wandb.init(
@@ -95,10 +103,11 @@ trained_model = seq_train(
     metadata=metadata,
     device=device,
     config=config,
+    unique_id=unique_id
 )
 
 extant_aln = pd.read_pickle(config.extant_aln)
-calc_reconstruction_accuracy(trained_model, extant_aln)
+calc_reconstruction_accuracy(trained_model, unique_id, extant_aln)
 
 print(f"elapsed minutes: {(time.time() - start) / 60}")
 
