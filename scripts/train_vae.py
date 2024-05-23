@@ -1,16 +1,17 @@
 # %%
 from evoVAE.utils.datasets import MSA_Dataset
 from evoVAE.models.seqVAE import SeqVAE
-from evoVAE.trainer.seq_trainer import seq_train
+from evoVAE.trainer.seq_trainer import seq_train, calc_reconstruction_accuracy
 from sklearn.model_selection import train_test_split
 import pandas as pd
 import torch
 import wandb
-import sys, yaml
+import sys, yaml, time
 
 # %% [markdown]
 # #### Config
 CONFIG_FILE = 1
+start = time.time()
 
 with open(sys.argv[CONFIG_FILE], "r") as stream:
     settings = yaml.safe_load(stream)
@@ -95,6 +96,11 @@ trained_model = seq_train(
     device=device,
     config=config,
 )
+
+extant_aln = pd.read_pickle(config.extant_aln)
+calc_reconstruction_accuracy(trained_model, extant_aln)
+
+print(f"elapsed minutes: {(time.time() - start) / 60}")
 
 # %%
 wandb.finish()

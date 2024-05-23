@@ -79,11 +79,7 @@ def pair_wise_covariances(msa):
 
 aln_file = "../../data/gb1/gb1_extants_encoded_weighted.pkl"
 orig_aln = pd.read_pickle(aln_file)
-#aln = orig_aln.sample(n=3000, random_state=42)
-<<<<<<< Updated upstream
-=======
-aln = orig_aln
->>>>>>> Stashed changes
+aln = orig_aln.sample(n=3000, random_state=42)
 
 
 train_dataset = MSA_Dataset(aln["encoding"], aln["weights"], aln["id"])
@@ -132,9 +128,7 @@ seq_len = train_dataset[BATCH_ZERO][SEQ_ZERO].shape[SEQ_LEN]
 input_dims = seq_len * 21
 
 
-model_weights = (
-    "../../data/gb1/model_weights/gb1_ancestors_no_dupes_model_state.pt"
-)
+model_weights = "../../data/gb1/model_weights/gb1_ancestors_no_dupes_model_state.pt"
 
 model = SeqVAETest(input_dims, 2, hidden_dims=config["hidden_dims"], config=config)
 model.load_state_dict(torch.load(model_weights))

@@ -10,6 +10,8 @@ from typing import Dict, Tuple
 from torch.utils.data import DataLoader
 import wandb
 import matplotlib.pyplot as plt
+from evoVAE.utils.datasets import MSA_Dataset
+import evoVAE.utils.statistics as stats
 
 
 ### EARLY STOPPING ###
@@ -36,7 +38,7 @@ class EarlyStopper:
                 return True
         else:
             self.counter = 0
-        
+
         self.min_val_loss = val_loss
 
         return False
@@ -78,7 +80,6 @@ def seq_train(
             model, train_loader, optimiser, device, config, iteration, anneal_schedule
         )
 
-        stop_early = False
         stop_early = validation_loop(
             model,
             val_loader,
@@ -94,8 +95,10 @@ def seq_train(
         if stop_early:
             break
 
-    #model.cpu()
-    #torch.save(model.state_dict(), f"{config.info}_model_state.pt")
+    # model.cpu()
+    # torch.save(model.state_dict(), f"{config.info}_model_state.pt")
+    # model.cpu()
+    # torch.save(model.state_dict(), f"{config.info}_model_state.pt")
 
     return model
 
@@ -130,7 +133,7 @@ def train_loop(
         loss, kl, likelihood = model.loss_function(
             modelOutputs, encoding, weights, epoch, anneal_schedule
         )
-        #print(loss, kl, likelihood)
+        # print(loss, kl, likelihood)
 
         # update epoch metrics
         epoch_loss += loss.item()
@@ -383,3 +386,87 @@ def split_by_mutations(dms_data: DataFrame) -> Dict[int, DataFrame]:
         subframes[count] = dms_data[dms_data["mut_count"] == count]
 
     return subframes
+
+
+def calc_reconstruction_accuracy(
+    model: SeqVAE, aln: pd.DataFrame, num_samples: int = 50
+):
+
+    train_dataset = MSA_Dataset(aln["encoding"], aln["weights"], aln["id"])
+    train_loader = torch.utils.data.DataLoader(
+        train_dataset, batch_size=512, shuffle=False
+    )
+
+    ids = []
+    x_hats = []
+
+    for encoding, _, name in train_loader:
+
+        encoding = encoding.float()
+        encoding = torch.flatten(encoding, start_dim=1)
+        # print(encoding.shape)
+
+        # create a tensor for each of the samples
+        encoding = encoding.expand(num_samples, encoding.shape[0], encoding.shape[1])
+        # print(encoding.shape)
+        # print(encoding.shape)
+        z_mu, z_logvar = model.encode(encoding.float())
+        z_samples = model.reparameterise(z_mu, z_logvar)
+        # print(z_samples.shape)
+        # print(z_samples[:, 0, :])
+        mean_z = torch.mean(z_samples, dim=0)
+        x_hat = model.decode(mean_z)
+
+        ids.extend(name)
+        x_hats.extend(x_hat.detach())
+
+    # EVALUATE DIFFERENCES BETWEEN THE RECONSTRUCTIONS AND INPUT
+    orig_shape = tuple(aln["encoding"].values[0].shape)
+    recons = []
+    for x_hat in x_hats:
+
+        # decode the Z sample and get it into a PPM shape
+        x_hat = x_hat.unsqueeze(-1)
+        # print(x_hat.shape)
+        x_hat = x_hat.view(orig_shape)
+
+        indices = x_hat.max(dim=-1).indices.tolist()
+        recon = "".join([st.GAPPY_PROTEIN_ALPHABET[x] for x in indices])
+        recons.append(recon)
+
+    recons_df = pd.DataFrame({"id": ids, "sequence": recons})
+    recon_msa, _, _ = st.convert_msa_numpy_array(recons_df)
+    predicted = stats.pair_wise_covariances(recon_msa)
+
+    msa, _, _ = st.convert_msa_numpy_array(aln)
+    actual = stats.pair_wise_covariances(msa)
+
+    corr_data = pd.DataFrame({"actual": actual, "prediction": predicted})
+
+    fig, ax = plt.subplots()
+
+    plt.scatter(corr_data["actual"], corr_data["prediction"])
+    plt.xlabel("MSA covariance")
+    plt.ylabel("Reconstruction covariance")
+    slope, intercept = np.polyfit(corr_data["actual"], corr_data["prediction"], 1)
+    x = np.arange(min(corr_data["actual"]), max(corr_data["actual"]) + 0.1, 0.1)
+    regression_line = slope * x + intercept
+
+    # Calculate correlation coefficient
+    correlation_coefficient = np.corrcoef(corr_data["actual"], corr_data["prediction"])[
+        0, 1
+    ]
+
+    # Display correlation value
+    plt.text(
+        plt.xlim()[0],
+        plt.ylim()[1],
+        f"Pearson's correlation: {correlation_coefficient:.3f}",
+        va="top",
+    )
+
+    # Plot regression line
+    plt.plot(x, regression_line, color="red")
+
+    title = "Reconstruction_vs_Actual_MSA_Covariance"
+    wandb.log({title: fig})

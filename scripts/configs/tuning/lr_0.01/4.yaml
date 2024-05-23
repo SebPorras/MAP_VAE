@@ -26,3 +26,5 @@ dms_file: /scratch/user/s4646506/gb1/dms_data/SPG1_STRSG_Wu_2016.pkl
 dms_metadata: /scratch/user/s4646506/evoVAE/data/DMS_substitutions.csv
 dms_id: SPG1_STRSG_Wu_2016
 
+extant_config: /scratch/user/s4646506/gb1/encoded_weighted/gb1_extants_encoded_weighted_no_dupes.pkl
+extant_aln: /scratch/user/s4646506/gb1/encoded_weighted/gb1_extants_encoded_weighted_no_dupes.pkl

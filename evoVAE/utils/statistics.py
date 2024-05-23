@@ -135,6 +135,71 @@ def calc_shannon_entropy(seqs: pd.DataFrame) -> np.ndarray:
     return entropy
 
 
+def pair_wise_covariances(msa):
+
+    SEQ_COUNT = 0
+    COLS = 1
+
+    pairs = []
+    for i in range(st.GAPPY_ALPHABET_LEN):
+        pairs.extend([(i, j) for j in range(i + 1, st.GAPPY_ALPHABET_LEN)])
+
+    # the number of unique ways we can compare columns in the MSA
+    column_combinations = msa.shape[COLS] * (msa.shape[COLS] - 1) // 2
+    # number of different residue combinations we can have
+    aa_combinations = st.GAPPY_ALPHABET_LEN**2
+
+    num_seqs = msa.shape[SEQ_COUNT]
+    num_columns = msa.shape[COLS]
+
+    # each column has aa_combinations many ways to combine residues
+    # this is an upper triangular matrix but we will store it in a linear format.
+    covariances = np.zeros(column_combinations * aa_combinations)
+
+    # keep track of which column combination we're up to
+    col_combination_count = 0
+    for i in range(num_columns - 1):
+        for j in range(i + 1, num_columns):
+            col_i = msa[:, i]
+            col_j = msa[:, j]
+
+            for a, b in pairs:
+
+                # find how many sequences have residues a and b
+                col_i_res = np.where(col_i == a)[0]
+                col_j_res = np.where(col_j == b)[0]
+
+                # find how many sequences have this combination
+                intersect = np.intersect1d(
+                    col_i_res, col_j_res, assume_unique=True
+                ).shape[SEQ_COUNT]
+                # make a frequency based on number of sequences
+                freq_Ai_Bj = intersect / num_seqs
+
+                # just count how many sequences have these residues
+                freq_Ai = col_i_res.shape[0] / num_seqs
+                freq_Bj = col_j_res.shape[0] / num_seqs
+
+                # get correct position: (which column combination we're at) + (which residue combination we're at)
+                covar_index = (
+                    col_combination_count * aa_combinations
+                    + a * st.GAPPY_ALPHABET_LEN
+                    + b
+                )
+
+                # useful in case you want to find a specific cov score based on column and residue indices in the upper tri matrix
+                # col_combination_count = (num_cols*(num_cols-1)/2) - (num_cols-col_1_idx)*((num_cols-col_1_idx)-1)/2 + col_2_idx - col_1_idx - 1
+                # covar_index = int(col_combination_count * aa_combinations + a_idx * st.GAPPY_ALPHABET_LEN + b_idx)
+
+                # (joint occurances of residues a & b at thi) - (occurence of A at col i * occurence of B at col j)
+                covariances[covar_index] = freq_Ai_Bj - (freq_Ai * freq_Bj)
+
+            # keep track of how many column combinations we've seen
+            col_combination_count += 1
+
+    return covariances
+
+
 ###### VISUALISATION FUNCTIONS #######
 
 
