@@ -5,11 +5,12 @@ before they are passed to the VAE.
 """
 
 import numpy as np
-from typing import Tuple
+from typing import Tuple, List
 import pandas as pd
 import evoVAE.utils.metrics as mt
 import torch, re, math
 from numba import njit, prange, jit
+from joblib import Parallel, delayed
 
 GAPPY_PROTEIN_ALPHABET = [
     "-",
@@ -41,6 +42,8 @@ RE_INVALID_PROTEIN_CHARS = "|".join(map(re.escape, INVALID_PROTEIN_CHARS))
 GAPPY_ALPHABET_LEN = len(GAPPY_PROTEIN_ALPHABET)
 IDX_TO_AA = dict((idx, acid) for idx, acid in enumerate(GAPPY_PROTEIN_ALPHABET))
 AA_TO_IDX = dict((acid, idx) for idx, acid in enumerate(GAPPY_PROTEIN_ALPHABET))
+NUM_SEQS = 0
+SEQ_LEN = 1
 
 
 def read_fasta_file(filename: str):
@@ -214,8 +217,11 @@ def encode_and_weight_seqs(
     return encodings, weights
 
 
-def convert_msa_numpy_array(aln: pd.DataFrame):
+def convert_msa_numpy_array(aln: pd.DataFrame) -> Tuple[np.ndarray, List, List]:
     """
+    Turn a group of aligned sequences into a numerical format to leverage
+    functionsin the numpy library.
+
     Returns:
     seq_msa, seq_key, seq_label
     """
@@ -277,32 +283,85 @@ def reweight_by_seq_similarity(sequences: np.ndarray, theta: float) -> np.ndarra
     return weights
 
 
-def reweight_by_col_frequences(seq_msa: np.ndarray):
+def position_based_seq_weighting(seq_msa: np.ndarray, n_processes: int) -> np.ndarray:
     """
     Alternative way of reweighting based off
     https://www.nature.com/articles/s41467-019-13633-0#Sec9 and implemented
     originally by Sanjana Tule.
+
+    Uses a mix of jobib process spawning and Numba parallelisation to
+    get a speed-up.
+
+    Returns:
+    Normalised sequence weights.
     """
 
-    seq_weight = np.zeros(seq_msa.shape)
-    NUM_SEQS = 0
-    SEQ_LEN = 1
-    for j in range(seq_msa.shape[SEQ_LEN]):
-        aa_type, aa_counts = np.unique(seq_msa[:, j], return_counts=True)
+    # hand each process an individual column to work on
+    chunks = [seq_msa[:, col] for col in range(seq_msa.shape[SEQ_LEN])]
+    results = Parallel(n_jobs=n_processes)(
+        delayed(process_column)(chunk) for chunk in chunks
+    )
 
-        num_type = len(aa_type)
-        aa_dict = {}
-        for a in aa_type:
-            aa_dict[a] = aa_counts[list(aa_type).index(a)]
+    # collect back futures in order they were submitted
+    seq_weight = np.column_stack([np.array(r) for r in results])
 
-        for i in range(seq_msa.shape[NUM_SEQS]):
-
-            seq_weight[i, j] = (1.0 / num_type) * (1.0 / aa_dict[seq_msa[i, j]])
-
+    # normalise the weights
     tot_weight = np.sum(seq_weight)
     seq_weight = seq_weight.sum(axis=1) / tot_weight
-    print(
-        "Sequence weight numpy array created with shape (num_seqs, columns): ",
-        seq_weight.shape,
-    )
+
+    # print(
+    #     "Sequence weight numpy array created with shape (num_seqs, columns): ",
+    #     seq_weight.shape,
+    # )
+
     return seq_weight
+
+
+def process_column(seq_msa_chunk: np.ndarray) -> np.ndarray:
+    """
+
+    Identifies unique amino acids within a column and then sends
+    work to a Numba compiled function to actually calculate weights.
+
+    Alternative way of reweighting based off
+    https://www.nature.com/articles/s41467-019-13633-0#Sec9 and implemented
+    originally by Sanjana Tule.
+
+    Returns:
+    Raw sequence weights before normalisation.
+    """
+
+    aa_type, aa_counts = np.unique(seq_msa_chunk, return_counts=True, axis=0)
+    weights = reweight_by_col_freqs(seq_msa_chunk, aa_type, aa_counts)
+
+    return weights
+
+
+@njit()
+def reweight_by_col_freqs(
+    seq_msa_chunk: np.ndarray, aa_type: np.ndarray, aa_counts: np.ndarray
+) -> np.ndarray:
+    """
+    Perform the actual reweighting by column frequencies here. Kept
+    as a separate function to allow compilation with Numba.
+
+    Alternative way of reweighting based off
+    https://www.nature.com/articles/s41467-019-13633-0#Sec9 and implemented
+    originally by Sanjana Tule.
+
+    Returns:
+    Raw sequence weights before normalisation.
+    """
+
+    weights = np.zeros(seq_msa_chunk.shape[0])
+
+    num_type = len(aa_type)
+    aa_dict = {}
+    for a, count in zip(aa_type, aa_counts):
+        aa_dict[a] = count
+
+    # product of how much the column varies and how many time a residue appears
+    for i in range(seq_msa_chunk.shape[NUM_SEQS]):
+        weights[i] = (1.0 / num_type) * (1.0 / aa_dict[seq_msa_chunk[i]])
+
+    return weights
