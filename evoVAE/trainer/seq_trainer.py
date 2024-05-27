@@ -99,8 +99,6 @@ def seq_train(
 
     # model.cpu()
     # torch.save(model.state_dict(), f"{config.info}_model_state.pt")
-    # model.cpu()
-    # torch.save(model.state_dict(), f"{config.info}_model_state.pt")
 
     return model
 
@@ -233,6 +231,15 @@ def zero_shot_prediction(
     stop_early: bool,
     unique_id: str,
 ):
+    """
+    Split the DMS dataset up into subsets based on how many mutations
+    each variant has. Measure performance metrics on model predictions
+    on these subsets. Then get metrics for performance on the entire
+    dataset.
+
+    Returns:
+    None, all metrics are logged with WandB.
+    """
 
     # split variants by how many mutations they have
     subset_dms = split_by_mutations(dms_data)

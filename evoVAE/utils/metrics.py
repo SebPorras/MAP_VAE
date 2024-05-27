@@ -13,6 +13,7 @@ import evoVAE.utils.metrics as mt
 from typing import Union, Tuple
 from sklearn.metrics import roc_auc_score
 from scipy.stats import spearmanr
+from numba import prange, jit
 
 
 def summary_stats(
@@ -32,8 +33,6 @@ def summary_stats(
     roc_auc_score,
 
     Based off the ProteinGym codebase by Notin et al., 2023.
-
-
     """
 
     k_recall = top_k_recall(predictions, actual, k_top)
@@ -76,6 +75,8 @@ def calc_ndcg(
     top_k: int = 10,
 ) -> float:
     """
+    Normalised discounted culmulative gains (NDCG).
+
     Inputs:
         actual: an array of the true scores where higher score is better
         predicted: an array of the predicted scores where higher score is better
@@ -139,11 +140,12 @@ def seq_log_probability(one_hot: Tensor, model_encoding: Tensor) -> float:
     """
 
     product = torch.matmul(model_encoding, one_hot.T)
-    #log_product = torch.log(product)
+    # log_product = torch.log(product)
     return torch.trace(product).item()
 
 
-def hamming_distance(seq1: str, seq2: str) -> float:
+@jit
+def hamming_distance(seq1: np.ndarray, seq2: np.ndarray) -> float:
     """Take two aligned sequences of the same length
     and return the Hamming distance between the two."""
 
@@ -152,8 +154,8 @@ def hamming_distance(seq1: str, seq2: str) -> float:
 
     mutations = 0
 
-    for i, j in zip(seq1, seq2):
-        if i != j:
+    for i in prange(seq1.shape[0]):
+        if seq1[i] != seq2[i]:
             mutations += 1
 
-    return mutations * 1.0
+    return mutations

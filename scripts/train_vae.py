@@ -103,7 +103,7 @@ trained_model = seq_train(
     metadata=metadata,
     device=device,
     config=config,
-    unique_id=unique_id
+    unique_id=unique_id,
 )
 
 extant_aln = pd.read_pickle(config.extant_aln)

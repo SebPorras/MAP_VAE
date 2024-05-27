@@ -9,7 +9,7 @@ from typing import Tuple
 import pandas as pd
 import evoVAE.utils.metrics as mt
 import torch, re, math
-
+from numba import njit, prange, jit
 
 GAPPY_PROTEIN_ALPHABET = [
     "-",
@@ -250,14 +250,20 @@ def convert_msa_numpy_array(aln: pd.DataFrame):
 ####### SEQUENCE REWEIGHTING #######
 
 
+@njit(parallel=True)
 def reweight_by_seq_similarity(sequences: np.ndarray, theta: float) -> np.ndarray:
     """Take in a Series of sequences and calculate the new weights. Sequences
-    are deemed to be clustered if (mutation_count/seq_len) < theta."""
+    are deemed to be clustered if (mutation_count/seq_len) < theta.
 
-    weights = np.ones(len(sequences))
+    Sequences must be converted into a numerical format using convert_msa_numpy_array()
+    or parallelisation will not work.
+    """
 
-    for i in range(len(sequences)):
-        for j in range(i + 1, len(sequences)):
+    weights = np.ones(sequences.shape[0])
+
+    for i in prange(sequences.shape[0]):
+        for j in prange(i + 1, sequences.shape[0]):
+
             if (
                 mt.hamming_distance(sequences[i], sequences[j]) / len(sequences[i])
                 < theta
@@ -265,7 +271,10 @@ def reweight_by_seq_similarity(sequences: np.ndarray, theta: float) -> np.ndarra
                 weights[i] += 1
                 weights[j] += 1
 
-    return np.fromiter((map(lambda x: 1.0 / x, weights)), dtype=float)
+    for i in prange(weights.shape[0]):
+        weights[i] = 1.0 / weights[i]
+
+    return weights
 
 
 def reweight_by_col_frequences(seq_msa: np.ndarray):
