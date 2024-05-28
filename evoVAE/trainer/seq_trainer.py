@@ -389,7 +389,7 @@ def fitness_prediction(
         # construct a plot of all the predictions
         title = "predicted_vs_actual_fitness"
         if mutation_count is None:
-            title += "_all_variants"
+            title += "all_variants"
         else:
             title += f"_{mutation_count}_mutation_variants"
         fig, ax = plt.subplots()
@@ -555,7 +555,7 @@ def calc_covariances(
     # save reconstruction vs actual for visualisation with MSA later
     recons_df["sequence"] = aln["sequence"]
     recons_df["reconstructions"] = reconstructions
-    recons_df.to_pickle(outfile + "_seqs.pkl")
+    recons_df.to_pickle(outfile + "recon_seqs.pkl")
 
     msa, _, _ = st.convert_msa_numpy_array(aln)
     actual_covar = stats.pair_wise_covariances_parallel(msa, num_processes)
@@ -595,7 +595,7 @@ def plot_and_save_covariances(
 
     plt.title("Reconstruction_vs_Actual_MSA_Covariance")
 
-    filename = outfile + "_covar.png"
+    filename = outfile + "covar.png"
     plt.savefig(filename)
 
     return correlation_coefficient

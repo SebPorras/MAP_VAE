@@ -7,6 +7,7 @@ import pandas as pd
 import torch
 import wandb
 import sys, yaml, time
+import os
 
 # %% [markdown]
 # #### Config
@@ -21,8 +22,8 @@ with open(sys.argv[CONFIG_FILE], "r") as stream:
 training_aln = settings["alignment"].split("/")[-1].split(".")[ALIGN_FILE]
 # alignment to calculate covariances on. eg. /data/gb1_extants.pkl
 covar_aln = settings["extant_aln"].split("/")[-1].split(".")[ALIGN_FILE]
-unique_id = f'lr_{settings["learning_rate"]}_b_{settings["batch_size"]}_wdecay_{settings["weight_decay"]}_train_{training_aln}_dms_{settings["dms_id"]}_covar_{covar_aln}_rep_{settings["replicate"]}_'
-
+unique_id = f'./lr_{settings["learning_rate"]}_b_{settings["batch_size"]}_wdecay_{settings["weight_decay"]}_train_{training_aln}_dms_{settings["dms_id"]}_covar_{covar_aln}_rep_{settings["replicate"]}/'
+os.mkdir(unique_id)
 
 # %%
 wandb.init(
