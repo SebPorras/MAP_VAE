@@ -1,6 +1,5 @@
 """seq_trainer.py"""
 
-from random import sample
 from pandas import DataFrame
 from evoVAE.models.seqVAE import SeqVAE
 from evoVAE.loss.standard_loss import frange_cycle_linear
@@ -101,8 +100,8 @@ def seq_train(
         if stop_early:
             break
 
-    # model.cpu()
-    # torch.save(model.state_dict(), f"{config.info}_model_state.pt")
+    model.cpu()
+    torch.save(model.state_dict(), f"{config.info}_model_state.pt")
 
     return model
 
@@ -316,7 +315,8 @@ def fitness_prediction(
 
     log(variant_fitness / wild_type_fitness) = log odds score
 
-    Returns: spear_rho, k_recall, ndcg, roc_auc.
+    Returns:
+    spear_rho, k_recall, ndcg, roc_auc.
     """
 
     # encode the wild type
@@ -383,6 +383,7 @@ def fitness_prediction(
                 "roc_auc": [roc_auc],
             }
         )
+
         final_metrics.to_csv(unique_id + "_zero_shot.csv")
 
         # construct a plot of all the predictions
@@ -475,6 +476,7 @@ def sample_latent_space(
 
     ids = []
     x_hats = []
+    model.eval()
     for encoding, _, id in data_loader:
 
         # get into flat format to pass through the model

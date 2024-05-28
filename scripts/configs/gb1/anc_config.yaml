@@ -1,6 +1,7 @@
 # Dataset info
-alignment: ../data/gb1/random_seqs_gb1_ancestors_encoded_weighted_no_dupes.pkl
-info: gb1_random_seqs
+alignment: /scratch/user/s4646506/gb1/encoded_weighted/gb1_ancestors_encoded_weighted_no_dupes.pkl.pkl
+extant_aln: /scratch/user/s4646506/gb1/encoded_weighted/gb1_extants_encoded_weighted_no_dupes.pkl
+info: gb1_ancestors_encoded_weighted_no_dupes
 project: GB1_SeqVAE
 seq_theta: 0.2  # reweighting
 AA_count: 21  # standard AA + gap
@@ -8,21 +9,17 @@ test_split: 0.2
 max_mutation: 4 # how many mutations the model will test up to
 # ADAM
 learning_rate: 0.001 # ADAM
-weight_decay: 0.0001 # ADAM
-# Hidden units
-momentum: None
-dropout: None
+weight_decay: 0 # ADAM
 # Training loop
-epochs: 300
-batch_size: 64
+epochs: 125
+batch_size: 256
 patience: 3
 max_norm: 5  # gradient clipping
 # Model info - default settings
 architecture: SeqVAE_reg_softmax
-latent_dims: 2
+latent_dims: 3
 hidden_dims: [256, 128, 64]
 # DMS data
-dms_file: ../data/gb1/SPG1_STRSG_Wu_2016.pkl
+dms_file: /scratch/user/s4646506/gb1/dms_data/SPG1_STRSG_Wu_2016.pkl
 dms_metadata: ../data/DMS_substitutions.csv
 dms_id: SPG1_STRSG_Wu_2016
-
