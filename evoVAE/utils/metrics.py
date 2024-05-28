@@ -13,7 +13,7 @@ import evoVAE.utils.metrics as mt
 from typing import Union, Tuple
 from sklearn.metrics import roc_auc_score
 from scipy.stats import spearmanr
-from numba import prange, jit
+from numba import prange, njit
 
 
 def summary_stats(
@@ -144,7 +144,7 @@ def seq_log_probability(one_hot: Tensor, model_encoding: Tensor) -> float:
     return torch.trace(product).item()
 
 
-@jit
+@njit()
 def hamming_distance(seq1: np.ndarray, seq2: np.ndarray) -> float:
     """Take two aligned sequences of the same length
     and return the Hamming distance between the two."""

@@ -40,6 +40,8 @@ INVALID_PROTEIN_CHARS = ["B", "J", "X", "Z", "U"]
 RE_INVALID_PROTEIN_CHARS = "|".join(map(re.escape, INVALID_PROTEIN_CHARS))
 
 GAPPY_ALPHABET_LEN = len(GAPPY_PROTEIN_ALPHABET)
+GAPPY_AA_COMBINATIONS = GAPPY_ALPHABET_LEN**2
+
 IDX_TO_AA = dict((idx, acid) for idx, acid in enumerate(GAPPY_PROTEIN_ALPHABET))
 AA_TO_IDX = dict((acid, idx) for idx, acid in enumerate(GAPPY_PROTEIN_ALPHABET))
 NUM_SEQS = 0

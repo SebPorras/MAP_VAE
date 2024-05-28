@@ -7,6 +7,12 @@ from scipy.spatial import distance_matrix
 from scipy.spatial.distance import euclidean
 import matplotlib.pyplot as plt
 import evoVAE.utils.seq_tools as st
+import os
+from joblib import dump, load, Parallel, delayed
+from numba import njit
+
+COLS = 1
+SEQ_COUNT = 0
 
 
 def calc_mean_seq_embeddings(seqs: pd.DataFrame) -> Dict[str, np.ndarray]:
@@ -80,9 +86,6 @@ def calc_position_freq_matrix(seqs: pd.DataFrame) -> np.ndarray:
 
     msa, _, _ = st.convert_msa_numpy_array(seqs)
 
-    SEQ_COUNT = 0
-    COLS = 1
-
     # shape (21, seq_len)
     pfm = np.zeros((st.GAPPY_ALPHABET_LEN, msa.shape[COLS]))
 
@@ -114,8 +117,6 @@ def calc_shannon_entropy(seqs: pd.DataFrame) -> np.ndarray:
 
     msa, _, _ = st.convert_msa_numpy_array(seqs)
 
-    SEQ_COUNT = 0
-    COLS = 1
     # find entropy for each column
     entropy = np.zeros(msa.shape[COLS])
 
@@ -135,10 +136,153 @@ def calc_shannon_entropy(seqs: pd.DataFrame) -> np.ndarray:
     return entropy
 
 
-def pair_wise_covariances(msa):
+def pair_wise_covariances_parallel(
+    msa: np.ndarray, num_processes: int = 2
+) -> np.ndarray:
+    """
+    Takes a MSA and calculates the covariances of amino acids
+    across columns. This is the parallel implementation.
 
-    SEQ_COUNT = 0
-    COLS = 1
+    In this implementation, each worker process is given a column to
+    work on. This does lead to some imbalances in work done because
+    of the upper triangular shape but i don't have time to
+    improve this.
+
+    Returns:
+    The covariance matrix (np.ndarray): This is a triangular matrix to save memory
+    In case you want to find a specific cov score based on column and residue indices in the upper tri matrix
+    col_combination_count = (num_cols*(num_cols-1)/2) - (num_cols-col_1_idx)*((num_cols-col_1_idx)-1)/2 + col_2_idx - col_1_idx - 1
+    covar_index = int(col_combination_count * aa_combinations + a_idx * st.GAPPY_ALPHABET_LEN + b_idx)
+    """
+
+    # number of different residue combinations we can have
+    aa_combinations = st.GAPPY_ALPHABET_LEN**2
+    num_columns = msa.shape[COLS]
+
+    # the number of unique ways we can compare columns in the MSA
+    column_combinations = msa.shape[COLS] * (msa.shape[COLS] - 1) // 2
+
+    # because we are using triangular matrix and are sending columns to each worker
+    # we need to keep track of the correct position in the matrix.
+    col_combinations = []
+    col_combination_count = 0  # starting from first col, each pair has id
+    for i in range(num_columns - 1):
+        col_combinations.append((i, col_combination_count))
+        # add the unique combinations to the count
+        col_combination_count += len(range(i + 1, num_columns))
+
+    # access tmp directory for data sharing across processes
+    folder = os.environ.get("TMPDIR")
+
+    # dump the MSA onto the file system to speed up process
+    msa_filename_memmap = os.path.join(folder, "msa_memmap")
+    dump(msa, msa_filename_memmap)
+    msa = load(msa_filename_memmap, mmap_mode="r")
+
+    # this will be where our output covariance matrix is dumped
+    covariances = np.zeros(column_combinations * aa_combinations)
+    output_filename_memmap = os.path.join(folder, "output_memmap")
+    output = np.memmap(
+        output_filename_memmap,
+        dtype=covariances.dtype,
+        shape=len(covariances),
+        mode="w+",
+    )
+
+    # submit columns to each worker
+    Parallel(n_jobs=num_processes)(
+        delayed(calc_columns_pair_covar)(msa, i, idx, output)
+        for i, idx in col_combinations
+    )
+
+    return output
+
+
+@njit()
+def calc_columns_pair_covar(
+    msa: np.ndarray, i: int, start_idx: int, output: np.ndarray
+) -> None:
+    """
+    Processes a single MSA column and compares it to all other combinations
+    of columns. Note that this has also been optimised with Numba.
+
+    Parameters:
+    msa: The MSA to process, written to disk with joblib
+    i: index of the column to process
+    start_idx: where to start in the triangular matrix
+    output: covariance matrix, written to disk with joblib
+    """
+
+    num_seqs = msa.shape[0]
+    num_columns = msa.shape[1]
+
+    col_i = msa[:, i]
+    col_combination_count = start_idx
+    for j in range(i + 1, num_columns):
+        for a in range(st.GAPPY_ALPHABET_LEN):
+            for b in range(a + 1, st.GAPPY_ALPHABET_LEN):
+
+                col_j = msa[:, j]
+                freq_Ai_Bj, freq_Ai, freq_Bj = calc_col_freqs(
+                    col_i, col_j, a, b, num_seqs
+                )
+
+                covar_index = (
+                    col_combination_count * st.GAPPY_AA_COMBINATIONS
+                    + a * st.GAPPY_ALPHABET_LEN
+                    + b
+                )
+
+                output[covar_index] = freq_Ai_Bj - (freq_Ai * freq_Bj)
+
+        # keep track of how many column combinations we've seen
+        col_combination_count += 1
+
+
+@njit()
+def calc_col_freqs(
+    col_i: np.ndarray, col_j: np.ndarray, a: int, b: int, num_seqs: int
+) -> float:
+    """
+    Calculates the joint probability of observing residue a
+    and b in columns i and j, respectively. Also finds the
+    independent frequencies of residue a in column i and residue
+    b in column j.
+
+    Returns:
+    freq_Ai_Bj: joint probability
+    freq_Ai: independent probability
+    freq_Bj: independent probability
+    """
+
+    # find how many sequences have residues a and b
+    col_i_res = np.where(col_i == a)[0]
+    col_j_res = np.where(col_j == b)[0]
+
+    # how many times do these residues appear together in these two columns
+    intersect = np.intersect1d(col_i_res, col_j_res).shape[SEQ_COUNT]
+
+    # make a frequency based on number of sequences
+    freq_Ai_Bj = intersect / num_seqs
+
+    # just count how many sequences have these residues
+    freq_Ai = col_i_res.shape[0] / num_seqs
+    freq_Bj = col_j_res.shape[0] / num_seqs
+
+    return freq_Ai_Bj, freq_Ai, freq_Bj
+
+
+def pair_wise_covariances(msa: np.ndarray):
+    """
+    Takes a MSA and calculates the covariances of amino acids
+    across columns.
+
+    Returns:
+    The covariance matrix (np.ndarray): This is a triangular matrix to save memory
+    In case you want to find a specific cov score based on column and residue indices in the upper tri matrix
+    col_combination_count = (num_cols*(num_cols-1)/2) - (num_cols-col_1_idx)*((num_cols-col_1_idx)-1)/2 + col_2_idx - col_1_idx - 1
+    covar_index = int(col_combination_count * aa_combinations + a_idx * st.GAPPY_ALPHABET_LEN + b_idx)
+    """
 
     pairs = []
     for i in range(st.GAPPY_ALPHABET_LEN):
@@ -147,14 +291,13 @@ def pair_wise_covariances(msa):
     # the number of unique ways we can compare columns in the MSA
     column_combinations = msa.shape[COLS] * (msa.shape[COLS] - 1) // 2
     # number of different residue combinations we can have
-    aa_combinations = st.GAPPY_ALPHABET_LEN**2
 
     num_seqs = msa.shape[SEQ_COUNT]
     num_columns = msa.shape[COLS]
 
     # each column has aa_combinations many ways to combine residues
     # this is an upper triangular matrix but we will store it in a linear format.
-    covariances = np.zeros(column_combinations * aa_combinations)
+    covariances = np.zeros(column_combinations * st.GAPPY_AA_COMBINATIONS)
 
     # keep track of which column combination we're up to
     col_combination_count = 0
@@ -182,7 +325,7 @@ def pair_wise_covariances(msa):
 
                 # get correct position: (which column combination we're at) + (which residue combination we're at)
                 covar_index = (
-                    col_combination_count * aa_combinations
+                    col_combination_count * st.GAPPY_AA_COMBINATIONS
                     + a * st.GAPPY_ALPHABET_LEN
                     + b
                 )

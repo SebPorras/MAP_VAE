@@ -326,6 +326,7 @@ def fitness_prediction(
 
     # get model representation of the wild type
     with torch.no_grad():
+
         wild_model_encoding, _, _, _ = model(wild_one_hot)
 
         # reshape into (1, seq_len, AA_count)
@@ -375,10 +376,11 @@ def fitness_prediction(
         # save the final metrics to file.
         final_metrics = pd.DataFrame(
             {
-                "spearman_rho": spear_rho,
-                "top_k_recall": k_recall,
-                "ndcg": ndcg,
-                "roc_auc": roc_auc,
+                "unique_id": [unique_id],
+                "spearman_rho": [spear_rho],
+                "top_k_recall": [k_recall],
+                "ndcg": [ndcg],
+                "roc_auc": [roc_auc],
             }
         )
         final_metrics.to_csv(unique_id + "_zero_shot.csv")
