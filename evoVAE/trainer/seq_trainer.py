@@ -437,6 +437,7 @@ def calc_reconstruction_accuracy(
     aln: pd.DataFrame,
     outfile: str,
     num_samples: int = 50,
+    num_processes: int = 2,
 ):
 
     train_dataset = MSA_Dataset(aln["encoding"], aln["weights"], aln["id"])
@@ -452,7 +453,9 @@ def calc_reconstruction_accuracy(
     recons = translate_model_predictions(x_hats, orig_shape)
 
     # find the pairwise covariances of each column in the MSAs
-    actual_covar, predicted_covar = calc_covariances(ids, recons, aln, outfile)
+    actual_covar, predicted_covar = calc_covariances(
+        ids, recons, aln, outfile, num_processes
+    )
 
     # Calculate correlation coefficient and save an image to file
     correlation_coefficient = plot_and_save_covariances(
@@ -528,7 +531,11 @@ def translate_model_predictions(x_hats: List[Tensor], orig_shape: Tuple) -> List
 
 
 def calc_covariances(
-    ids: List[str], reconstructions: List[Tensor], aln: pd.DataFrame, outfile: str
+    ids: List[str],
+    reconstructions: List[Tensor],
+    aln: pd.DataFrame,
+    outfile: str,
+    num_processes: int = 2,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Takes reconstructed sequences and computes the pairwise covariances of
@@ -543,7 +550,7 @@ def calc_covariances(
 
     recons_df = pd.DataFrame({"id": ids, "sequence": reconstructions})
     recon_msa, _, _ = st.convert_msa_numpy_array(recons_df)
-    predicted_covar = stats.pair_wise_covariances(recon_msa)
+    predicted_covar = stats.pair_wise_covariances_parallel(recon_msa, num_processes)
 
     # save reconstruction vs actual for visualisation with MSA later
     recons_df["sequence"] = aln["sequence"]
@@ -551,7 +558,7 @@ def calc_covariances(
     recons_df.to_pickle(outfile + "_seqs.pkl")
 
     msa, _, _ = st.convert_msa_numpy_array(aln)
-    actual_covar = stats.pair_wise_covariances(msa)
+    actual_covar = stats.pair_wise_covariances_parallel(msa, num_processes)
 
     return actual_covar, predicted_covar
 

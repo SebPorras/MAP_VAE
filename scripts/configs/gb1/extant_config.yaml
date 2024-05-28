@@ -24,3 +24,4 @@ dms_file: /scratch/user/s4646506/gb1/dms_data/SPG1_STRSG_Wu_2016.pkl
 dms_metadata: ../data/DMS_substitutions.csv
 dms_id: SPG1_STRSG_Wu_2016
 replicate: 0
+num_processes: 12
