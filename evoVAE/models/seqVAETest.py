@@ -37,8 +37,6 @@ class SeqVAETest(SeqVAE):
                 nn.Sequential(
                     nn.Linear(input_dims, h_dim),
                     nn.LeakyReLU(),
-                    nn.Linear(h_dim, h_dim),
-                    nn.LeakyReLU(),
                 )
             )
             input_dims = h_dim
@@ -63,8 +61,6 @@ class SeqVAETest(SeqVAE):
                 nn.Sequential(
                     nn.Linear(hidden_dims[i], hidden_dims[i + 1]),
                     nn.LeakyReLU(),
-                    nn.Linear(hidden_dims[i + 1], hidden_dims[i + 1]),
-                    nn.LeakyReLU(),
                 )
             )
         # add a final layer to get back to length of seq * AA_Count
@@ -74,9 +70,8 @@ class SeqVAETest(SeqVAE):
 
     def loss_function(
         self,
-        x: Tensor,
         modelOutputs: Tuple[Tensor, Tensor, Tensor, Tensor],
-        input: Tensor,
+        x: Tensor,
         seq_weight: float,
     ) -> Tuple[Tensor, Tensor, Tensor]:
         """The standard ELBO loss is used in a StandardVAE. Also passes
@@ -85,20 +80,23 @@ class SeqVAETest(SeqVAE):
         """
 
         xHat, zSample, zMu, zLogvar = modelOutputs
-    
-        # KLD across whole all dimensions for each x
-        KLD = KL_divergence(zMu, zLogvar, zSample, weights)
 
-        # estimate likelihood of each input sequence 
+        # KLD across whole all dimensions for each x
+        kld = KL_divergence(zMu, zLogvar, zSample, seq_weight)
+
+        # Recon loss: estimate likelihood of each input sequence
         log_PxGz = sequence_likelihood(x, xHat)
 
         # remove KLD and then use normalised sequence weights
-        elbo = log_PxGz - KLD
-        norm_weight = weights / torch.sum(weights)
-        elbo = torch.sum(elbo * norm_weight)
+        elbo = log_PxGz - (kld * 1.0)
+        norm_weight = seq_weight / torch.sum(seq_weight)
 
-        return elbo, KLD.detach(), log_PxGz.detach()
+        # reweight
+        elbo = (-1) * torch.sum(elbo * norm_weight)
+        recon_weighted = torch.sum(log_PxGz * norm_weight)
+        reg_weighted = torch.sum(kld * norm_weight)
 
+        return elbo, reg_weighted.detach(), recon_weighted.detach()
 
     def forward(self, raw_input: Tensor) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
         """
@@ -135,4 +133,3 @@ class SeqVAETest(SeqVAE):
         log_p = log_p.view(input_shape + (-1,))
 
         return log_p, z_sample, z_mu, z_logvar
-

@@ -1,3 +1,6 @@
+"""seq_trainer.py"""
+
+from random import sample
 from pandas import DataFrame
 from evoVAE.models.seqVAE import SeqVAE
 from evoVAE.loss.standard_loss import frange_cycle_linear
@@ -6,12 +9,13 @@ import evoVAE.utils.seq_tools as st
 import numpy as np
 import pandas as pd
 import torch
-from typing import Dict, Tuple
+from typing import Dict, Tuple, List
 from torch.utils.data import DataLoader
 import wandb
 import matplotlib.pyplot as plt
 from evoVAE.utils.datasets import MSA_Dataset
 import evoVAE.utils.statistics as stats
+from torch import Tensor
 
 
 ### EARLY STOPPING ###
@@ -371,14 +375,13 @@ def fitness_prediction(
         # save the final metrics to file.
         final_metrics = pd.DataFrame(
             {
-                "run_id": unique_id,
                 "spearman_rho": spear_rho,
                 "top_k_recall": k_recall,
                 "ndcg": ndcg,
                 "roc_auc": roc_auc,
             }
         )
-        final_metrics.to_csv(unique_id + "zero_shot.csv")
+        final_metrics.to_csv(unique_id + "_zero_shot.csv")
 
         # construct a plot of all the predictions
         title = "predicted_vs_actual_fitness"
@@ -429,7 +432,7 @@ def split_by_mutations(dms_data: DataFrame) -> Dict[int, DataFrame]:
 def calc_reconstruction_accuracy(
     model: SeqVAE,
     aln: pd.DataFrame,
-    outfile: "str",
+    outfile: str,
     num_samples: int = 50,
 ):
 
@@ -438,32 +441,73 @@ def calc_reconstruction_accuracy(
         train_dataset, batch_size=512, shuffle=False
     )
 
+    # sample the latent space and get an average reconstruction for each seq
+    ids, x_hats = sample_latent_space(model, train_loader, num_samples)
+
+    # get those reconstructions back into a sequence format
+    orig_shape = tuple(aln["encoding"].values[0].shape)
+    recons = translate_model_predictions(x_hats, orig_shape)
+
+    # find the pairwise covariances of each column in the MSAs
+    actual_covar, predicted_covar = calc_covariances(ids, recons, aln, outfile)
+
+    # Calculate correlation coefficient and save an image to file
+    correlation_coefficient = plot_and_save_covariances(
+        actual_covar, predicted_covar, outfile
+    )
+
+    wandb.log({"pearson_correlation": correlation_coefficient})
+
+
+def sample_latent_space(
+    model: SeqVAE, data_loader: MSA_Dataset, num_samples: int
+) -> Tuple[List[str], List[Tensor]]:
+    """
+    Take a trained model and sample the latent space num_samples many times. This gets the average
+    latent space representation of that sequence.
+
+    Returns:
+    ids: The ID of each sequence.
+    x_hats: The model output for each sequence.
+    """
+
     ids = []
     x_hats = []
+    for encoding, _, id in data_loader:
 
-    for encoding, _, name in train_loader:
-
+        # get into flat format to pass through the model
         encoding = encoding.float()
         encoding = torch.flatten(encoding, start_dim=1)
-        # print(encoding.shape)
 
-        # create a tensor for each of the samples
-        encoding = encoding.expand(num_samples, encoding.shape[0], encoding.shape[1])
-        # print(encoding.shape)
-        # print(encoding.shape)
-        z_mu, z_logvar = model.encode(encoding.float())
+        # get encoding and replicate to allow multiple samples from latent space
+        z_mu, z_logvar = model.encode(encoding)
+        z_mu = z_mu.expand(num_samples, z_mu.shape[0], z_mu.shape[1])
+        z_logvar = z_logvar.expand(num_samples, z_logvar.shape[0], z_logvar.shape[1])
+
+        # pass each sample through the latent space and then average and decode
         z_samples = model.reparameterise(z_mu, z_logvar)
-        # print(z_samples.shape)
-        # print(z_samples[:, 0, :])
         mean_z = torch.mean(z_samples, dim=0)
         x_hat = model.decode(mean_z)
 
-        ids.extend(name)
+        ids.extend(id)
         x_hats.extend(x_hat.detach())
 
-    # EVALUATE DIFFERENCES BETWEEN THE RECONSTRUCTIONS AND INPUT
-    orig_shape = tuple(aln["encoding"].values[0].shape)
-    recons = []
+    return ids, x_hats
+
+
+def translate_model_predictions(x_hats: List[Tensor], orig_shape: Tuple) -> List[str]:
+    """
+    Get the most likely residue for each column in the model reconstruction.
+
+    Inputs:
+    x_hats (List[Tensor]): The model outputs
+    orig_shape (Tuple): The shape for a PWM represenation of the sequence.
+
+    Returns (List[str]):
+    The string representation of each sequence.
+    """
+
+    reconstructions = []
     for x_hat in x_hats:
 
         # decode the Z sample and get it into a PPM shape
@@ -471,32 +515,64 @@ def calc_reconstruction_accuracy(
         # print(x_hat.shape)
         x_hat = x_hat.view(orig_shape)
 
+        # Identify most likely residue at each column
         indices = x_hat.max(dim=-1).indices.tolist()
         recon = "".join([st.GAPPY_PROTEIN_ALPHABET[x] for x in indices])
-        recons.append(recon)
+        reconstructions.append(recon)
 
-    recons_df = pd.DataFrame({"id": ids, "sequence": recons})
+    return reconstructions
+
+
+def calc_covariances(
+    ids: List[str], reconstructions: List[Tensor], aln: pd.DataFrame, outfile: str
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Takes reconstructed sequences and computes the pairwise covariances of
+    columns in those sequences. Then does the same thing for the actual MSA.
+
+    Also writes the reconstruction and actual sequences to a pkl file
+    so that they can be easily visualised with a MSA later.
+
+    Returns (Tuple[np.ndarray, np.ndarray]):
+    actual_covariances, predicted_covariances
+    """
+
+    recons_df = pd.DataFrame({"id": ids, "sequence": reconstructions})
     recon_msa, _, _ = st.convert_msa_numpy_array(recons_df)
-    predicted = stats.pair_wise_covariances(recon_msa)
+    predicted_covar = stats.pair_wise_covariances(recon_msa)
+
+    # save reconstruction vs actual for visualisation with MSA later
+    recons_df["sequence"] = aln["sequence"]
+    recons_df["reconstructions"] = reconstructions
+    recons_df.to_pickle(outfile + "_seqs.pkl")
 
     msa, _, _ = st.convert_msa_numpy_array(aln)
-    actual = stats.pair_wise_covariances(msa)
+    actual_covar = stats.pair_wise_covariances(msa)
 
-    corr_data = pd.DataFrame({"actual": actual, "prediction": predicted})
+    return actual_covar, predicted_covar
+
+
+def plot_and_save_covariances(
+    actual_covar: np.ndarray, predicted_covar: np.ndarray, outfile: str
+) -> float:
+    """
+    Plot the covariance values of the reconstruction MSA and actual MSA
+    on a single and calculate Pearson's correlation.
+
+    Writes a .png to file for reference.
+
+    Returns (float):
+    correlation_coefficient
+    """
 
     fig, ax = plt.subplots()
 
-    plt.scatter(corr_data["actual"], corr_data["prediction"])
+    plt.scatter(actual_covar, predicted_covar)
     plt.xlabel("MSA covariance")
     plt.ylabel("Reconstruction covariance")
-    slope, intercept = np.polyfit(corr_data["actual"], corr_data["prediction"], 1)
-    x = np.arange(min(corr_data["actual"]), max(corr_data["actual"]) + 0.1, 0.1)
-    regression_line = slope * x + intercept
 
-    # Calculate correlation coefficient
-    correlation_coefficient = np.corrcoef(corr_data["actual"], corr_data["prediction"])[
-        0, 1
-    ]
+    # Calculate correlation coefficient, use [0,1] to not take from diagnonal
+    correlation_coefficient = np.corrcoef(actual_covar, predicted_covar)[0, 1]
 
     # Display correlation value
     plt.text(
@@ -506,11 +582,9 @@ def calc_reconstruction_accuracy(
         va="top",
     )
 
-    # Plot regression line
-    plt.plot(x, regression_line, color="red")
     plt.title("Reconstruction_vs_Actual_MSA_Covariance")
 
     filename = outfile + "_covar.png"
     plt.savefig(filename)
 
-    wandb.log({"pearson_correlation": correlation_coefficient})
+    return correlation_coefficient

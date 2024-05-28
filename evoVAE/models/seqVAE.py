@@ -162,24 +162,24 @@ class SeqVAE(BaseVAE):
         Returns:
         elbo, kld, recon_loss
         """
-        
+
         xHat, zSample, zMu, zLogvar = modelOutputs
-    
+
         # KLD across whole all dimensions for each x
         kld = KL_divergence(zMu, zLogvar, zSample, seq_weight)
 
-        # Recon loss: estimate likelihood of each input sequence 
+        # Recon loss: estimate likelihood of each input sequence
         log_PxGz = sequence_likelihood(x, xHat)
 
         # remove KLD and then use normalised sequence weights
         elbo = log_PxGz - (kld * anneal_schedule[epoch])
         norm_weight = seq_weight / torch.sum(seq_weight)
 
-        # reweight 
+        # reweight
         elbo = (-1) * torch.sum(elbo * norm_weight)
         recon_weighted = torch.sum(log_PxGz * norm_weight)
         reg_weighted = torch.sum(kld * norm_weight)
-        
+
         return elbo, reg_weighted.detach(), recon_weighted.detach()
 
     def generate(self, x: Tensor) -> Tensor:

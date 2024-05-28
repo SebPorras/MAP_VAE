@@ -198,7 +198,7 @@ def one_hot_to_seq(encoding: torch.Tensor, is_tensor: True) -> str:
 
 
 def encode_and_weight_seqs(
-    seqs: pd.Series,
+    aln: pd.DataFrame,
     theta: float,
     reweight=True,
 ) -> Tuple[np.ndarray, np.ndarray]:
@@ -206,12 +206,14 @@ def encode_and_weight_seqs(
     print("Encoding the sequences and calculating weights")
 
     # encodings = np.stack(seqs.apply(seq_to_one_hot))
-    encodings = seqs.apply(seq_to_one_hot)
+    encodings = aln["sequence"].apply(seq_to_one_hot)
     print(f"The sequence encoding has size: {encodings.shape}\n")
+
+    msa, _, _ = convert_msa_numpy_array(aln)
 
     weights = None
     if reweight:
-        weights = reweight_by_seq_similarity(seqs.values, theta=theta)
+        weights = reweight_by_seq_similarity(msa, theta=theta)
         print(f"The sequence weight array has size: {weights.shape}\n")
 
     return encodings, weights
@@ -220,7 +222,7 @@ def encode_and_weight_seqs(
 def convert_msa_numpy_array(aln: pd.DataFrame) -> Tuple[np.ndarray, List, List]:
     """
     Turn a group of aligned sequences into a numerical format to leverage
-    functionsin the numpy library.
+    functions in the numpy library.
 
     Returns:
     seq_msa, seq_key, seq_label
