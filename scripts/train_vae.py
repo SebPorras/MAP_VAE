@@ -112,7 +112,11 @@ calc_reconstruction_accuracy(
     trained_model, extant_aln, unique_id, config.latent_samples, config.num_processes
 )
 
+wandb.finish()
+
+trained_model.cpu()
+torch.save(trained_model.state_dict(), unique_id + f"{config.info}_model_state.pt")
+
 print(f"elapsed minutes: {(time.time() - start) / 60}")
 
 # %%
-wandb.finish()

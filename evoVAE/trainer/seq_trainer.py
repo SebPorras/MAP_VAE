@@ -100,9 +100,6 @@ def seq_train(
         if stop_early:
             break
 
-    model.cpu()
-    torch.save(model.state_dict(), f"{config.info}_model_state.pt")
-
     return model
 
 
