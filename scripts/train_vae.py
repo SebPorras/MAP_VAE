@@ -107,7 +107,9 @@ trained_model = seq_train(
 )
 
 extant_aln = pd.read_pickle(config.extant_aln)
-calc_reconstruction_accuracy(trained_model, unique_id, extant_aln, config.num_processes)
+calc_reconstruction_accuracy(
+    trained_model, extant_aln, unique_id, config.latent_samples, config.num_processes
+)
 
 print(f"elapsed minutes: {(time.time() - start) / 60}")
 

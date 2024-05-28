@@ -25,3 +25,4 @@ dms_metadata: ../data/DMS_substitutions.csv
 dms_id: SPG1_STRSG_Wu_2016
 replicate: 0
 num_processes: 12
+latent_samples: 100
