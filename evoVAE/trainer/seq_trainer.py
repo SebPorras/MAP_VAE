@@ -144,7 +144,7 @@ def train_loop(
         # update weights
         loss.backward()
         # sets max value for gradient
-        if config.max_norm is not None:
+        if config.max_norm != -1:
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=config.max_norm)
         optimiser.step()
 
@@ -377,7 +377,7 @@ def fitness_prediction(
     # construct a plot of all the predictions
     title = "predicted_vs_actual_fitness"
     if mutation_count is None:
-        title += "all_variants"
+        title += "_all_variants"
     else:
         title += f"_{mutation_count}_mutation_variants"
     fig, ax = plt.subplots()

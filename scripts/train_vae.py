@@ -23,7 +23,10 @@ training_aln = settings["alignment"].split("/")[-1].split(".")[ALIGN_FILE]
 # alignment to calculate covariances on. eg. /data/gb1_extants.pkl
 covar_aln = settings["extant_aln"].split("/")[-1].split(".")[ALIGN_FILE]
 unique_id = f'./lr_{settings["learning_rate"]}_b_{settings["batch_size"]}_wdecay_{settings["weight_decay"]}_train_{training_aln}_dms_{settings["dms_id"]}_covar_{covar_aln}_rep_{settings["replicate"]}_dropout_{settings["dropout"]}/'
-os.mkdir(unique_id)
+
+
+if not os.path.exists(unique_id):
+    os.mkdir(unique_id)
 
 # %%
 wandb.init(
