@@ -195,6 +195,10 @@ def pair_wise_covariances_parallel(
         for i, idx in col_combinations
     )
 
+    # clean up, TMPDIR is removed at end of slurm job.
+    os.remove(output_filename_memmap)
+    os.remove(msa_filename_memmap)
+
     return output
 
 

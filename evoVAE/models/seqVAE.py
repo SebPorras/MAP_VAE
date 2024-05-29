@@ -35,6 +35,8 @@ class SeqVAE(BaseVAE):
             encoder_modules.append(
                 nn.Sequential(
                     nn.Linear(input_dims, h_dim),
+                    nn.BatchNorm1d(h_dim),
+                    nn.Dropout(config.dropout),
                     nn.LeakyReLU(),
                 )
             )
@@ -59,6 +61,8 @@ class SeqVAE(BaseVAE):
             decoder_modules.append(
                 nn.Sequential(
                     nn.Linear(hidden_dims[i], hidden_dims[i + 1]),
+                    nn.BatchNorm1d(hidden_dims[i + 1]),
+                    nn.Dropout(config.dropout),
                     nn.LeakyReLU(),
                 )
             )

@@ -143,8 +143,9 @@ def train_loop(
 
         # update weights
         loss.backward()
-        # sets max value for gradient - currently 1.0
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=config.max_norm)
+        # sets max value for gradient
+        if config.max_norm is not None:
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=config.max_norm)
         optimiser.step()
 
     # log batch results
@@ -214,10 +215,11 @@ def validation_loop(
 
     stop_early = early_stopper.early_stop((epoch_val_elbo / batch_count))
 
-    # predict variant fitnesses
-    zero_shot_prediction(
-        model, dms_data, metadata, config, current_epoch, stop_early, unique_id
-    )
+    if (current_epoch == config.epochs - 1) or stop_early:
+        # predict variant fitnesses
+        zero_shot_prediction(
+            model, dms_data, metadata, config, current_epoch, unique_id
+        )
 
     return stop_early
 
@@ -228,7 +230,6 @@ def zero_shot_prediction(
     metadata: pd.DataFrame,
     config,
     current_epoch: int,
-    stop_early: bool,
     unique_id: str,
 ):
     """
@@ -254,9 +255,6 @@ def zero_shot_prediction(
             subset_mutants,
             count,
             metadata,
-            current_epoch,
-            config.epochs,
-            stop_early,
             unique_id,
         )
         wandb.log(
@@ -275,9 +273,6 @@ def zero_shot_prediction(
         dms_data,
         None,
         metadata,
-        current_epoch,
-        config.epochs,
-        stop_early,
         unique_id,
     )
     wandb.log(
@@ -296,9 +291,6 @@ def fitness_prediction(
     dms_data: DataFrame,
     mutation_count: int,
     metadata: DataFrame,
-    current_epoch: int,
-    max_epoch: int,
-    stop_early: bool,
     unique_id: str,
 ) -> Tuple[float, float, float, float]:
     """
@@ -368,43 +360,42 @@ def fitness_prediction(
 
     # Plot predictions vs actual fitness values but only on final epoch
     # or if early stopping has been triggered.
-    if (current_epoch == max_epoch - 1) or stop_early:
 
-        # save the final metrics to file.
-        final_metrics = pd.DataFrame(
-            {
-                "unique_id": [unique_id],
-                "spearman_rho": [spear_rho],
-                "top_k_recall": [k_recall],
-                "ndcg": [ndcg],
-                "roc_auc": [roc_auc],
-            }
-        )
+    # save the final metrics to file.
+    final_metrics = pd.DataFrame(
+        {
+            "unique_id": [unique_id],
+            "spearman_rho": [spear_rho],
+            "top_k_recall": [k_recall],
+            "ndcg": [ndcg],
+            "roc_auc": [roc_auc],
+        }
+    )
 
-        final_metrics.to_csv(unique_id + "_zero_shot.csv")
+    final_metrics.to_csv(unique_id + "_zero_shot.csv")
 
-        # construct a plot of all the predictions
-        title = "predicted_vs_actual_fitness"
-        if mutation_count is None:
-            title += "all_variants"
-        else:
-            title += f"_{mutation_count}_mutation_variants"
-        fig, ax = plt.subplots()
+    # construct a plot of all the predictions
+    title = "predicted_vs_actual_fitness"
+    if mutation_count is None:
+        title += "all_variants"
+    else:
+        title += f"_{mutation_count}_mutation_variants"
+    fig, ax = plt.subplots()
 
-        raw_data = pd.DataFrame(
-            {
-                "mutant": dms_data["mutant"],
-                "actual": dms_data["DMS_score"],
-                "predicted": model_scores,
-            }
-        )
-        raw_data.to_csv(unique_id + title + ".csv")
-        ax.scatter(dms_data["DMS_score"], model_scores)
-        plt.title(title)
-        plt.xlabel("Actual")
-        plt.ylabel("Prediction")
-        plt.savefig(unique_id + title + ".png")
-        wandb.log({title: fig})
+    raw_data = pd.DataFrame(
+        {
+            "mutant": dms_data["mutant"],
+            "actual": dms_data["DMS_score"],
+            "predicted": model_scores,
+        }
+    )
+    raw_data.to_csv(unique_id + title + ".csv")
+    ax.scatter(dms_data["DMS_score"], model_scores)
+    plt.title(title)
+    plt.xlabel("Actual")
+    plt.ylabel("Prediction")
+    plt.savefig(unique_id + title + ".png")
+    wandb.log({title: fig})
 
     return spear_rho, k_recall, ndcg, roc_auc
 
