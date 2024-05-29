@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 from evoVAE.utils.datasets import MSA_Dataset
 import evoVAE.utils.statistics as stats
 from torch import Tensor
+from torch.optim.lr_scheduler import CosineAnnealingLR
 
 
 ### EARLY STOPPING ###
@@ -66,6 +67,7 @@ def seq_train(
     optimiser = model.configure_optimiser(
         learning_rate=config.learning_rate, weight_decay=config.weight_decay
     )
+    scheduler = CosineAnnealingLR(optimiser, T_max=config.epochs)
 
     wandb.define_metric("epoch")
     wandb.define_metric("ELBO", step_metric="epoch")
@@ -81,7 +83,14 @@ def seq_train(
 
     for iteration in range(config.epochs):
         train_loop(
-            model, train_loader, optimiser, device, config, iteration, anneal_schedule
+            model,
+            train_loader,
+            optimiser,
+            device,
+            config,
+            iteration,
+            anneal_schedule,
+            scheduler,
         )
 
         stop_early = validation_loop(
@@ -111,6 +120,7 @@ def train_loop(
     config,
     epoch: int,
     anneal_schedule: np.ndarray,
+    scheduler,
 ) -> None:
 
     epoch_loss = 0
@@ -147,6 +157,8 @@ def train_loop(
         if config.max_norm != -1:
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=config.max_norm)
         optimiser.step()
+
+    scheduler.step()  # adjust learning rate
 
     # log batch results
     wandb.log(
