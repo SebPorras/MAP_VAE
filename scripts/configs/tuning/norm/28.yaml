@@ -1,3 +1,4 @@
+AA_count: 21
 alignment: /scratch/user/s4646506/gb1/encoded_weighted/gb1_ancestors_encoded_weighted_no_dupes.pkl
 architecture: SeqVAE_softmax
 batch_size: 64

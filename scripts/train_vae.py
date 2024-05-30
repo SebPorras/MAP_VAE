@@ -20,8 +20,8 @@ with open(sys.argv[CONFIG_FILE], "r") as stream:
     settings = yaml.safe_load(stream)
 
 # update our replicate number if a slurm array task ID has been included.
-if len(sys.argv) == 2:
-    settings["replicate"] = int(sys.argv[ARRAY_ID])
+#if len(sys.argv) == 2:
+#    settings["replicate"] = int(sys.argv[ARRAY_ID])
 
 
 # example file name would look like  eg. /data/gb1_ancestors.aln

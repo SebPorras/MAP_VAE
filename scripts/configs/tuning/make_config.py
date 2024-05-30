@@ -20,6 +20,7 @@ for lr in lrs:
                 data = {
                     "alignment": "/scratch/user/s4646506/gb1/encoded_weighted/gb1_ancestors_encoded_weighted_no_dupes.pkl",
                     "extant_aln": "/scratch/user/s4646506/gb1/encoded_weighted/gb1_extants_encoded_weighted_no_dupes.pkl",
+                    "AA_count": 21,
                     "info": "None",
                     "project": "GB1_tuning_round_2",
                     "seq_theta": 0.2,  # reweighting,
