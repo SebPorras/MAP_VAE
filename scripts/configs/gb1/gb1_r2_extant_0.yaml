@@ -1,0 +1,27 @@
+AA_count: 21
+alignment: /scratch/user/s4646506/gb1/encoded_weighted/gb1_ancestors_extants_no_dupes_clustered_r2_extant_0_encoded_weighted.pkl
+architecture: SeqVAE_softmax
+batch_size: 256
+dms_file: /scratch/user/s4646506/gb1/dms_data/SPG1_STRSG_Wu_2016.pkl
+dms_id: SPG1_STRSG_Wu_2016
+dms_metadata: /scratch/user/s4646506/evoVAE/data/DMS_substitutions.csv
+dropout: 0.01
+epochs: 800
+extant_aln: /scratch/user/s4646506/gb1/encoded_weighted/gb1_extants_encoded_weighted.pkl
+hidden_dims:
+- 256
+- 128
+- 64
+info: ./rep_2_train_gb1_ancestors_extants_no_dupes_clustered_r2_extant_0_encoded_weighted_dms_SPG1_STRSG_Wu_2016_covar_gb1_extants_encoded_weighted/
+latent_dims: 3
+latent_samples: 50
+learning_rate: 0.01
+max_mutation: 4
+max_norm: -1
+num_processes: 8
+patience: 10
+project: gb1_clustering
+replicate: 2
+seq_theta: 0.2
+test_split: 0.2
+weight_decay: 0

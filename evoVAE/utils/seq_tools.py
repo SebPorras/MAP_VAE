@@ -205,6 +205,11 @@ def encode_and_weight_seqs(
     theta: float,
     reweight=True,
 ) -> Tuple[np.ndarray, np.ndarray]:
+    """
+
+    Return:
+    encodings, weights
+    """
 
     print("Encoding the sequences and calculating weights")
 
