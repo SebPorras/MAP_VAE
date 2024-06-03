@@ -9,8 +9,9 @@ from typing import Tuple, List
 import pandas as pd
 import evoVAE.utils.metrics as mt
 import torch, re, math
-from numba import njit, prange, jit
+from numba import njit, prange
 from joblib import Parallel, delayed
+import random
 
 GAPPY_PROTEIN_ALPHABET = [
     "-",
@@ -369,3 +370,86 @@ def reweight_by_col_freqs(
         weights[i] = (1.0 / num_type) * (1.0 / aa_dict[seq_msa_chunk[i]])
 
     return weights
+
+
+def sample_clusters(
+    clusters: List[pd.DataFrame],
+    sample_ids: set,
+    clusters_seen: int,
+    num_clusters: int,
+    cluster_obs: dict,
+    is_ancestor: int,
+    current_size: int,
+) -> Tuple[int, int]:
+
+    cluster_idx = clusters_seen % num_clusters
+    current_cluster = clusters[cluster_idx]
+    current_cluster = current_cluster[current_cluster["is_ancestor"] == is_ancestor]
+
+    # can't sample if there's no extants in this cluster
+    if (
+        current_cluster.shape[0] == 0
+        or cluster_obs[cluster_idx] == current_cluster.shape[0]
+    ):
+        clusters_seen += 1
+        return current_size, clusters_seen
+
+    sample_idx = random.randint(0, current_cluster.shape[0] - 1)
+    sample = current_cluster.iloc[sample_idx, 1:]
+
+    while True:
+
+        if sample["sequence"] not in sample_ids:
+            sample_ids.add(sample["sequence"])
+            current_size += 1
+            clusters_seen += 1
+            cluster_obs[cluster_idx] += 1
+            break
+
+        else:
+            sample_idx = random.randint(0, current_cluster.shape[0] - 1)
+            sample = current_cluster.iloc[sample_idx, 1:]
+
+    return current_size, clusters_seen
+
+
+def sample_extant_ancestors(
+    clusters: List[pd.DataFrame], sample_size: int, extant_proportion: float
+):
+
+    num_clusters = len(clusters)
+    cluster_an_obs = {i: 0 for i in range(num_clusters)}
+    cluster_ex_obs = {i: 0 for i in range(num_clusters)}
+
+    current_size = 0
+    clusters_seen = 0
+
+    EXTANT = 0
+    ANCESTOR = 1
+
+    sample_ids = set()
+
+    while current_size < sample_size:
+
+        while (current_size / sample_size) < extant_proportion:
+            current_size, clusters_seen = sample_clusters(
+                clusters,
+                sample_ids,
+                clusters_seen,
+                num_clusters,
+                cluster_ex_obs,
+                EXTANT,
+                current_size,
+            )
+
+        current_size, clusters_seen = sample_clusters(
+            clusters,
+            sample_ids,
+            clusters_seen,
+            num_clusters,
+            cluster_an_obs,
+            ANCESTOR,
+            current_size,
+        )
+
+    return sample_ids
