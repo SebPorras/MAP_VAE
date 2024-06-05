@@ -225,7 +225,7 @@ def validation_loop(
         }
     )
 
-    # only check every 10 epochs to account for ruggedness of loss plot. 
+    # only check every 10 epochs to account for ruggedness of loss plot.
     stop_early = False
     if current_epoch % 10 == 0:
         stop_early = early_stopper.early_stop((epoch_val_elbo / batch_count))
@@ -387,7 +387,7 @@ def fitness_prediction(
         }
     )
 
-    final_metrics.to_csv(unique_id + "_zero_shot.csv")
+    final_metrics.to_csv(unique_id + "zero_shot.csv")
 
     # construct a plot of all the predictions
     title = "predicted_vs_actual_fitness"

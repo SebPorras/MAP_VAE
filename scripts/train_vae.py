@@ -4,6 +4,7 @@ from evoVAE.models.seqVAE import SeqVAE
 from evoVAE.trainer.seq_trainer import seq_train, calc_reconstruction_accuracy
 from sklearn.model_selection import train_test_split
 import pandas as pd
+import evoVAE.utils.seq_tools as st
 import torch
 import wandb
 import sys, yaml, time
@@ -19,11 +20,18 @@ start = time.time()
 with open(sys.argv[CONFIG_FILE], "r") as stream:
     settings = yaml.safe_load(stream)
 
+# slurm array task id
+if len(sys.argv) == 3:
+    replicate = sys.argv[ARRAY_ID]
 
-unique_id = settings["info"]
+unique_id = settings["info"] + "_r" + replicate + "/"
+settings["info"] = unique_id
 
 if not os.path.exists(unique_id):
     os.mkdir(unique_id)
+
+
+settings["replicate"] = replicate
 
 # %%
 wandb.init(
@@ -45,6 +53,28 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # Read in the datasets and create train and validation sets
 # Assume that encodings and weights have been calculated.
 ancestors_aln = pd.read_pickle(config.alignment)
+replicate_data = pd.read_csv(config.replicate_csv)
+
+
+indices = replicate_data.loc[
+    replicate_data["replicate"] == config.replicate, "indices"
+].values[0]
+
+indices = [int(x.strip()) for x in indices[1:-1].split(",")]
+print(indices[:10])
+
+# subset based on random sample
+ancestors_aln = ancestors_aln.loc[indices]
+
+
+# subset the ancestors and extants and then reweight the sequences
+ancestors_aln = ancestors_aln.loc[indices]
+numpy_aln, _, _ = st.convert_msa_numpy_array(ancestors_aln)
+weights = st.reweight_by_seq_similarity(numpy_aln, config.seq_theta)
+ancestors_aln["weights"] = weights
+one_hot = ancestors_aln["sequence"].apply(st.seq_to_one_hot)
+ancestors_aln["encoding"] = one_hot
+
 
 train, val = train_test_split(ancestors_aln, test_size=config.test_split)
 print(f"Train shape: {train.shape}")
@@ -107,10 +137,10 @@ trained_model = seq_train(
     unique_id=unique_id,
 )
 
-#extant_aln = pd.read_pickle(config.extant_aln)
-#calc_reconstruction_accuracy(
+# extant_aln = pd.read_pickle(config.extant_aln)
+# calc_reconstruction_accuracy(
 #    trained_model, extant_aln, unique_id, config.latent_samples, config.num_processes
-#)
+# )
 
 wandb.finish()
 
