@@ -11,6 +11,7 @@ build/
 notebooks/wandb/
 scripts/wandb
 scripts/ancestor_random_sampling/gb1/training/wandb/
+./scripts/configs/
 
 # Non-important data 
 data/FashionMNIST
