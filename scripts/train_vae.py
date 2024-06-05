@@ -107,10 +107,10 @@ trained_model = seq_train(
     unique_id=unique_id,
 )
 
-extant_aln = pd.read_pickle(config.extant_aln)
-calc_reconstruction_accuracy(
-    trained_model, extant_aln, unique_id, config.latent_samples, config.num_processes
-)
+#extant_aln = pd.read_pickle(config.extant_aln)
+#calc_reconstruction_accuracy(
+#    trained_model, extant_aln, unique_id, config.latent_samples, config.num_processes
+#)
 
 wandb.finish()
 
