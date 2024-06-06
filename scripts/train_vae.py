@@ -53,27 +53,25 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # Read in the datasets and create train and validation sets
 # Assume that encodings and weights have been calculated.
 ancestors_aln = pd.read_pickle(config.alignment)
-replicate_data = pd.read_csv(config.replicate_csv)
 
+if config.replicate_csv != 0:
+    replicate_data = pd.read_csv(config.replicate_csv)
 
-indices = replicate_data.loc[
-    replicate_data["replicate"] == config.replicate, "indices"
-].values[0]
+    indices = replicate_data.loc[
+        replicate_data["replicate"] == config.replicate, "indices"
+    ].values[0]
 
-indices = [int(x.strip()) for x in indices[1:-1].split(",")]
+    indices = [int(x.strip()) for x in indices[1:-1].split(",")]
 
-# subset based on random sample
-ancestors_aln = ancestors_aln.loc[indices]
+    # subset based on random sample
+    ancestors_aln = ancestors_aln.loc[indices]
 
-
-# subset the ancestors and extants and then reweight the sequences
-ancestors_aln = ancestors_aln.loc[indices]
+# one-hot encode and add weights to teh sequences
 numpy_aln, _, _ = st.convert_msa_numpy_array(ancestors_aln)
 weights = st.reweight_by_seq_similarity(numpy_aln, config.seq_theta)
 ancestors_aln["weights"] = weights
 one_hot = ancestors_aln["sequence"].apply(st.seq_to_one_hot)
 ancestors_aln["encoding"] = one_hot
-
 
 train, val = train_test_split(ancestors_aln, test_size=config.test_split)
 print(f"Train shape: {train.shape}")
@@ -93,7 +91,7 @@ val_loader = torch.utils.data.DataLoader(
     val_dataset, batch_size=config.batch_size, shuffle=True
 )
 
-# Load and process the DMS data used for fitness prediction
+# Load and subset the DMS data used for fitness prediction
 dms_data = pd.read_pickle(config.dms_file)
 metadata = pd.read_csv(config.dms_metadata)
 # grab metadata for current experiment
