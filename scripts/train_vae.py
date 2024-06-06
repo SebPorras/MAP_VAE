@@ -31,7 +31,7 @@ if not os.path.exists(unique_id):
     os.mkdir(unique_id)
 
 
-settings["replicate"] = replicate
+settings["replicate"] = int(replicate)
 
 # %%
 wandb.init(
@@ -61,7 +61,6 @@ indices = replicate_data.loc[
 ].values[0]
 
 indices = [int(x.strip()) for x in indices[1:-1].split(",")]
-print(indices[:10])
 
 # subset based on random sample
 ancestors_aln = ancestors_aln.loc[indices]
@@ -142,11 +141,10 @@ trained_model = seq_train(
 #    trained_model, extant_aln, unique_id, config.latent_samples, config.num_processes
 # )
 
+print(f"elapsed minutes: {(time.time() - start) / 60}")
 wandb.finish()
 
 trained_model.cpu()
-torch.save(trained_model.state_dict(), unique_id + f"{config.info}_model_state.pt")
-
-print(f"elapsed minutes: {(time.time() - start) / 60}")
+torch.save(trained_model.state_dict(), unique_id + f"{unique_id[2:]}_model_state.pt")
 
 # %%
