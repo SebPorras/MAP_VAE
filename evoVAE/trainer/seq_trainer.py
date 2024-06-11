@@ -81,33 +81,39 @@ def seq_train(
     anneal_schedule = frange_cycle_linear(config.epochs)
     early_stopper = EarlyStopper(patience=config.patience)
 
-    for iteration in range(config.epochs):
-        train_loop(
-            model,
-            train_loader,
-            optimiser,
-            device,
-            config,
-            iteration,
-            anneal_schedule,
-            scheduler,
-        )
+    with open(unique_id + "loss.csv", "w") as file:
+        file.write("epoch,elbo,kld,recon,val_elbo,val_kld,val_recon")
+ 
+        for iteration in range(config.epochs):
 
-        stop_early = validation_loop(
-            model,
-            val_loader,
-            device,
-            dms_data,
-            metadata,
-            iteration,
-            config,
-            anneal_schedule,
-            early_stopper,
-            unique_id,
-        )
+            epoch, elbo, kld, recon = train_loop(
+                    model,
+                    train_loader,
+                    optimiser,
+                    device,
+                    config,
+                    iteration,
+                    anneal_schedule,
+                    scheduler,
+                )
 
-        if stop_early:
-            break
+            stop_early, val_elbo, val_kld, val_recon = validation_loop(
+                model,
+                val_loader,
+                device,
+                dms_data,
+                metadata,
+                iteration,
+                config,
+                anneal_schedule,
+                early_stopper,
+                unique_id,
+            )
+            
+            file.write(epoch, elbo, kld, recon, val_elbo, val_kld, val_recon)
+
+            if stop_early:
+                break
 
     return model
 
@@ -121,7 +127,12 @@ def train_loop(
     epoch: int,
     anneal_schedule: np.ndarray,
     scheduler,
-) -> None:
+) -> Tuple[int, float, float, float]:
+    """
+    
+    Returns:
+    epoch, elbo, kld, reconstruction_error
+    """
 
     epoch_loss = 0
     epoch_kl = 0
@@ -169,6 +180,10 @@ def train_loop(
             "epoch": epoch,
         }
     )
+    
+    # epoch, elbo, kld, reconstruction_error
+    return epoch, epoch_loss / batch_count, epoch_kl / batch_count, epoch_likelihood / batch_count
+
 
 
 def validation_loop(
@@ -182,14 +197,16 @@ def validation_loop(
     anneal_schedule: np.ndarray,
     early_stopper: EarlyStopper,
     unique_id: str,
-) -> bool:
+) -> Tuple[bool, float, float, float]:
     """
     Calculate loss on validation set. Will also evaluate how well
     the model can predict fitness for unseen variants.
 
     Returns:
-    True if the model should stop early if validation loss is
+    early_stop: True if the model should stop early if validation loss is
     increasing, otherwise False.
+
+    val_elbo, val_kld, val_reconstruction_error
     """
 
     epoch_val_elbo = 0
@@ -236,7 +253,9 @@ def validation_loop(
             model, dms_data, metadata, config, current_epoch, unique_id
         )
 
-    return stop_early
+    # early_stop, val_elbo, val_kld, val_reconstruction_error
+    return stop_early, epoch_val_elbo / batch_count, epoch_val_kl / batch_count, epoch_val_likelihood / batch_count
+ 
 
 
 def zero_shot_prediction(
@@ -367,10 +386,8 @@ def fitness_prediction(
 
     # compare to ground truth
     model_scores = pd.Series(model_scores)
-    print("model scores")
-    print(model_scores.shape)
     spear_rho, k_recall, ndcg, roc_auc = mt.summary_stats(
-        predictions=model_scores,
+        predictions=model_scores.values,
         actual=dms_data["DMS_score"],
         actual_binned=dms_data["DMS_score_bin"],
     )
@@ -389,30 +406,31 @@ def fitness_prediction(
         }
     )
 
-    final_metrics.to_csv(unique_id + "zero_shot.csv")
-
     # construct a plot of all the predictions
-    title = "predicted_vs_actual_fitness"
+    title = "zero_shot"
     if mutation_count is None:
         title += "_all_variants"
     else:
-        title += f"_{mutation_count}_mutation_variants"
+        title += f"_{mutation_count}_mutations"
     fig, ax = plt.subplots()
 
     raw_data = pd.DataFrame(
         {
             "mutant": dms_data["mutant"],
             "actual": dms_data["DMS_score"],
-            "predicted": model_scores,
+            "predicted": model_scores.values,
         }
     )
+
     raw_data.to_csv(unique_id + title + ".csv")
+    final_metrics.to_csv(unique_id + title + "_final_metrics.csv")
+
     ax.scatter(dms_data["DMS_score"], model_scores)
     plt.title(title)
     plt.xlabel("Actual")
     plt.ylabel("Prediction")
     plt.savefig(unique_id + title + ".png")
-    wandb.log({title: fig})
+    #wandb.log({title: fig})
 
     return spear_rho, k_recall, ndcg, roc_auc
 
@@ -443,7 +461,7 @@ def calc_reconstruction_accuracy(
     outfile: str,
     num_samples: int = 50,
     num_processes: int = 2,
-):
+) -> float:
 
     train_dataset = MSA_Dataset(aln["encoding"], aln["weights"], aln["id"])
     train_loader = torch.utils.data.DataLoader(
@@ -468,6 +486,8 @@ def calc_reconstruction_accuracy(
     )
 
     wandb.log({"pearson_correlation": correlation_coefficient})
+
+    return correlation_coefficient
 
 
 def sample_latent_space(

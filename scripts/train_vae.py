@@ -9,6 +9,7 @@ import torch
 import wandb
 import sys, yaml, time
 import os
+from datetime import datetime
 
 CONFIG_FILE = 1
 ARRAY_ID = 2
@@ -21,6 +22,8 @@ SEQ_ZERO = 0
 
 # %% [markdown]
 # #### Config
+
+wandb.login()
 
 start = time.time()
 
@@ -46,6 +49,7 @@ wandb.init(
     project=settings["project"],
     # hyperparameters
     config=settings,
+    name=unique_id,
 )
 
 
@@ -65,7 +69,7 @@ if config.replicate != HAS_REPLICATES:
     replicate_data = pd.read_csv(config.replicate_csv)
 
     # subset based on random sample
-    indices = replicate_data["rep_" + config.replicate]
+    indices = replicate_data["rep_" + str(config.replicate)]
     ancestors_extants_aln = ancestors_extants_aln.loc[indices]
 
 # add weights to the sequences
@@ -120,6 +124,16 @@ model = SeqVAE(
 # model
 print(model)
 
+# save config for the run 
+yaml_str = yaml.dump(settings, default_flow_style=False)
+with open(unique_id + "log.txt", "w") as file:
+    file.write("run_id:", unique_id)
+    file.write("time:", datetime.now())
+    file.write("###CONFIG###")
+    file.write(yaml_str)
+    file.write(print(model))
+
+
 # %% [markdown]
 # #### Training Loop
 
@@ -136,15 +150,28 @@ trained_model = seq_train(
 )
 
 extant_aln = pd.read_pickle(config.extant_aln)
-calc_reconstruction_accuracy(
+# add weights to the sequences
+numpy_aln, _, _ = st.convert_msa_numpy_array(extant_aln)
+weights = st.reweight_by_seq_similarity(numpy_aln, config.seq_theta)
+extant_aln["weights"] = weights
+# one-hot encode
+one_hot = extant_aln["sequence"].apply(st.seq_to_one_hot)
+extant_aln["encoding"] = one_hot
+
+
+pearson = calc_reconstruction_accuracy(
     trained_model, extant_aln, unique_id, config.latent_samples, config.num_processes
 )
 
+final_metrics = pd.read_csv(unique_id + "zero_shot_final_metrics.csv")
+final_metrics["pearson"] = [pearson]
+final_metrics.to_csv(unique_id + "zero_shot_final_metrics.csv")
+
 print(f"elapsed minutes: {(time.time() - start) / 60}")
-wandb.finish()
 
 trained_model.cpu()
 # remove '/' at end and './' at start of unique_id and save
 torch.save(trained_model.state_dict(), unique_id + f"{unique_id[2:-1]}_model_state.pt")
 
+wandb.finish()
 # %%
