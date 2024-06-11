@@ -124,7 +124,7 @@ model = SeqVAE(
 # model
 print(model)
 
-# save config for the run 
+# save config for the run
 yaml_str = yaml.dump(settings, default_flow_style=False)
 with open(unique_id + "log.txt", "w") as file:
     file.write("run_id:", unique_id)

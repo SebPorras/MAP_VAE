@@ -83,19 +83,19 @@ def seq_train(
 
     with open(unique_id + "loss.csv", "w") as file:
         file.write("epoch,elbo,kld,recon,val_elbo,val_kld,val_recon")
- 
+
         for iteration in range(config.epochs):
 
             epoch, elbo, kld, recon = train_loop(
-                    model,
-                    train_loader,
-                    optimiser,
-                    device,
-                    config,
-                    iteration,
-                    anneal_schedule,
-                    scheduler,
-                )
+                model,
+                train_loader,
+                optimiser,
+                device,
+                config,
+                iteration,
+                anneal_schedule,
+                scheduler,
+            )
 
             stop_early, val_elbo, val_kld, val_recon = validation_loop(
                 model,
@@ -109,7 +109,7 @@ def seq_train(
                 early_stopper,
                 unique_id,
             )
-            
+
             file.write(epoch, elbo, kld, recon, val_elbo, val_kld, val_recon)
 
             if stop_early:
@@ -129,7 +129,7 @@ def train_loop(
     scheduler,
 ) -> Tuple[int, float, float, float]:
     """
-    
+
     Returns:
     epoch, elbo, kld, reconstruction_error
     """
@@ -180,10 +180,14 @@ def train_loop(
             "epoch": epoch,
         }
     )
-    
-    # epoch, elbo, kld, reconstruction_error
-    return epoch, epoch_loss / batch_count, epoch_kl / batch_count, epoch_likelihood / batch_count
 
+    # epoch, elbo, kld, reconstruction_error
+    return (
+        epoch,
+        epoch_loss / batch_count,
+        epoch_kl / batch_count,
+        epoch_likelihood / batch_count,
+    )
 
 
 def validation_loop(
@@ -254,8 +258,12 @@ def validation_loop(
         )
 
     # early_stop, val_elbo, val_kld, val_reconstruction_error
-    return stop_early, epoch_val_elbo / batch_count, epoch_val_kl / batch_count, epoch_val_likelihood / batch_count
- 
+    return (
+        stop_early,
+        epoch_val_elbo / batch_count,
+        epoch_val_kl / batch_count,
+        epoch_val_likelihood / batch_count,
+    )
 
 
 def zero_shot_prediction(
@@ -430,7 +438,7 @@ def fitness_prediction(
     plt.xlabel("Actual")
     plt.ylabel("Prediction")
     plt.savefig(unique_id + title + ".png")
-    #wandb.log({title: fig})
+    # wandb.log({title: fig})
 
     return spear_rho, k_recall, ndcg, roc_auc
 
