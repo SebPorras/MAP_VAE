@@ -1,6 +1,6 @@
 AA_count: 21
 alignment: /scratch/user/s4646506/a4/encoded_weighted/a4_ancestors_extants_no_dupes.pkl
-replicate_csv: 0 
+replicate_csv: /scratch/user/s4646506/a4/a4_0.2_replicates.csv
 architecture: SeqVAE_softmax
 batch_size: 128
 dms_file: /scratch/user/s4646506/a4/dms_data/A4_HUMAN_Seuma_2022.pkl
@@ -8,21 +8,21 @@ dms_id: A4_HUMAN_Seuma_2022
 dms_metadata: /scratch/user/s4646506/evoVAE/data/DMS_substitutions.csv
 dropout: 0.01
 epochs: 200
-extant_aln: 0
+extant_aln: /scratch/user/s4646506/a4/encoded_weighted/a4_extants_encoded_weighted.pkl
 hidden_dims:
 - 256
 - 128
 - 64
-info: ./a4_anc_extants
-latent_dims: 3
+info: ./a4_0.2_extants
+latent_dims: 8
 latent_samples: 50
 learning_rate: 0.01
 max_mutation: 4
 max_norm: -1
 num_processes: 8
 patience: 3
-project: a4_standard
-replicate: 1
+project: latent_test
+replicate: 0
 seq_theta: 0.2
 test_split: 0.2
 weight_decay: 0

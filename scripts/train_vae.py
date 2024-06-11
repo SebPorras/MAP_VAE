@@ -23,15 +23,16 @@ with open(sys.argv[CONFIG_FILE], "r") as stream:
 # slurm array task id
 if len(sys.argv) == 3:
     replicate = sys.argv[ARRAY_ID]
+    unique_id = settings["info"] + "_r" + replicate + "/"
+    settings["replicate"] = int(replicate)
+else:
+    unique_id = settings["info"] + "/"
 
-unique_id = settings["info"] + "_r" + replicate + "/"
 settings["info"] = unique_id
 
 if not os.path.exists(unique_id):
     os.mkdir(unique_id)
 
-
-settings["replicate"] = int(replicate)
 
 # %%
 wandb.init(
@@ -54,7 +55,8 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # Assume that encodings and weights have been calculated.
 ancestors_aln = pd.read_pickle(config.alignment)
 
-if config.replicate_csv != 0:
+#if config.replicate_csv != 0:
+if config.replicate != 0:
     replicate_data = pd.read_csv(config.replicate_csv)
 
     indices = replicate_data.loc[

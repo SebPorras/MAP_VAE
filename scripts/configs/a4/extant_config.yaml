@@ -1,9 +1,9 @@
 AA_count: 21
-alignment: /scratch/user/s4646506/gb1/encoded_weighted/a4_extants_no_dupes.pkl
+alignment: /scratch/user/s4646506/a4/encoded_weighted/a4_extants_no_dupes.pkl
 replicate_csv: 0 
 architecture: SeqVAE_softmax
 batch_size: 128
-dms_file: /scratch/user/s4646506/gb1/dms_data/A4_HUMAN_Seuma_2022.pkl
+dms_file: /scratch/user/s4646506/a4/dms_data/A4_HUMAN_Seuma_2022.pkl
 dms_id: A4_HUMAN_Seuma_2022
 dms_metadata: /scratch/user/s4646506/evoVAE/data/DMS_substitutions.csv
 dropout: 0.01
