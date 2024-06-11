@@ -367,6 +367,8 @@ def fitness_prediction(
 
     # compare to ground truth
     model_scores = pd.Series(model_scores)
+    print("model scores")
+    print(model_scores.shape)
     spear_rho, k_recall, ndcg, roc_auc = mt.summary_stats(
         predictions=model_scores,
         actual=dms_data["DMS_score"],

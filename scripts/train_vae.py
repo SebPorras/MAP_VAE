@@ -10,18 +10,25 @@ import wandb
 import sys, yaml, time
 import os
 
-# %% [markdown]
-# #### Config
 CONFIG_FILE = 1
 ARRAY_ID = 2
 ALIGN_FILE = -2
+MULTIPLE_REPS = 3
+HAS_REPLICATES = 0
+SEQ_LEN = 0
+BATCH_ZERO = 0
+SEQ_ZERO = 0
+
+# %% [markdown]
+# #### Config
+
 start = time.time()
 
 with open(sys.argv[CONFIG_FILE], "r") as stream:
     settings = yaml.safe_load(stream)
 
 # slurm array task id
-if len(sys.argv) == 3:
+if len(sys.argv) == MULTIPLE_REPS:
     replicate = sys.argv[ARRAY_ID]
     unique_id = settings["info"] + "_r" + replicate + "/"
     settings["replicate"] = int(replicate)
@@ -30,9 +37,9 @@ else:
 
 settings["info"] = unique_id
 
+# create output directory for data
 if not os.path.exists(unique_id):
     os.mkdir(unique_id)
-
 
 # %%
 wandb.init(
@@ -52,30 +59,24 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # %%
 
 # Read in the datasets and create train and validation sets
-# Assume that encodings and weights have been calculated.
-ancestors_aln = pd.read_pickle(config.alignment)
+ancestors_extants_aln = pd.read_pickle(config.alignment)
 
-#if config.replicate_csv != 0:
-if config.replicate != 0:
+if config.replicate != HAS_REPLICATES:
     replicate_data = pd.read_csv(config.replicate_csv)
 
-    indices = replicate_data.loc[
-        replicate_data["replicate"] == config.replicate, "indices"
-    ].values[0]
-
-    indices = [int(x.strip()) for x in indices[1:-1].split(",")]
-
     # subset based on random sample
-    ancestors_aln = ancestors_aln.loc[indices]
+    indices = replicate_data["rep_" + config.replicate]
+    ancestors_extants_aln = ancestors_extants_aln.loc[indices]
 
-# one-hot encode and add weights to teh sequences
-numpy_aln, _, _ = st.convert_msa_numpy_array(ancestors_aln)
+# add weights to the sequences
+numpy_aln, _, _ = st.convert_msa_numpy_array(ancestors_extants_aln)
 weights = st.reweight_by_seq_similarity(numpy_aln, config.seq_theta)
-ancestors_aln["weights"] = weights
-one_hot = ancestors_aln["sequence"].apply(st.seq_to_one_hot)
-ancestors_aln["encoding"] = one_hot
+ancestors_extants_aln["weights"] = weights
+# one-hot encode
+one_hot = ancestors_extants_aln["sequence"].apply(st.seq_to_one_hot)
+ancestors_extants_aln["encoding"] = one_hot
 
-train, val = train_test_split(ancestors_aln, test_size=config.test_split)
+train, val = train_test_split(ancestors_extants_aln, test_size=config.test_split)
 print(f"Train shape: {train.shape}")
 print(f"Validation shape: {val.shape}")
 
@@ -104,9 +105,7 @@ metadata = metadata[metadata["DMS_id"] == config.dms_id]
 
 # %%
 # get the sequence length from first sequence
-SEQ_LEN = 0
-BATCH_ZERO = 0
-SEQ_ZERO = 0
+
 seq_len = train_dataset[BATCH_ZERO][SEQ_ZERO].shape[SEQ_LEN]
 input_dims = seq_len * config.AA_count
 print(f"Seq length: {seq_len}")
@@ -136,15 +135,16 @@ trained_model = seq_train(
     unique_id=unique_id,
 )
 
-# extant_aln = pd.read_pickle(config.extant_aln)
-# calc_reconstruction_accuracy(
-#    trained_model, extant_aln, unique_id, config.latent_samples, config.num_processes
-# )
+extant_aln = pd.read_pickle(config.extant_aln)
+calc_reconstruction_accuracy(
+    trained_model, extant_aln, unique_id, config.latent_samples, config.num_processes
+)
 
 print(f"elapsed minutes: {(time.time() - start) / 60}")
 wandb.finish()
 
 trained_model.cpu()
-torch.save(trained_model.state_dict(), unique_id + f"{unique_id[2:]}_model_state.pt")
+# remove '/' at end and './' at start of unique_id and save
+torch.save(trained_model.state_dict(), unique_id + f"{unique_id[2:-1]}_model_state.pt")
 
 # %%

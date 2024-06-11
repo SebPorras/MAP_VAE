@@ -12,7 +12,7 @@ hidden_dims:
 - 256
 - 128
 - 64
-info: ./a4_ancestors_extants/
+info: ./a4_ancestors_extants
 latent_dims: 20
 latent_samples: 50
 learning_rate: 0.01
