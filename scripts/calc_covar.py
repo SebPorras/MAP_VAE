@@ -13,6 +13,7 @@ CONFIG_FILE = 1
 ARRAY_ID = 2
 ALIGN_FILE = -2
 MULTIPLE_REPS = 3
+PROCESSES = 4
 HAS_REPLICATES = 0
 SEQ_LEN = 0
 BATCH_ZERO = 0
@@ -21,14 +22,13 @@ SEQ_ZERO = 0
 # %% [markdown]
 # #### Config
 
-
 start = time.time()
 
 with open(sys.argv[CONFIG_FILE], "r") as stream:
     settings = yaml.safe_load(stream)
 
 # slurm array task id
-if len(sys.argv) == MULTIPLE_REPS:
+if len(sys.argv) >= MULTIPLE_REPS:
     replicate = sys.argv[ARRAY_ID]
     unique_id = settings["info"] + "_r" + replicate + "/"
     settings["replicate"] = int(replicate)
@@ -73,12 +73,12 @@ model.load_state_dict(torch.load(unique_id + f"{unique_id[2:-1]}_model_state.pt"
 # #### Training Loop
 
 pearson = calc_reconstruction_accuracy(
-    model, extant_aln, unique_id, settings[latent_samples, settings[num_processes
+    model, extant_aln, unique_id, settings["latent_samples"], settings["num_processes"]
 )
 
 final_metrics = pd.read_csv(unique_id + "zero_shot_all_variants_final_metrics.csv")
 final_metrics["pearson"] = [pearson]
-final_metrics.to_csv(unique_id + "zero_shot_all_variants_final_metrics.csv")
+final_metrics.to_csv(unique_id + "zero_shot_all_variants_final_metrics.csv", index=False)
 
 print(f"elapsed minutes: {(time.time() - start) / 60}")
 

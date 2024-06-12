@@ -6,7 +6,7 @@ batch_size: 128
 dms_file: /scratch/user/s4646506/a4/dms_data/A4_HUMAN_Seuma_2022.pkl
 dms_id: A4_HUMAN_Seuma_2022
 dms_metadata: /scratch/user/s4646506/evoVAE/data/DMS_substitutions.csv
-dropout: 0.01
+dropout: 0.05
 epochs: 200
 extant_aln: 0
 hidden_dims:
@@ -20,7 +20,7 @@ learning_rate: 0.01
 max_mutation: 4
 max_norm: -1
 num_processes: 8
-patience: 3
+patience: 5
 project: a4_standard
 replicate: 1
 seq_theta: 0.2

@@ -19,7 +19,7 @@ latent_samples: 50
 learning_rate: 0.01
 max_mutation: 4
 max_norm: -1
-num_processes: 8
+num_processes: 4
 patience: 3
 project: gb1_standard
 replicate: 0

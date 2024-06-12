@@ -51,7 +51,11 @@ class SeqVAE(BaseVAE):
         self.z_logvar_sampler = nn.Linear(hidden_dims[-1], latent_dims)
 
         # restructure latent sample to be passed to decoder
-        self.upscale_z = nn.Linear(latent_dims, hidden_dims[-1])
+        self.upscale_z = nn.Sequential(
+                            nn.Linear(latent_dims, hidden_dims[-1]),
+                            nn.BatchNorm1d(hidden_dims[-1]),
+                            nn.Dropout(config["dropout"]), 
+                            nn.LeakyReLU(),)
 
         ### DECODER ###
 
@@ -144,7 +148,6 @@ class SeqVAE(BaseVAE):
 
         # apply the softmax over last dim, i.e the 21 amino acids
         log_p = F.log_softmax(x_hat, dim=-1)
-        # log_p = F.softmax(x_hat, dim=-1)
 
         # reflatten our probability distribution
         log_p = log_p.view(input_shape + (-1,))

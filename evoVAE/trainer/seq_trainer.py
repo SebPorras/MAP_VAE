@@ -83,6 +83,7 @@ def seq_train(
 
     with open(unique_id + "loss.csv", "w") as file:
         file.write("epoch,elbo,kld,recon,val_elbo,val_kld,val_recon\n")
+        file.flush()
 
         for iteration in range(config["epochs"]):
 
@@ -113,6 +114,7 @@ def seq_train(
             file.write(
                 f"{iteration},{elbo},{kld},{recon},{val_elbo},{val_kld},{val_recon}\n"
             )
+            file.flush()
 
             if stop_early:
                 break
@@ -433,8 +435,8 @@ def fitness_prediction(
         }
     )
 
-    raw_data.to_csv(unique_id + title + ".csv")
-    final_metrics.to_csv(unique_id + title + "_final_metrics.csv")
+    raw_data.to_csv(unique_id + title + ".csv", index=False)
+    final_metrics.to_csv(unique_id + title + "_final_metrics.csv", index=False)
 
     ax.scatter(dms_data["DMS_score"], model_scores)
     plt.title(title)
@@ -495,8 +497,6 @@ def calc_reconstruction_accuracy(
     correlation_coefficient = plot_and_save_covariances(
         actual_covar, predicted_covar, outfile
     )
-
-    wandb.log({"pearson_correlation": correlation_coefficient})
 
     return correlation_coefficient
 

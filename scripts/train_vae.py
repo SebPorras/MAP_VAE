@@ -23,6 +23,8 @@ SEQ_ZERO = 0
 # %% [markdown]
 # #### Config
 
+#os.environ["WANDB_MODE"] = "offline"
+
 wandb.login()
 
 start = time.time()
@@ -65,7 +67,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # Read in the datasets and create train and validation sets
 ancestors_extants_aln = pd.read_pickle(settings["alignment"])
 
-if settings["replicate"] != HAS_REPLICATES:
+if len(sys.argv) == MULTIPLE_REPS:
     replicate_data = pd.read_csv(settings["replicate_csv"])
 
     # subset based on random sample
