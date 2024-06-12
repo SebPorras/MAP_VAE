@@ -35,16 +35,18 @@ with open(sys.argv[CONFIG_FILE], "r") as stream:
 # slurm array task id
 if len(sys.argv) == MULTIPLE_REPS:
     replicate = sys.argv[ARRAY_ID]
-    unique_id = settings["info"] + "_r" + replicate + "/"
+    unique_id_path = settings["info"] + "_r" + replicate + "/"
     settings["replicate"] = int(replicate)
 else:
-    unique_id = settings["info"] + "/"
+    unique_id_path = settings["info"] + "/"
 
-settings["info"] = unique_id
+# remove '/' at end and './' at start of unique_id
+unique_id = unique_id_path[2:-1]
+settings["info"] = unique_id_path
 
 # create output directory for data
-if not os.path.exists(unique_id):
-    os.mkdir(unique_id)
+if not os.path.exists(unique_id_path):
+    os.mkdir(unique_id_path)
 
 # %%
 # wandb.init(
@@ -136,11 +138,11 @@ trained_model = seq_train(
     metadata=metadata,
     device=device,
     config=settings,
-    unique_id=unique_id,
+    unique_id=unique_id_path,
 )
 
 # plot the loss for visualtion of learning
-losses = pd.read_csv(unique_id + "loss.csv")
+losses = pd.read_csv(unique_id_path + "loss.csv")
 
 plt.figure()
 plt.plot(losses["epoch"], losses["elbo"], label="train", marker="o", color="b")
@@ -148,13 +150,14 @@ plt.plot(losses["epoch"], losses["val_elbo"], label="validation", marker="x", co
 plt.xlabel("epoch")
 plt.ylabel("ELBO")
 plt.legend()
-plt.savefig(unique_id + "loss" + ".png")
+plt.title(unique_id)  # remove file / and ./
+plt.savefig(unique_id_path + "loss" + ".png")
 
 
 # save config for the run
 yaml_str = yaml.dump(settings, default_flow_style=False)
-with open(unique_id + "log.txt", "w") as file:
-    file.write(f"run_id: {unique_id}\n")
+with open(unique_id_path + "log.txt", "w") as file:
+    file.write(f"run_id: {unique_id_path}\n")
     file.write(f"time: {datetime.now()}\n")
     file.write("###CONFIG###\n")
     file.write(f"{yaml_str}\n")
@@ -162,8 +165,11 @@ with open(unique_id + "log.txt", "w") as file:
     file.write(f"{str(model)}\n")
     file.write(f"elapsed minutes: {(time.time() - start) / 60}\n")
 
-# remove '/' at end and './' at start of unique_id and save
-torch.save(trained_model.state_dict(), unique_id + f"{unique_id[2:-1]}_model_state.pt")
+
+torch.save(
+    trained_model.state_dict(),
+    unique_id_path + f"{unique_id}_model_state.pt",
+)
 
 # wandb.finish()
 # %%

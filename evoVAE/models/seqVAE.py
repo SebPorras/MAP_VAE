@@ -52,10 +52,11 @@ class SeqVAE(BaseVAE):
 
         # restructure latent sample to be passed to decoder
         self.upscale_z = nn.Sequential(
-                            nn.Linear(latent_dims, hidden_dims[-1]),
-                            nn.BatchNorm1d(hidden_dims[-1]),
-                            nn.Dropout(config["dropout"]), 
-                            nn.LeakyReLU(),)
+            nn.Linear(latent_dims, hidden_dims[-1]),
+            nn.BatchNorm1d(hidden_dims[-1]),
+            nn.Dropout(config["dropout"]),
+            nn.LeakyReLU(),
+        )
 
         ### DECODER ###
 
@@ -71,10 +72,11 @@ class SeqVAE(BaseVAE):
                 )
             )
         # add a final layer to get back to length of seq * AA_Count
-        decoder_modules.append(nn.Sequential(
-                                nn.Linear(hidden_dims[-1], self.encoded_seq_len),
-                                nn.BatchNorm1d(self.encoded_seq_len),
-                                nn.LeakyReLU()
+        decoder_modules.append(
+            nn.Sequential(
+                nn.Linear(hidden_dims[-1], self.encoded_seq_len),
+                nn.BatchNorm1d(self.encoded_seq_len),
+                nn.LeakyReLU(),
             )
         )
 

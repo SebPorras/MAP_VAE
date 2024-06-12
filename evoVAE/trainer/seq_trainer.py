@@ -441,7 +441,7 @@ def fitness_prediction(
     final_metrics.to_csv(unique_id + title + "_final_metrics.csv", index=False)
 
     ax.scatter(dms_data["DMS_score"], model_scores)
-    plt.title(title)
+    plt.title(title + unique_id[2:-1])
     plt.xlabel("Actual")
     plt.ylabel("Prediction")
     plt.savefig(unique_id + title + ".png")
@@ -617,8 +617,8 @@ def plot_and_save_covariances(
     fig, ax = plt.subplots()
 
     plt.scatter(actual_covar, predicted_covar)
-    plt.xlabel("MSA covariance")
-    plt.ylabel("Reconstruction covariance")
+    plt.xlabel("Extant MSA covariance")
+    plt.ylabel("Extant MSA reconstruction covariance")
 
     # Calculate correlation coefficient, use [0,1] to not take from diagnonal
     correlation_coefficient = np.corrcoef(actual_covar, predicted_covar)[0, 1]
@@ -630,10 +630,9 @@ def plot_and_save_covariances(
         f"Pearson's correlation: {correlation_coefficient:.3f}",
         va="top",
     )
+    # remove directory '/' and './'
+    plt.title(outfile[2:-1])
 
-    plt.title("Reconstruction_vs_Actual_MSA_Covariance")
-
-    filename = outfile + "covar.png"
-    plt.savefig(filename)
+    plt.savefig(outfile + "covar.png")
 
     return correlation_coefficient

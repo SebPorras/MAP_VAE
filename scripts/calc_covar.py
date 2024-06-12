@@ -1,8 +1,6 @@
 # %%
-from evoVAE.utils.datasets import MSA_Dataset
 from evoVAE.models.seqVAE import SeqVAE
-from evoVAE.trainer.seq_trainer import seq_train, calc_reconstruction_accuracy
-from sklearn.model_selection import train_test_split
+from evoVAE.trainer.seq_trainer import calc_reconstruction_accuracy
 import pandas as pd
 import evoVAE.utils.seq_tools as st
 import torch
@@ -30,16 +28,17 @@ with open(sys.argv[CONFIG_FILE], "r") as stream:
 # slurm array task id
 if len(sys.argv) >= MULTIPLE_REPS:
     replicate = sys.argv[ARRAY_ID]
-    unique_id = settings["info"] + "_r" + replicate + "/"
+    unique_id_path = settings["info"] + "_r" + replicate + "/"
     settings["replicate"] = int(replicate)
 else:
-    unique_id = settings["info"] + "/"
+    unique_id_path = settings["info"] + "/"
 
-settings["info"] = unique_id
+unique_id = unique_id_path[2:-1]
+settings["info"] = unique_id_path
 
 # create output directory for data
-if not os.path.exists(unique_id):
-    os.mkdir(unique_id)
+if not os.path.exists(unique_id_path):
+    os.mkdir(unique_id_path)
 
 
 extant_aln = pd.read_pickle(settings["extant_aln"])
@@ -68,25 +67,24 @@ model = SeqVAE(
 )
 
 model.load_state_dict(
-    torch.load(unique_id + f"{unique_id[2:-1]}_model_state.pt", map_location=device)
+    torch.load(unique_id_path + f"{unique_id}_model_state.pt", map_location=device)
 )
 
 # %% [markdown]
 # #### Training Loop
 
 pearson = calc_reconstruction_accuracy(
-    model, extant_aln, unique_id, settings["latent_samples"], settings["num_processes"]
+    model,
+    extant_aln,
+    unique_id_path,
+    settings["latent_samples"],
+    settings["num_processes"],
 )
 
-final_metrics = pd.read_csv(unique_id + "zero_shot_all_variants_final_metrics.csv")
+final_metrics = pd.read_csv(unique_id_path + "zero_shot_all_variants_final_metrics.csv")
 final_metrics["pearson"] = [pearson]
 final_metrics.to_csv(
-    unique_id + "zero_shot_all_variants_final_metrics.csv", index=False
+    unique_id_path + "zero_shot_all_variants_final_metrics.csv", index=False
 )
 
 print(f"elapsed minutes: {(time.time() - start) / 60}")
-
-# remove '/' at end and './' at start of unique_id and save
-
-wandb.finish()
-# %%
