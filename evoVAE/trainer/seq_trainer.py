@@ -255,8 +255,8 @@ def validation_loop(
 
     # only check every 10 epochs to account for ruggedness of loss plot.
     stop_early = False
-    if current_epoch % 10 == 0:
-        stop_early = early_stopper.early_stop((epoch_val_elbo / batch_count))
+    # if current_epoch % 10 == 0:
+    stop_early = early_stopper.early_stop((epoch_val_elbo / batch_count))
 
     if (current_epoch == config["epochs"] - 1) or stop_early:
         # predict variant fitnesses
