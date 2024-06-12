@@ -82,11 +82,11 @@ def seq_train(
     early_stopper = EarlyStopper(patience=config.patience)
 
     with open(unique_id + "loss.csv", "w") as file:
-        file.write("epoch,elbo,kld,recon,val_elbo,val_kld,val_recon")
+        file.write("epoch,elbo,kld,recon,val_elbo,val_kld,val_recon\n")
 
         for iteration in range(config.epochs):
 
-            epoch, elbo, kld, recon = train_loop(
+            elbo, kld, recon = train_loop(
                 model,
                 train_loader,
                 optimiser,
@@ -110,7 +110,7 @@ def seq_train(
                 unique_id,
             )
 
-            file.write(epoch, elbo, kld, recon, val_elbo, val_kld, val_recon)
+            file.write(f"{iteration},{elbo},{kld},{recon},{val_elbo},{val_kld},{val_recon}\n")
 
             if stop_early:
                 break
@@ -127,11 +127,11 @@ def train_loop(
     epoch: int,
     anneal_schedule: np.ndarray,
     scheduler,
-) -> Tuple[int, float, float, float]:
+) -> Tuple[float, float, float]:
     """
 
     Returns:
-    epoch, elbo, kld, reconstruction_error
+    elbo, kld, reconstruction_error
     """
 
     epoch_loss = 0
@@ -181,9 +181,8 @@ def train_loop(
         }
     )
 
-    # epoch, elbo, kld, reconstruction_error
+    # elbo, kld, reconstruction_error
     return (
-        epoch,
         epoch_loss / batch_count,
         epoch_kl / batch_count,
         epoch_likelihood / batch_count,
