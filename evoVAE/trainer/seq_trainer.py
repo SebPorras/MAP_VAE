@@ -65,9 +65,9 @@ def seq_train(
     model = model.to(device)
 
     optimiser = model.configure_optimiser(
-        learning_rate=config.learning_rate, weight_decay=config.weight_decay
+        learning_rate=config["learning_rate"], weight_decay=config["weight_decay"]
     )
-    scheduler = CosineAnnealingLR(optimiser, T_max=config.epochs)
+    scheduler = CosineAnnealingLR(optimiser, T_max=config["epochs"])
 
     wandb.define_metric("epoch")
     wandb.define_metric("ELBO", step_metric="epoch")
@@ -78,13 +78,13 @@ def seq_train(
     wandb.define_metric("val_KLD", step_metric="epoch")
     wandb.define_metric("val_Gauss_likelihood", step_metric="epoch")
 
-    anneal_schedule = frange_cycle_linear(config.epochs)
-    early_stopper = EarlyStopper(patience=config.patience)
+    anneal_schedule = frange_cycle_linear(config["epochs"])
+    early_stopper = EarlyStopper(patience=config["patience"])
 
     with open(unique_id + "loss.csv", "w") as file:
         file.write("epoch,elbo,kld,recon,val_elbo,val_kld,val_recon\n")
 
-        for iteration in range(config.epochs):
+        for iteration in range(config["epochs"]):
 
             elbo, kld, recon = train_loop(
                 model,
@@ -110,7 +110,9 @@ def seq_train(
                 unique_id,
             )
 
-            file.write(f"{iteration},{elbo},{kld},{recon},{val_elbo},{val_kld},{val_recon}\n")
+            file.write(
+                f"{iteration},{elbo},{kld},{recon},{val_elbo},{val_kld},{val_recon}\n"
+            )
 
             if stop_early:
                 break
@@ -165,8 +167,10 @@ def train_loop(
         # update weights
         loss.backward()
         # sets max value for gradient
-        if config.max_norm != -1:
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=config.max_norm)
+        if config["max_norm"] != -1:
+            torch.nn.utils.clip_grad_norm_(
+                model.parameters(), max_norm=config["max_norm"]
+            )
         optimiser.step()
 
     scheduler.step()  # adjust learning rate
@@ -250,7 +254,7 @@ def validation_loop(
     if current_epoch % 10 == 0:
         stop_early = early_stopper.early_stop((epoch_val_elbo / batch_count))
 
-    if (current_epoch == config.epochs - 1) or stop_early:
+    if (current_epoch == config["epochs"] - 1) or stop_early:
         # predict variant fitnesses
         zero_shot_prediction(
             model, dms_data, metadata, config, current_epoch, unique_id
@@ -288,7 +292,7 @@ def zero_shot_prediction(
     for count, subset_mutants in subset_dms.items():
 
         # Predict fitness of DMS variants with {count} mutations dataset
-        if count > config.max_mutation:
+        if count > config["max_mutation"]:
             continue
 
         sub_spear_rho, sub_k_recall, sub_ndcg, sub_roc_auc = fitness_prediction(

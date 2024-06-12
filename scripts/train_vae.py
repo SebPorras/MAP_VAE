@@ -54,7 +54,7 @@ wandb.init(
 
 
 # %%
-config = wandb.config
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # %% [markdown]
@@ -63,24 +63,24 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # %%
 
 # Read in the datasets and create train and validation sets
-ancestors_extants_aln = pd.read_pickle(config.alignment)
+ancestors_extants_aln = pd.read_pickle(settings["alignment"])
 
-if config.replicate != HAS_REPLICATES:
-    replicate_data = pd.read_csv(config.replicate_csv)
+if settings["replicate"] != HAS_REPLICATES:
+    replicate_data = pd.read_csv(settings["replicate_csv"])
 
     # subset based on random sample
-    indices = replicate_data["rep_" + str(config.replicate)]
+    indices = replicate_data["rep_" + str(settings["replicate"])]
     ancestors_extants_aln = ancestors_extants_aln.loc[indices]
 
 # add weights to the sequences
 numpy_aln, _, _ = st.convert_msa_numpy_array(ancestors_extants_aln)
-weights = st.reweight_by_seq_similarity(numpy_aln, config.seq_theta)
+weights = st.reweight_by_seq_similarity(numpy_aln, settings["seq_theta"])
 ancestors_extants_aln["weights"] = weights
 # one-hot encode
 one_hot = ancestors_extants_aln["sequence"].apply(st.seq_to_one_hot)
 ancestors_extants_aln["encoding"] = one_hot
 
-train, val = train_test_split(ancestors_extants_aln, test_size=config.test_split)
+train, val = train_test_split(ancestors_extants_aln, test_size=settings["test_split"])
 print(f"Train shape: {train.shape}")
 print(f"Validation shape: {val.shape}")
 
@@ -92,17 +92,17 @@ val_dataset = MSA_Dataset(val["encoding"], val["weights"], val["id"])
 
 # DATA LOADERS #
 train_loader = torch.utils.data.DataLoader(
-    train_dataset, batch_size=config.batch_size, shuffle=True
+    train_dataset, batch_size=settings["batch_size"], shuffle=True
 )
 val_loader = torch.utils.data.DataLoader(
-    val_dataset, batch_size=config.batch_size, shuffle=True
+    val_dataset, batch_size=settings["batch_size"], shuffle=True
 )
 
 # Load and subset the DMS data used for fitness prediction
-dms_data = pd.read_pickle(config.dms_file)
-metadata = pd.read_csv(config.dms_metadata)
+dms_data = pd.read_pickle(settings["dms_file"])
+metadata = pd.read_csv(settings["dms_metadata"])
 # grab metadata for current experiment
-metadata = metadata[metadata["DMS_id"] == config.dms_id]
+metadata = metadata[metadata["DMS_id"] == settings["dms_id"]]
 
 # %% [markdown]
 # #### Create the model
@@ -111,15 +111,15 @@ metadata = metadata[metadata["DMS_id"] == config.dms_id]
 # get the sequence length from first sequence
 
 seq_len = train_dataset[BATCH_ZERO][SEQ_ZERO].shape[SEQ_LEN]
-input_dims = seq_len * config.AA_count
+input_dims = seq_len * settings["AA_count"]
 print(f"Seq length: {seq_len}")
 
 # instantiate the model
 model = SeqVAE(
     input_dims=input_dims,
-    latent_dims=config.latent_dims,
-    hidden_dims=config.hidden_dims,
-    config=config,
+    latent_dims=settings["latent_dims"],
+    hidden_dims=settings["hidden_dims"],
+    config=settings,
 )
 # model
 print(model)
@@ -145,7 +145,7 @@ trained_model = seq_train(
     dms_data=dms_data,
     metadata=metadata,
     device=device,
-    config=config,
+    config=settings,
     unique_id=unique_id,
 )
 
