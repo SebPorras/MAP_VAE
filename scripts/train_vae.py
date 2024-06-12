@@ -10,6 +10,7 @@ import wandb
 import sys, yaml, time
 import os
 from datetime import datetime
+import matplotlib.pyplot as plt
 
 CONFIG_FILE = 1
 ARRAY_ID = 2
@@ -23,9 +24,8 @@ SEQ_ZERO = 0
 # %% [markdown]
 # #### Config
 
-#os.environ["WANDB_MODE"] = "offline"
-
-wandb.login()
+# os.environ["WANDB_MODE"] = "offline"
+# wandb.login()
 
 start = time.time()
 
@@ -47,12 +47,12 @@ if not os.path.exists(unique_id):
     os.mkdir(unique_id)
 
 # %%
-wandb.init(
-    project=settings["project"],
-    # hyperparameters
-    config=settings,
-    name=unique_id,
-)
+# wandb.init(
+#     project=settings["project"],
+#     # hyperparameters
+#     config=settings,
+#     name=unique_id,
+# )
 
 
 # %%
@@ -151,10 +151,18 @@ trained_model = seq_train(
     unique_id=unique_id,
 )
 
+# plot the loss for visualtion of learning
+losses = pd.read_csv(unique_id + "loss.csv")
+plt.plot(losses["epoch"], losses["elbo"], label="val ELBO", marker="o", color="b")
+plt.plot(losses["epoch"], losses["val_elbo"], label="val ELBO", marker="x", color="r")
+plt.xlabel("epoch")
+plt.ylabel("ELBO")
+plt.savefig(unique_id + "loss" + ".png")
+
 print(f"elapsed minutes: {(time.time() - start) / 60}")
 
 # remove '/' at end and './' at start of unique_id and save
 torch.save(trained_model.state_dict(), unique_id + f"{unique_id[2:-1]}_model_state.pt")
 
-wandb.finish()
+# wandb.finish()
 # %%

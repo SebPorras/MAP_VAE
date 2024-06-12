@@ -178,14 +178,14 @@ def train_loop(
     scheduler.step()  # adjust learning rate
 
     # log batch results
-    wandb.log(
-        {
-            "ELBO": epoch_loss / batch_count,
-            "KLD": epoch_kl / batch_count,
-            "Gauss_likelihood": epoch_likelihood / batch_count,
-            "epoch": epoch,
-        }
-    )
+    # wandb.log(
+    #     {
+    #         "ELBO": epoch_loss / batch_count,
+    #         "KLD": epoch_kl / batch_count,
+    #         "Gauss_likelihood": epoch_likelihood / batch_count,
+    #         "epoch": epoch,
+    #     }
+    # )
 
     # elbo, kld, reconstruction_error
     return (
@@ -242,14 +242,14 @@ def validation_loop(
             epoch_val_likelihood += likelihood_val.item()
             batch_count += 1
 
-    wandb.log(
-        {
-            "val_ELBO": epoch_val_elbo / batch_count,
-            "val_KLD": epoch_val_kl / batch_count,
-            "val_Gauss_likelihood": epoch_val_likelihood / batch_count,
-            "epoch": current_epoch,
-        }
-    )
+    # wandb.log(
+    #     {
+    #         "val_ELBO": epoch_val_elbo / batch_count,
+    #         "val_KLD": epoch_val_kl / batch_count,
+    #         "val_Gauss_likelihood": epoch_val_likelihood / batch_count,
+    #         "epoch": current_epoch,
+    #     }
+    # )
 
     # only check every 10 epochs to account for ruggedness of loss plot.
     stop_early = False
@@ -304,15 +304,15 @@ def zero_shot_prediction(
             metadata,
             unique_id,
         )
-        wandb.log(
-            {
-                f"{count}_mutations_spearman_rho": sub_spear_rho,
-                f"{count}_top_k_recall": sub_k_recall,
-                f"{count}_ndcg": sub_ndcg,
-                f"{count}_roc_auc": sub_roc_auc,
-                "epoch": current_epoch,
-            }
-        )
+        # wandb.log(
+        #     {
+        #         f"{count}_mutations_spearman_rho": sub_spear_rho,
+        #         f"{count}_top_k_recall": sub_k_recall,
+        #         f"{count}_ndcg": sub_ndcg,
+        #         f"{count}_roc_auc": sub_roc_auc,
+        #         "epoch": current_epoch,
+        #     }
+        # )
 
     # Predict fitness of DMS variants for ENTIRE dataset
     spear_rho, k_recall, ndcg, roc_auc = fitness_prediction(
@@ -322,15 +322,15 @@ def zero_shot_prediction(
         metadata,
         unique_id,
     )
-    wandb.log(
-        {
-            "spearman_rho": spear_rho,
-            "top_k_recall": k_recall,
-            "ndcg": ndcg,
-            "roc_auc": roc_auc,
-            "epoch": current_epoch,
-        }
-    )
+    # wandb.log(
+    #     {
+    #         "spearman_rho": spear_rho,
+    #         "top_k_recall": k_recall,
+    #         "ndcg": ndcg,
+    #         "roc_auc": roc_auc,
+    #         "epoch": current_epoch,
+    #     }
+    # )
 
 
 def fitness_prediction(

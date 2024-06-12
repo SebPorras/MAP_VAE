@@ -67,7 +67,9 @@ model = SeqVAE(
     config=settings,
 )
 
-model.load_state_dict(torch.load(unique_id + f"{unique_id[2:-1]}_model_state.pt", map_location=device))
+model.load_state_dict(
+    torch.load(unique_id + f"{unique_id[2:-1]}_model_state.pt", map_location=device)
+)
 
 # %% [markdown]
 # #### Training Loop
@@ -78,7 +80,9 @@ pearson = calc_reconstruction_accuracy(
 
 final_metrics = pd.read_csv(unique_id + "zero_shot_all_variants_final_metrics.csv")
 final_metrics["pearson"] = [pearson]
-final_metrics.to_csv(unique_id + "zero_shot_all_variants_final_metrics.csv", index=False)
+final_metrics.to_csv(
+    unique_id + "zero_shot_all_variants_final_metrics.csv", index=False
+)
 
 print(f"elapsed minutes: {(time.time() - start) / 60}")
 
