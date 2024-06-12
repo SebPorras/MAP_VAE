@@ -71,7 +71,12 @@ class SeqVAE(BaseVAE):
                 )
             )
         # add a final layer to get back to length of seq * AA_Count
-        decoder_modules.append(nn.Linear(hidden_dims[-1], self.encoded_seq_len))
+        decoder_modules.append(nn.Sequential(
+                                nn.Linear(hidden_dims[-1], self.encoded_seq_len),
+                                nn.BatchNorm1d(self.encoded_seq_len),
+                                nn.LeakyReLU()
+            )
+        )
 
         self.decoder = nn.Sequential(*decoder_modules)
 

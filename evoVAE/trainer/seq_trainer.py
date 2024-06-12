@@ -69,6 +69,7 @@ def seq_train(
     )
     scheduler = CosineAnnealingLR(optimiser, T_max=config["epochs"])
 
+    """
     wandb.define_metric("epoch")
     wandb.define_metric("ELBO", step_metric="epoch")
     wandb.define_metric("KLD", step_metric="epoch")
@@ -77,6 +78,7 @@ def seq_train(
     wandb.define_metric("val_ELBO", step_metric="epoch")
     wandb.define_metric("val_KLD", step_metric="epoch")
     wandb.define_metric("val_Gauss_likelihood", step_metric="epoch")
+    """
 
     anneal_schedule = frange_cycle_linear(config["epochs"])
     early_stopper = EarlyStopper(patience=config["patience"])

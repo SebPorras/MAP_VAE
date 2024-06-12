@@ -6,14 +6,14 @@ batch_size: 128
 dms_file: /scratch/user/s4646506/a4/dms_data/A4_HUMAN_Seuma_2022.pkl
 dms_id: A4_HUMAN_Seuma_2022
 dms_metadata: /scratch/user/s4646506/evoVAE/data/DMS_substitutions.csv
-dropout: 0.01
+dropout: 0.05
 epochs: 200
 extant_aln: /scratch/user/s4646506/a4/encoded_weighted/a4_extants_encoded_weighted.pkl
 hidden_dims:
 - 256
 - 128
 - 64
-info: ./a4_0.2_extants
+info: ./9_dims
 latent_dims: 9
 latent_samples: 50
 learning_rate: 0.01

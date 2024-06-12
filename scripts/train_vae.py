@@ -59,10 +59,7 @@ if not os.path.exists(unique_id):
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# %% [markdown]
 # #### Data loading and preprocessing
-
-# %%
 
 # Read in the datasets and create train and validation sets
 ancestors_extants_aln = pd.read_pickle(settings["alignment"])
@@ -83,8 +80,11 @@ one_hot = ancestors_extants_aln["sequence"].apply(st.seq_to_one_hot)
 ancestors_extants_aln["encoding"] = one_hot
 
 train, val = train_test_split(ancestors_extants_aln, test_size=settings["test_split"])
-print(f"Train shape: {train.shape}")
-print(f"Validation shape: {val.shape}")
+
+
+log = ""
+log += f"Train shape: {train.shape}\n"
+log += f"Validation shape: {val.shape}\n"
 
 # TRAINING
 train_dataset = MSA_Dataset(train["encoding"], train["weights"], train["id"])
@@ -114,7 +114,7 @@ metadata = metadata[metadata["DMS_id"] == settings["dms_id"]]
 
 seq_len = train_dataset[BATCH_ZERO][SEQ_ZERO].shape[SEQ_LEN]
 input_dims = seq_len * settings["AA_count"]
-print(f"Seq length: {seq_len}")
+log += f"Seq length: {seq_len}\n"
 
 # instantiate the model
 model = SeqVAE(
@@ -124,18 +124,6 @@ model = SeqVAE(
     config=settings,
 )
 # model
-print(model)
-
-# save config for the run
-yaml_str = yaml.dump(settings, default_flow_style=False)
-with open(unique_id + "log.txt", "w") as file:
-    file.write(f"run_id: {unique_id}\n")
-    file.write(f"time: {datetime.now()}\n")
-    file.write("###CONFIG###\n")
-    file.write(f"{yaml_str}\n")
-    file.write(f"{str(model)}\n")
-
-
 # %% [markdown]
 # #### Training Loop
 
@@ -153,13 +141,26 @@ trained_model = seq_train(
 
 # plot the loss for visualtion of learning
 losses = pd.read_csv(unique_id + "loss.csv")
-plt.plot(losses["epoch"], losses["elbo"], label="val ELBO", marker="o", color="b")
-plt.plot(losses["epoch"], losses["val_elbo"], label="val ELBO", marker="x", color="r")
+
+plt.figure()
+plt.plot(losses["epoch"], losses["elbo"], label="train", marker="o", color="b")
+plt.plot(losses["epoch"], losses["val_elbo"], label="validation", marker="x", color="r")
 plt.xlabel("epoch")
 plt.ylabel("ELBO")
+plt.legend()
 plt.savefig(unique_id + "loss" + ".png")
 
-print(f"elapsed minutes: {(time.time() - start) / 60}")
+
+# save config for the run
+yaml_str = yaml.dump(settings, default_flow_style=False)
+with open(unique_id + "log.txt", "w") as file:
+    file.write(f"run_id: {unique_id}\n")
+    file.write(f"time: {datetime.now()}\n")
+    file.write("###CONFIG###\n")
+    file.write(f"{yaml_str}\n")
+    file.write(log)
+    file.write(f"{str(model)}\n")
+    file.write(f"elapsed minutes: {(time.time() - start) / 60}\n")
 
 # remove '/' at end and './' at start of unique_id and save
 torch.save(trained_model.state_dict(), unique_id + f"{unique_id[2:-1]}_model_state.pt")
