@@ -9,9 +9,10 @@ def KL_divergence(
     """KLD calculation when there is a gaussian normal distribution"""
 
     zStd = zLogvar.mul(0.5).exp()
-    KLD = torch.sum(0.5*(zStd**2 + zMu**2 - 2*torch.log(zStd) - 1), -1)
+    KLD = torch.sum(0.5 * (zStd**2 + zMu**2 - 2 * torch.log(zStd) - 1), -1)
 
-    return KLD 
+    return KLD
+
 
 def KL_divergence_monte_carlo(
     zMu: Tensor, zLogvar: Tensor, zSample: Tensor, seq_weights: Tensor
@@ -22,7 +23,7 @@ def KL_divergence_monte_carlo(
     """
 
     zStd = zLogvar.mul(0.5).exp()
-    p = torch.distributions.Normal(torch.zeros_like(mu), torch.ones_like(zStd))
+    p = torch.distributions.Normal(torch.zeros_like(zMu), torch.ones_like(zStd))
     q = torch.distributions.Normal(zMu, zStd)
 
     # 2. get the probabilities from the equation
@@ -30,7 +31,7 @@ def KL_divergence_monte_carlo(
     log_pz = p.log_prob(zSample)
 
     # kl
-    kl = (log_qzx - log_pz)
+    kl = log_qzx - log_pz
     kl = kl.sum(-1)
     return kl
 
@@ -56,17 +57,19 @@ def gaussian_likelihood(
 
     return log_pxz.mean(dim=0)
 
+
 def sequence_likelihood(x_one_hot, x_hat):
     """
-    X_hat is the distribution of possible residues, 
-    calculate the likelihood of observing the original 
-    input under this distribution. 
+    X_hat is the distribution of possible residues,
+    calculate the likelihood of observing the original
+    input under this distribution.
     """
-    
+
     flat_input = torch.flatten(x_one_hot, start_dim=1)
     log_PxGz = torch.sum(flat_input * x_hat, -1)
 
     return log_PxGz
+
 
 def frange_cycle_linear(
     n_iter, start=0.0, stop=1.0, n_cycle=4, ratio=0.5

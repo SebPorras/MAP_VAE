@@ -16,6 +16,8 @@ from evoVAE.utils.datasets import MSA_Dataset
 import evoVAE.utils.statistics as stats
 from torch import Tensor
 from torch.optim.lr_scheduler import CosineAnnealingLR
+from evoVAE.loss.standard_loss import KL_divergence, sequence_likelihood
+from evoVAE.utils.datasets import DMS_Dataset
 
 
 ### EARLY STOPPING ###
@@ -341,6 +343,7 @@ def fitness_prediction(
     mutation_count: int,
     metadata: DataFrame,
     unique_id: str,
+    device,
 ) -> Tuple[float, float, float, float]:
     """
     Briefly, the model produces the representation of the
@@ -357,54 +360,46 @@ def fitness_prediction(
     spear_rho, k_recall, ndcg, roc_auc.
     """
 
+    dms_dataset = DMS_Dataset(
+        dms_data["encoding"], dms_data["mutant"], dms_data["DMS_score"]
+    )
+    dms_loader = torch.utils.data.DataLoader(dms_dataset, batch_size=1, shuffle=True)
+
     # encode the wild type
+    n_samples = 500
     wild_type = metadata["target_seq"].to_numpy()[0]
     # add dim to the front to allow model to process it
-    wild_one_hot = torch.Tensor(st.seq_to_one_hot(wild_type)).unsqueeze(0)
+    wild_one_hot = torch.Tensor(st.seq_to_one_hot(wild_type)).unsqueeze(0).float()
 
-    # get model representation of the wild type
+    model.eval()
+    actual_fitness = []
+    actual_fitness_binned = []
+    predicted_fitness = []
+    ids = []
     with torch.no_grad():
+        wt_elbo_mean = mean_elbo(wild_one_hot, n_samples)
 
-        wild_model_encoding, _, _, _ = model(wild_one_hot)
+        for variant_encoding, variant_id, score, score_bin in dms_loader:
 
-        # reshape into (1, seq_len, AA_count)
-        orig_shape = wild_model_encoding.shape[0:-1]
-        wild_model_encoding = torch.unsqueeze(wild_model_encoding, -1)
-        wild_model_encoding = wild_model_encoding.view(
-            orig_shape + (-1, model.AA_COUNT)
-        )
+            variant_encoding = variant_encoding.float().to(device)
+            variant_elbo_mean = mean_elbo(variant_encoding, n_samples)
 
-        # remove first dim which is just 1 for both tensors
-        wild_model_encoding = wild_model_encoding.squeeze(0)
-        wild_one_hot = wild_one_hot.squeeze(0)
+            pred_fitness = variant_elbo_mean - wt_elbo_mean
 
-        # estimate the log ikelihood of sequence based on model output
-        wt_prob = mt.seq_log_probability(wild_one_hot, wild_model_encoding)
-
-        # pass all variants through the model
-        variant_encodings = torch.Tensor(np.stack(dms_data["encoding"].values))
-        variant_model_outputs, _, _, _ = model(variant_encodings)
-
-    # now make fitness estimates
-    model_scores = []
-    for variant, var_one_hot in zip(variant_model_outputs, variant_encodings):
-
-        # take flat model output and reshape into (seq_len, AA_count)
-        var_model_encoding = torch.unsqueeze(variant, -1)
-        var_model_encoding = var_model_encoding.view(orig_shape + (-1, model.AA_COUNT))
-        var_model_encoding = var_model_encoding.squeeze(0)
-
-        log_prob = mt.seq_log_probability(var_one_hot, var_model_encoding)
-
-        # log(variant_fitness / wild_type_fitness) = log odds score
-        model_scores.append(log_prob - wt_prob)
+            predicted_fitness.append(pred_fitness.item())
+            actual_fitness.append(score.item())
+            actual_fitness_binned.append(score_bin.item())
+            ids.append(variant_id)
 
     # compare to ground truth
-    model_scores = pd.Series(model_scores)
+    predicted_fitness = pd.Series(predicted_fitness)
+    actual_fitness = pd.Series(actual_fitness)
+    actual_fitness_binned = pd.Series(actual_fitness_binned)
+
     spear_rho, k_recall, ndcg, roc_auc = mt.summary_stats(
-        predictions=model_scores.values,
-        actual=dms_data["DMS_score"],
-        actual_binned=dms_data["DMS_score_bin"],
+        predictions=predicted_fitness,
+        actual=actual_fitness,
+        actual_binned=actual_fitness_binned,
     )
 
     # Plot predictions vs actual fitness values but only on final epoch
@@ -431,16 +426,16 @@ def fitness_prediction(
 
     raw_data = pd.DataFrame(
         {
-            "mutant": dms_data["mutant"],
-            "actual": dms_data["DMS_score"],
-            "predicted": model_scores.values,
+            "mutant": ids,
+            "actual": actual_fitness.values,
+            "predicted": predicted_fitness.values,
         }
     )
 
     raw_data.to_csv(unique_id + title + ".csv", index=False)
     final_metrics.to_csv(unique_id + title + "_final_metrics.csv", index=False)
 
-    ax.scatter(dms_data["DMS_score"], model_scores)
+    ax.scatter(actual_fitness, predicted_fitness)
     plt.title(title + "_" + unique_id[2:-1])
     plt.xlabel("Actual")
     plt.ylabel("Prediction")
@@ -448,6 +443,22 @@ def fitness_prediction(
     # wandb.log({title: fig})
 
     return spear_rho, k_recall, ndcg, roc_auc
+
+
+def mean_elbo(model: SeqVAE, one_hot_encoding: torch.Tensor, n_samples):
+
+    one_hot_encoding = one_hot_encoding.expand(n_samples, -1, -1)
+
+    wt_log_p, _, wt_z_mu, wt_z_logvar = model(one_hot_encoding)
+
+    kld = KL_divergence(wt_z_mu, wt_z_logvar, None, None)
+
+    log_PxGz = sequence_likelihood(one_hot_encoding, wt_log_p)
+
+    wt_elbo = (-1) * (log_PxGz - kld)
+    wt_elbo_mean = wt_elbo.mean()
+
+    return wt_elbo_mean
 
 
 def split_by_mutations(dms_data: DataFrame) -> Dict[int, DataFrame]:
