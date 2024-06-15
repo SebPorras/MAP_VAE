@@ -6,7 +6,7 @@ replicate_csv: /scratch/user/s4646506/gcn4/gcn4_0.06_replicates.csv
 dms_file: /scratch/user/s4646506/gcn4/dms_data/GCN4_YEAST_Staller_2018.pkl
 dms_id: GCN4_YEAST_Staller_2018
 dms_metadata: /scratch/user/s4646506/evoVAE/data/DMS_substitutions.csv
-dropout: 0.05
+dropout: 0.025
 epochs: 150
 extant_aln: /scratch/user/s4646506/gcn4/encoded_weighted/gcn4_extants_no_dupes.pkl
 hidden_dims:

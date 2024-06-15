@@ -26,7 +26,7 @@ with open(sys.argv[CONFIG_FILE], "r") as stream:
     settings = yaml.safe_load(stream)
 
 # slurm array task id
-if len(sys.argv) >= MULTIPLE_REPS:
+if len(sys.argv) == MULTIPLE_REPS:
     replicate = sys.argv[ARRAY_ID]
     unique_id_path = settings["info"] + "_r" + replicate + "/"
     settings["replicate"] = int(replicate)
@@ -39,7 +39,6 @@ settings["info"] = unique_id_path
 # create output directory for data
 if not os.path.exists(unique_id_path):
     os.mkdir(unique_id_path)
-
 
 extant_aln = pd.read_pickle(settings["extant_aln"])
 

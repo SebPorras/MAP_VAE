@@ -255,8 +255,8 @@ def validation_loop(
 
     # only check every 10 epochs to account for ruggedness of loss plot.
     stop_early = False
-    # if current_epoch % 10 == 0:
-    stop_early = early_stopper.early_stop((epoch_val_elbo / batch_count))
+    if current_epoch % 5 == 0:
+        stop_early = early_stopper.early_stop((epoch_val_elbo / batch_count))
 
     if (current_epoch == config["epochs"] - 1) or stop_early:
         # predict variant fitnesses
@@ -441,7 +441,7 @@ def fitness_prediction(
     final_metrics.to_csv(unique_id + title + "_final_metrics.csv", index=False)
 
     ax.scatter(dms_data["DMS_score"], model_scores)
-    plt.title(title + unique_id[2:-1])
+    plt.title(title + "_" + unique_id[2:-1])
     plt.xlabel("Actual")
     plt.ylabel("Prediction")
     plt.savefig(unique_id + title + ".png")

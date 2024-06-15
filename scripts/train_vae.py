@@ -16,7 +16,6 @@ CONFIG_FILE = 1
 ARRAY_ID = 2
 ALIGN_FILE = -2
 MULTIPLE_REPS = 3
-HAS_REPLICATES = 0
 SEQ_LEN = 0
 BATCH_ZERO = 0
 SEQ_ZERO = 0
@@ -66,9 +65,8 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # Read in the datasets and create train and validation sets
 ancestors_extants_aln = pd.read_pickle(settings["alignment"])
 
-if len(sys.argv) == MULTIPLE_REPS:
+if settings["replicate_csv"] is not None:
     replicate_data = pd.read_csv(settings["replicate_csv"])
-
     # subset based on random sample
     indices = replicate_data["rep_" + str(settings["replicate"])]
     ancestors_extants_aln = ancestors_extants_aln.loc[indices]

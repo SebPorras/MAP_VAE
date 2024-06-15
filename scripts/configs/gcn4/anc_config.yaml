@@ -2,11 +2,11 @@ AA_count: 21
 alignment: /scratch/user/s4646506/gcn4/encoded_weighted/gcn4_ancestors_no_dupes.pkl
 architecture: SeqVAE_softmax
 batch_size: 128
-replicate_csv: 0
+replicate_csv: null 
 dms_file: /scratch/user/s4646506/gcn4/dms_data/GCN4_YEAST_Staller_2018.pkl
 dms_id: GCN4_YEAST_Staller_2018
 dms_metadata: /scratch/user/s4646506/evoVAE/data/DMS_substitutions.csv
-dropout: 0.05
+dropout: 0.025
 epochs: 150
 extant_aln: /scratch/user/s4646506/gcn4/encoded_weighted/gcn4_extants_no_dupes.pkl
 hidden_dims:
