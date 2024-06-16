@@ -6,7 +6,10 @@ import numpy as np
 def KL_divergence(
     zMu: Tensor, zLogvar: Tensor, zSample: Tensor, seq_weights: Tensor
 ) -> Tensor:
-    """KLD calculation when there is a gaussian normal distribution"""
+    """
+    KLD calculation when there is a gaussian normal distribution
+    https://github.com/loschmidt/vae-dehalogenases/blob/main/scripts/VAE_model.py
+    """
 
     zStd = zLogvar.mul(0.5).exp()
     KLD = torch.sum(0.5 * (zStd**2 + zMu**2 - 2 * torch.log(zStd) - 1), -1)
@@ -69,6 +72,57 @@ def sequence_likelihood(x_one_hot, x_hat):
     log_PxGz = torch.sum(flat_input * x_hat, -1)
 
     return log_PxGz
+
+
+def elbo_importance_sampling(
+    model, one_hot_encoding: torch.Tensor, n_samples: int = 500
+) -> Tensor:
+    """
+    Approximation of marginal probability of sequence using importance sample.
+
+    Described by Ding et al., https://www.nature.com/articles/s41467-019-13633-0
+
+    Return:
+    log_elbo: Tensor
+
+    source:
+    https://github.com/loschmidt/vae-dehalogenases/
+    """
+
+    one_hot_encoding = one_hot_encoding.expand(n_samples, -1, -1)
+
+    log_p, z, z_mu, z_logvar = model.forward(one_hot_encoding)
+    z_sigma = torch.sqrt(torch.exp(z_logvar))
+    # find the random noise used for this sample
+    eps = (z - z_mu) / z_sigma
+
+    # P(x|z)
+    log_PxGz = sequence_likelihood(one_hot_encoding, log_p)
+    # P(z) - log probability density function for Gausian distribution
+    log_Pz = torch.sum(-0.5 * z**2 - 0.5 * torch.log(2 * z.new_tensor(np.pi)), -1)
+    # joint probability P(x,z)
+    log_Pxz = log_PxGz + log_Pz
+
+    # now estimate q(z|x)
+    log_QzGx = torch.sum(
+        -0.5 * (eps) ** 2
+        - 0.5 * torch.log(2 * z.new_tensor(np.pi))
+        - torch.log(z_sigma),
+        -1,
+    )
+
+    # P(x,z) / Q(z|x)
+    log_weight = (log_Pxz - log_QzGx).detach().data
+    log_weight = log_weight.double()
+    # find the max to allow for normalisation
+    log_weight_max = torch.max(log_weight, 0)[0]
+    # now normalise, prevents overflow when we exponentiate
+    log_weight = log_weight - log_weight_max
+    weight = torch.exp(log_weight)
+    # average the weightings and correct the normalisation
+    log_elbo = torch.log(torch.mean(weight, 0)) + log_weight_max
+
+    return log_elbo
 
 
 def frange_cycle_linear(

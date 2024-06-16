@@ -40,7 +40,7 @@ class DMS_Dataset(Dataset):
         assert encodings.shape[0] == len(fitness_bin)
 
         self.encodings = torch.tensor(np.stack(encodings))
-        self.ids = ids
+        self.ids = ids.values
         self.fitness = torch.tensor(fitness.values)
         self.fitness_bin = torch.tensor(fitness_bin.values)
 

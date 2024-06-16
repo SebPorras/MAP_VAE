@@ -16,7 +16,7 @@ from evoVAE.utils.datasets import MSA_Dataset
 import evoVAE.utils.statistics as stats
 from torch import Tensor
 from torch.optim.lr_scheduler import CosineAnnealingLR
-from evoVAE.loss.standard_loss import KL_divergence, sequence_likelihood
+from evoVAE.loss.standard_loss import elbo_importance_sampling
 from evoVAE.utils.datasets import DMS_Dataset
 
 
@@ -282,7 +282,7 @@ def zero_shot_prediction(
     config,
     current_epoch: int,
     unique_id: str,
-    device
+    device,
 ):
     """
     Split the DMS dataset up into subsets based on how many mutations
@@ -312,24 +312,19 @@ def zero_shot_prediction(
             device
         )
     """
-        # wandb.log(
-        #     {
-        #         f"{count}_mutations_spearman_rho": sub_spear_rho,
-        #         f"{count}_top_k_recall": sub_k_recall,
-        #         f"{count}_ndcg": sub_ndcg,
-        #         f"{count}_roc_auc": sub_roc_auc,
-        #         "epoch": current_epoch,
-        #     }
-        # )
+    # wandb.log(
+    #     {
+    #         f"{count}_mutations_spearman_rho": sub_spear_rho,
+    #         f"{count}_top_k_recall": sub_k_recall,
+    #         f"{count}_ndcg": sub_ndcg,
+    #         f"{count}_roc_auc": sub_roc_auc,
+    #         "epoch": current_epoch,
+    #     }
+    # )
 
     # Predict fitness of DMS variants for ENTIRE dataset
     spear_rho, k_recall, ndcg, roc_auc = fitness_prediction(
-        model,
-        dms_data,
-        None,
-        metadata,
-        unique_id,
-        device
+        model, dms_data, None, metadata, unique_id, device
     )
     # wandb.log(
     #     {
@@ -366,8 +361,12 @@ def fitness_prediction(
     """
 
     dms_dataset = DMS_Dataset(
-        dms_data["encoding"], dms_data["mutant"], dms_data["DMS_score"], dms_data["DMS_score_bin"]
+        dms_data["encoding"],
+        dms_data["mutant"],
+        dms_data["DMS_score"],
+        dms_data["DMS_score_bin"],
     )
+
     dms_loader = torch.utils.data.DataLoader(dms_dataset, batch_size=1, shuffle=False)
 
     # encode the wild type
@@ -383,19 +382,21 @@ def fitness_prediction(
     ids = []
     with torch.no_grad():
 
-        wt_elbo_mean = mean_elbo(model, wild_one_hot, n_samples)
+        wt_elbo_mean = elbo_importance_sampling(model, wild_one_hot, n_samples)
 
         for variant_encoding, variant_id, score, score_bin in dms_loader:
 
             variant_encoding = variant_encoding.float().to(device)
-            variant_elbo_mean = mean_elbo(model, variant_encoding, n_samples)
+            variant_elbo_mean = elbo_importance_sampling(
+                model, variant_encoding, n_samples
+            )
 
             pred_fitness = variant_elbo_mean - wt_elbo_mean
 
             predicted_fitness.append(pred_fitness.item())
             actual_fitness.append(score.item())
             actual_fitness_binned.append(score_bin.item())
-            ids.append(variant_id)
+            ids.append(variant_id[0])
 
     # compare to ground truth
     predicted_fitness = pd.Series(predicted_fitness)
@@ -451,22 +452,6 @@ def fitness_prediction(
     return spear_rho, k_recall, ndcg, roc_auc
 
 
-def mean_elbo(model: SeqVAE, one_hot_encoding: torch.Tensor, n_samples):
-
-    one_hot_encoding = one_hot_encoding.expand(n_samples, -1, -1)
-
-    wt_log_p, _, wt_z_mu, wt_z_logvar = model(one_hot_encoding)
-
-    kld = KL_divergence(wt_z_mu, wt_z_logvar, None, None)
-
-    log_PxGz = sequence_likelihood(one_hot_encoding, wt_log_p)
-
-    wt_elbo = (-1) * (log_PxGz - kld)
-    wt_elbo_mean = wt_elbo.mean()
-
-    return wt_elbo_mean
-
-
 def split_by_mutations(dms_data: DataFrame) -> Dict[int, DataFrame]:
     """
     Create a subset of the mutation DataFrames based on how many mutations
@@ -482,8 +467,10 @@ def split_by_mutations(dms_data: DataFrame) -> Dict[int, DataFrame]:
 
     subframes = dict()
     for count in dms_data["mut_count"].unique():
-        subframes[count] = dms_data[dms_data["mut_count"] == count]
-        #subframes[count] = dms_data[dms_data["mut_count"] == count].reset_index(drop=True)
+        # subframes[count] = dms_data[dms_data["mut_count"] == count]
+        subframes[count] = dms_data[dms_data["mut_count"] == count].reset_index(
+            drop=True
+        )
 
     return subframes
 
