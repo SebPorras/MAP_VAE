@@ -7,40 +7,38 @@ from sklearn.model_selection import train_test_split
 import pandas as pd
 import torch
 import wandb
+import sys
+
+rep = sys.argv[1]
 
 # %% [markdown]
 # #### Config
 
 # %%
 wandb.init(
-    project="SeqVAE_training",
+    project="GB1_ancestor_sampling",
     # hyperparameters
-    config={
-        # Dataset info
-        "alignment": "../data/GFP_AEQVI_full_04-29-2022_b08_encoded_weighted_ancestors_extants_no_syn.pkl",
-        "seq_theta": 0.2,  # reweighting
-        "AA_count": 21,  # standard AA + gap
-        "test_split": 0.2,
-        "max_mutation": 4,  # how many mutations the model will test up to
-        # ADAM
-        "learning_rate": 1e-3,  # ADAM
-        "weight_decay": 1e-4,  # ADAM
-        # Hidden units
-        "momentum": None,
-        "dropout": None,
-        # Training loop
-        "epochs": 60,
-        "batch_size": 128,
-        "max_norm": 5.0,  # gradient clipping
-        # Model info - default settings
-        "architecture": "SeqVAE",
-        "latent_dims": 10,
-        "hidden_dims": [128, 64, 32],
-        # DMS data
-        "dms_file": "../data/GFP_AEQVI_Sarkisyan_2016_dms_encoded.pkl",
-        "dms_metadata": "../data/DMS_substitutions.csv",
-        "dms_id": "GFP_AEQVI_Sarkisyan_2016",
-    },
+    config={"AA_count": 21,
+            "alignment": f"/scratch/user/s4646506/gb1/random_sampling/data/gb1_ancestors_no_dupes_encoded_weighted_0.8_sample_r{rep}.pkl",
+            "architecture": "SeqVAE_reg_softmax",
+            "batch_size": 64,
+            "dms_file": "/scratch/user/s4646506/gb1/dms_data/SPG1_STRSG_Wu_2016.pkl",
+            "dms_id": "SPG1_STRSG_Wu_2016",
+            "dms_metadata": "/scratch/user/s4646506/evoVAE/data/DMS_substitutions.csv",
+            "dropout": None,
+            "epochs": 300,
+            "hidden_dims": [256, 128,64],
+            "info": f"gb1_ancestors_no_dupes_r{rep}_sample_0.8",
+            "latent_dims": 3,
+            "learning_rate": 0.001,
+            "max_mutation": 4,
+            "max_norm": 5,
+            "momentum": None,
+            "patience": 3,
+            "project": "GB1_SeqVAE",
+            "seq_theta": 0.2,
+            "test_split": 0.2,
+            "weight_decay": 0.0001},
 )
 
 
@@ -59,10 +57,10 @@ ancestors_aln = pd.read_pickle(config.alignment)
 train, val = train_test_split(ancestors_aln, test_size=config.test_split)
 
 # TRAINING
-train_dataset = MSA_Dataset(train["encodings"], train["weights"], train["id"])
+train_dataset = MSA_Dataset(train["encoding"], train["weights"], train["id"])
 
 # VALIDATION
-val_dataset = MSA_Dataset(val["encodings"], val["weights"], val["id"])
+val_dataset = MSA_Dataset(val["encoding"], val["weights"], val["id"])
 
 # DATA LOADERS #
 train_loader = torch.utils.data.DataLoader(

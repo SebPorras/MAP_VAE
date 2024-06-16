@@ -5,14 +5,13 @@ before they are passed to the VAE.
 """
 
 import numpy as np
-from typing import Tuple, Dict, List
+from typing import Tuple, List
 import pandas as pd
-import torch, re, math
 import evoVAE.utils.metrics as mt
-from scipy.spatial import distance_matrix
-from scipy.spatial.distance import euclidean
-import matplotlib.pyplot as plt
-
+import torch, re, math
+from numba import njit, prange
+from joblib import Parallel, delayed
+import random
 
 GAPPY_PROTEIN_ALPHABET = [
     "-",
@@ -38,23 +37,19 @@ GAPPY_PROTEIN_ALPHABET = [
     "W",
 ]
 
-INVALID_PROTEIN_CHARS = ["B", "J", "X", "Z"]
+INVALID_PROTEIN_CHARS = ["B", "J", "X", "Z", "U"]
 RE_INVALID_PROTEIN_CHARS = "|".join(map(re.escape, INVALID_PROTEIN_CHARS))
 
 GAPPY_ALPHABET_LEN = len(GAPPY_PROTEIN_ALPHABET)
+GAPPY_AA_COMBINATIONS = GAPPY_ALPHABET_LEN**2
+
 IDX_TO_AA = dict((idx, acid) for idx, acid in enumerate(GAPPY_PROTEIN_ALPHABET))
 AA_TO_IDX = dict((acid, idx) for idx, acid in enumerate(GAPPY_PROTEIN_ALPHABET))
+NUM_SEQS = 0
+SEQ_LEN = 1
 
 
-def read_aln_file(
-    filename: str,
-    encode: bool = True,
-) -> pd.DataFrame:
-    """Read in an alignment file in Fasta format and
-    return a Pandas DataFrame with sequences and IDs. If encode
-    is true, a one-hot encoding will be made."""
-
-    print(f"Reading the alignment: {filename}")
+def read_fasta_file(filename: str):
 
     with open(filename, "r") as file:
         lines = file.readlines()
@@ -80,6 +75,20 @@ def read_aln_file(
         # add the last sequence
         data.append([id, sequence])
 
+    return data
+
+
+def read_aln_file(
+    filename: str,
+    encode: bool = True,
+) -> pd.DataFrame:
+    """Read in an alignment file in Fasta format and
+    return a Pandas DataFrame with sequences and IDs. If encode
+    is true, a one-hot encoding will be made."""
+
+    print(f"Reading the alignment: {filename}")
+
+    data = read_fasta_file(filename)
     columns = ["id", "sequence"]
     df = pd.DataFrame(data, columns=columns)
 
@@ -191,14 +200,86 @@ def one_hot_to_seq(encoding: torch.Tensor, is_tensor: True) -> str:
     return "".join(IDX_TO_AA[char] for char in aa_indices)
 
 
-def reweight_sequences(sequences: np.ndarray, theta: float) -> np.ndarray:
+def encode_and_weight_seqs(
+    aln: pd.DataFrame,
+    theta: float,
+    reweight=True,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+
+    Return:
+    encodings, weights
+    """
+
+    print("Encoding the sequences and calculating weights")
+
+    # encodings = np.stack(seqs.apply(seq_to_one_hot))
+    encodings = aln["sequence"].apply(seq_to_one_hot)
+    print(f"The sequence encoding has size: {encodings.shape}\n")
+
+    msa, _, _ = convert_msa_numpy_array(aln)
+
+    weights = None
+    if reweight:
+        weights = reweight_by_seq_similarity(msa, theta=theta)
+        print(f"The sequence weight array has size: {weights.shape}\n")
+
+    return encodings, weights
+
+
+def convert_msa_numpy_array(aln: pd.DataFrame) -> Tuple[np.ndarray, List, List]:
+    """
+    Turn a group of aligned sequences into a numerical format to leverage
+    functions in the numpy library.
+
+    Returns:
+    seq_msa, seq_key, seq_label
+    """
+    sequence_pattern_dict = {}
+    seq_msa = []
+    seq_key = []
+    seq_label = []
+
+    lb = 0
+
+    for id, seq in zip(aln["id"], aln["sequence"]):
+        seq_trns = [AA_TO_IDX[s] for s in seq]
+        seq_trns_m = "".join([str(x) for x in seq_trns])
+        seq_msa.append(seq_trns)
+        seq_key.append(id)
+
+        if seq_trns_m not in sequence_pattern_dict:
+            sequence_pattern_dict.update({seq_trns_m: lb})
+            lb = lb + 1
+
+        seq_label.append(sequence_pattern_dict[seq_trns_m])
+
+    seq_msa = np.array(seq_msa)
+
+    print(
+        "Sequence weight numpy array created with shape (num_seqs, columns): ",
+        seq_msa.shape,
+    )
+    return seq_msa, seq_label, seq_key
+
+
+####### SEQUENCE REWEIGHTING #######
+
+
+@njit(parallel=True)
+def reweight_by_seq_similarity(sequences: np.ndarray, theta: float) -> np.ndarray:
     """Take in a Series of sequences and calculate the new weights. Sequences
-    are deemed to be clustered if (mutation_count/seq_len) < theta."""
+    are deemed to be clustered if (mutation_count/seq_len) < theta.
 
-    weights = np.ones(len(sequences))
+    Sequences must be converted into a numerical format using convert_msa_numpy_array()
+    or parallelisation will not work.
+    """
 
-    for i in range(len(sequences)):
-        for j in range(i + 1, len(sequences)):
+    weights = np.ones(sequences.shape[0])
+
+    for i in prange(sequences.shape[0]):
+        for j in prange(i + 1, sequences.shape[0]):
+
             if (
                 mt.hamming_distance(sequences[i], sequences[j]) / len(sequences[i])
                 < theta
@@ -206,152 +287,174 @@ def reweight_sequences(sequences: np.ndarray, theta: float) -> np.ndarray:
                 weights[i] += 1
                 weights[j] += 1
 
-    return np.fromiter((map(lambda x: 1.0 / x, weights)), dtype=float)
+    for i in prange(weights.shape[0]):
+        weights[i] = 1.0 / weights[i]
+
+    return weights
 
 
-def encode_and_weight_seqs(
-    seqs: pd.Series,
-    theta: float,
-    reweight=True,
-) -> Tuple[np.ndarray, np.ndarray]:
-
-    print("Encoding the sequences and calculating weights")
-
-    # encodings = np.stack(seqs.apply(seq_to_one_hot))
-    encodings = seqs.apply(seq_to_one_hot)
-    print(f"The sequence encoding has size: {encodings.shape}\n")
-
-    weights = None
-    if reweight:
-        weights = reweight_sequences(seqs.values, theta=theta)
-        print(f"The sequence weight array has size: {weights.shape}\n")
-
-    return encodings, weights
-
-
-def calc_mean_seq_embeddings(seqs: pd.DataFrame) -> Dict[str, np.ndarray]:
+def position_based_seq_weighting(seq_msa: np.ndarray, n_processes: int) -> np.ndarray:
     """
-    Read in an alignment or aln file and calculate the distribution
-    of amino acids in each sequence for every sequence in the file.
+    Alternative way of reweighting based off
+    https://www.nature.com/articles/s41467-019-13633-0#Sec9 and implemented
+    originally by Sanjana Tule.
 
-    Return:
-    A dictionary mapping seq ID to embedding means.
+    Uses a mix of jobib process spawning and Numba parallelisation to
+    get a speed-up.
+
+    Returns:
+    Normalised sequence weights.
     """
 
-    aa_means = {}
+    # hand each process an individual column to work on
+    chunks = [seq_msa[:, col] for col in range(seq_msa.shape[SEQ_LEN])]
+    results = Parallel(n_jobs=n_processes)(
+        delayed(process_column)(chunk) for chunk in chunks
+    )
 
-    for name, seq in zip(seqs["id"], seqs["encoding"]):
-        aa_means[name] = seq.mean(axis=0)
+    # collect back futures in order they were submitted
+    seq_weight = np.column_stack([np.array(r) for r in results])
 
-    return aa_means
+    # normalise the weights
+    tot_weight = np.sum(seq_weight)
+    seq_weight = seq_weight.sum(axis=1) / tot_weight
+
+    # print(
+    #     "Sequence weight numpy array created with shape (num_seqs, columns): ",
+    #     seq_weight.shape,
+    # )
+
+    return seq_weight
 
 
-def calc_average_residue_distribution(
-    mean_seq_embeddings: Dict[str, np.ndarray],
-    alphabet: List[str] = GAPPY_PROTEIN_ALPHABET,
+def process_column(seq_msa_chunk: np.ndarray) -> np.ndarray:
+    """
+
+    Identifies unique amino acids within a column and then sends
+    work to a Numba compiled function to actually calculate weights.
+
+    Alternative way of reweighting based off
+    https://www.nature.com/articles/s41467-019-13633-0#Sec9 and implemented
+    originally by Sanjana Tule.
+
+    Returns:
+    Raw sequence weights before normalisation.
+    """
+
+    aa_type, aa_counts = np.unique(seq_msa_chunk, return_counts=True, axis=0)
+    weights = reweight_by_col_freqs(seq_msa_chunk, aa_type, aa_counts)
+
+    return weights
+
+
+@njit()
+def reweight_by_col_freqs(
+    seq_msa_chunk: np.ndarray, aa_type: np.ndarray, aa_counts: np.ndarray
+) -> np.ndarray:
+    """
+    Perform the actual reweighting by column frequencies here. Kept
+    as a separate function to allow compilation with Numba.
+
+    Alternative way of reweighting based off
+    https://www.nature.com/articles/s41467-019-13633-0#Sec9 and implemented
+    originally by Sanjana Tule.
+
+    Returns:
+    Raw sequence weights before normalisation.
+    """
+
+    weights = np.zeros(seq_msa_chunk.shape[0])
+
+    num_type = len(aa_type)
+    aa_dict = {}
+    for a, count in zip(aa_type, aa_counts):
+        aa_dict[a] = count
+
+    # product of how much the column varies and how many time a residue appears
+    for i in range(seq_msa_chunk.shape[NUM_SEQS]):
+        weights[i] = (1.0 / num_type) * (1.0 / aa_dict[seq_msa_chunk[i]])
+
+    return weights
+
+
+def sample_clusters(
+    clusters: List[pd.DataFrame],
+    sample_ids: set,
+    clusters_seen: int,
+    num_clusters: int,
+    cluster_obs: dict,
+    is_ancestor: int,
+    current_size: int,
+) -> Tuple[int, int]:
+
+    cluster_idx = clusters_seen % num_clusters
+    current_cluster = clusters[cluster_idx]
+    current_cluster = current_cluster[current_cluster["is_ancestor"] == is_ancestor]
+
+    # can't sample if there's no extants in this cluster
+    if (
+        current_cluster.shape[0] == 0
+        or cluster_obs[cluster_idx] == current_cluster.shape[0]
+    ):
+        clusters_seen += 1
+        return current_size, clusters_seen
+
+    sample_idx = random.randint(0, current_cluster.shape[0] - 1)
+    sample = current_cluster.iloc[sample_idx, 1:]
+
+    while True:
+
+        if sample["sequence"] not in sample_ids:
+            sample_ids.add(sample["sequence"])
+            current_size += 1
+            clusters_seen += 1
+            cluster_obs[cluster_idx] += 1
+            break
+
+        else:
+            sample_idx = random.randint(0, current_cluster.shape[0] - 1)
+            sample = current_cluster.iloc[sample_idx, 1:]
+
+    return current_size, clusters_seen
+
+
+def sample_extant_ancestors(
+    clusters: List[pd.DataFrame], sample_size: int, extant_proportion: float
 ):
-    """Calculate the proportion of amino acids in this group of
-    sequences but this is column invariant."""
 
-    encodings = np.stack(list(mean_seq_embeddings.values()))
-    encoding_mean = encodings.mean(axis=0)
-    encoding_std = np.std(encodings, axis=0)
+    num_clusters = len(clusters)
+    cluster_an_obs = {i: 0 for i in range(num_clusters)}
+    cluster_ex_obs = {i: 0 for i in range(num_clusters)}
 
-    averages = {
-        letter: {"mean": mean, "std": std}
-        for letter, mean, std in zip(alphabet, encoding_mean, encoding_std)
-    }
+    current_size = 0
+    clusters_seen = 0
 
-    return averages
+    EXTANT = 0
+    ANCESTOR = 1
 
+    sample_ids = set()
 
-def calc_position_prob_matrix(seqs: pd.DataFrame):
+    while current_size < sample_size:
 
-    encodings = np.stack(seqs["encoding"].values)
-    # position_freq_matrix(pfm)
-    pfm = np.zeros(encodings.shape[1:])
+        while (current_size / sample_size) < extant_proportion:
+            current_size, clusters_seen = sample_clusters(
+                clusters,
+                sample_ids,
+                clusters_seen,
+                num_clusters,
+                cluster_ex_obs,
+                EXTANT,
+                current_size,
+            )
 
-    for seq in seqs["sequence"]:
-        for row, letter in enumerate(seq):
-            index = AA_TO_IDX[letter]
-            pfm[row][index] += 1
+        current_size, clusters_seen = sample_clusters(
+            clusters,
+            sample_ids,
+            clusters_seen,
+            num_clusters,
+            cluster_an_obs,
+            ANCESTOR,
+            current_size,
+        )
 
-    # make a position probability matrix
-    for column in pfm:
-        total = np.sum(column)
-        column /= total
-
-    # makes columns positoins in the sequence
-    return pfm.T
-
-
-def create_euclidean_dist_matrix(
-    embedding_means: Dict[str, np.ndarray], plot: bool = False
-) -> pd.DataFrame:
-    """
-    Takes a dictionary mapping of seq ID to the distribution
-    of amino acids in a sequence and calculates the euclidean
-    distance between pairs of sequence distributions.
-
-    Return:
-    A DataFrame of the euclidan matrix.
-    """
-
-    ids = list(embedding_means.keys())
-    embeddings = np.array(list(embedding_means.values()))
-
-    dist_mat = distance_matrix(embeddings, embeddings)
-
-    if plot:
-        plt.imshow(dist_mat, cmap="viridis", interpolation="nearest")
-        plt.colorbar(label="Distance")
-        plt.title("Euclidean distance matrix")
-        plt.xticks(range(len(embeddings)), ids, rotation=90)
-        plt.yticks(range(len(embeddings)), ids)
-        plt.xlabel("Samples")
-        plt.ylabel("Samples")
-        plt.show()
-
-    return pd.DataFrame(dist_mat, index=ids, columns=ids)
-
-
-def plot_residue_distributions(data: Dict[str, np.ndarray]) -> None:
-
-    plot_info = [[] for x in range(GAPPY_ALPHABET_LEN)]
-
-    for residues in data.values():
-        for aa_index in range(GAPPY_ALPHABET_LEN):
-            plot_info[aa_index].append(residues[aa_index])
-
-    # Extract category labels, means, and standard deviations
-    plt.figure(figsize=(10, 6))
-    plt.xlabel("Residue")
-    plt.ylabel("Average Residue Proportion")
-    plt.grid(True)
-    plt.boxplot(plot_info)
-    plt.xticks([i for i in range(1, GAPPY_ALPHABET_LEN + 1)], GAPPY_PROTEIN_ALPHABET)
-
-    plt.show()
-
-
-def population_profile_deviation(
-    population: pd.DataFrame, sample: pd.DataFrame
-) -> float:
-
-    # get the average residue proportion across the population
-    pop_means = calc_mean_seq_embeddings(population)
-    pop_means = calc_average_residue_distribution(pop_means)
-
-    # put this in an array to allow comparisons
-    pop_vector = np.array([x["mean"] for x in pop_means.values()])
-
-    sample_means = calc_mean_seq_embeddings(sample)
-    sample_n = len(sample_means)
-
-    total_dist = 0.0
-    for sample_vector in sample_means.values():
-        total_dist += euclidean(pop_vector, sample_vector)
-
-    mean_deviation = total_dist / sample_n
-
-    return mean_deviation
+    return sample_ids

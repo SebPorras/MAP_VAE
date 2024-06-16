@@ -2,7 +2,7 @@ from evoVAE.models.types_ import *
 import torch
 from evoVAE.models.base import BaseVAE
 from torch import nn
-from evoVAE.loss.standard_loss import KL_divergence, gaussian_likelihood
+from evoVAE.loss.standard_loss import KL_divergence, sequence_likelihood
 import torch.nn.functional as F
 from typing import Dict
 import numpy as np
@@ -35,11 +35,9 @@ class SeqVAE(BaseVAE):
             encoder_modules.append(
                 nn.Sequential(
                     nn.Linear(input_dims, h_dim),
+                    nn.BatchNorm1d(h_dim),
+                    nn.Dropout(config["dropout"]),
                     nn.LeakyReLU(),
-                    # nn.Dropout(config.dropout),  # mask random units
-                    nn.Linear(h_dim, h_dim),
-                    nn.LeakyReLU(),
-                    # nn.BatchNorm1d(h_dim,momentum=config.momentum,),  # normalise and learn alpha/beta
                 )
             )
             input_dims = h_dim
@@ -53,7 +51,12 @@ class SeqVAE(BaseVAE):
         self.z_logvar_sampler = nn.Linear(hidden_dims[-1], latent_dims)
 
         # restructure latent sample to be passed to decoder
-        self.upscale_z = nn.Linear(latent_dims, hidden_dims[-1])
+        self.upscale_z = nn.Sequential(
+            nn.Linear(latent_dims, hidden_dims[-1]),
+            nn.BatchNorm1d(hidden_dims[-1]),
+            nn.Dropout(config["dropout"]),
+            nn.LeakyReLU(),
+        )
 
         ### DECODER ###
 
@@ -63,15 +66,19 @@ class SeqVAE(BaseVAE):
             decoder_modules.append(
                 nn.Sequential(
                     nn.Linear(hidden_dims[i], hidden_dims[i + 1]),
+                    nn.BatchNorm1d(hidden_dims[i + 1]),
+                    nn.Dropout(config["dropout"]),
                     nn.LeakyReLU(),
-                    # nn.Dropout(config.dropout),  # mask random units
-                    nn.Linear(hidden_dims[i + 1], hidden_dims[i + 1]),
-                    nn.LeakyReLU(),
-                    # nn.BatchNorm1d(hidden_dims[i + 1], momentum=config.momentum),
                 )
             )
         # add a final layer to get back to length of seq * AA_Count
-        decoder_modules.append(nn.Linear(hidden_dims[-1], self.encoded_seq_len))
+        decoder_modules.append(
+            nn.Sequential(
+                nn.Linear(hidden_dims[-1], self.encoded_seq_len),
+                nn.BatchNorm1d(self.encoded_seq_len),
+                nn.LeakyReLU(),
+            )
+        )
 
         self.decoder = nn.Sequential(*decoder_modules)
 
@@ -105,12 +112,15 @@ class SeqVAE(BaseVAE):
 
         return z_mu, z_logvar
 
-    def decode(self, z_upscaled: Tensor) -> Tensor:
+    def decode(self, z_sample: Tensor) -> Tensor:
         """
         Sample a latent vector, Z, and
         learn the parameters from which reconstructions
         can be sampled from. I.e. we are learning P_sigma(X|Z)
         """
+
+        # upscale from latent dims to the decoder
+        z_upscaled = self.upscale_z(z_sample)
 
         xHat = self.decoder(z_upscaled)
 
@@ -132,10 +142,7 @@ class SeqVAE(BaseVAE):
         # sample from the distribution
         z_sample = self.reparameterise(z_mu, z_logvar)
 
-        # upscale from latent dims to the decoder
-        z_upscaled = self.upscale_z(z_sample)
-
-        x_hat = self.decode(z_upscaled)
+        x_hat = self.decode(z_sample)
 
         # record input shape
         input_shape = tuple(x_hat.shape[0:-1])
@@ -147,7 +154,7 @@ class SeqVAE(BaseVAE):
         x_hat = x_hat.view(input_shape + (-1, self.AA_COUNT))
 
         # apply the softmax over last dim, i.e the 21 amino acids
-        log_p = F.softmax(x_hat, dim=-1)
+        log_p = F.log_softmax(x_hat, dim=-1)
 
         # reflatten our probability distribution
         log_p = log_p.view(input_shape + (-1,))
@@ -157,7 +164,7 @@ class SeqVAE(BaseVAE):
     def loss_function(
         self,
         modelOutputs: Tuple[Tensor, Tensor, Tensor, Tensor],
-        input: Tensor,
+        x: Tensor,
         seq_weight: Tensor,
         epoch: int,
         anneal_schedule: np.ndarray,
@@ -172,21 +179,22 @@ class SeqVAE(BaseVAE):
 
         xHat, zSample, zMu, zLogvar = modelOutputs
 
-        # average KL across whole batch
+        # KLD across whole all dimensions for each x
         kld = KL_divergence(zMu, zLogvar, zSample, seq_weight)
 
-        # averaged across the whole batch
-        recon_loss = gaussian_likelihood(
-            xHat,
-            self.logStandardDeviation,
-            torch.flatten(input, start_dim=1),
-            seq_weight,
-        )
+        # Recon loss: estimate likelihood of each input sequence
+        log_PxGz = sequence_likelihood(x, xHat)
 
-        # vary the strength of KLD to prevent it vanishing
-        elbo = (anneal_schedule[epoch] * kld) - recon_loss
+        # remove KLD and then use normalised sequence weights
+        elbo = log_PxGz - (kld * anneal_schedule[epoch])
+        norm_weight = seq_weight / torch.sum(seq_weight)
 
-        return elbo, kld.detach(), recon_loss.detach()
+        # reweight
+        elbo = (-1) * torch.sum(elbo * norm_weight)
+        recon_weighted = torch.sum(log_PxGz * norm_weight)
+        reg_weighted = torch.sum(kld * norm_weight)
+
+        return elbo, reg_weighted.detach(), recon_weighted.detach()
 
     def generate(self, x: Tensor) -> Tensor:
         """Return the reconstructed input

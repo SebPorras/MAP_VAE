@@ -1,0 +1,30 @@
+# Dataset info
+alignment: /scratch/user/s4646506/gfp/encoded_weighted/gfp_ancestors_no_syn_no_dupes.pkl
+info: ./gfp_a
+replicate_csv: null
+project: null
+seq_theta: 0.2  # reweighting
+AA_count: 21  # standard AA + gap
+test_split: 0.2
+max_mutation: 4  # how many mutations the model will test up to
+# ADAM
+learning_rate: 0.01 # ADAM
+weight_decay: 0 # ADAM
+# Hidden units
+momentum: null
+dropout: 0.025
+# Training loop
+epochs: 250
+batch_size: 128
+max_norm: -1  # gradient clipping
+patience: 3
+# Model info - default settings
+architecture: SeqVAE_reg_softmax
+latent_dims: 3
+hidden_dims: [1024, 512, 256]
+# DMS data
+dms_file: /scratch/user/s4646506/gfp/dms_data//GFP_AEQVI_Sarkisyan_2016_dms_encoded.pkl
+extant_aln: /scratch/user/s4646506/gfp/encoded_weighted/gfp_extants_no_syn_no_dupes.pkl
+dms_metadata:  /scratch/user/s4646506/evoVAE/data/DMS_substitutions.csv
+dms_id: GFP_AEQVI_Sarkisyan_2016
+

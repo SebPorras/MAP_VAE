@@ -1,4 +1,6 @@
-import evoVAE.utils.seq_tools as st
+# sample_size.py
+
+import evoVAE.utils.statistics as stats
 import pandas as pd
 import numpy as np
 
@@ -14,7 +16,7 @@ for frac in fracs:
 
     sub_sample = ancestors.sample(frac=frac, replace=False)
 
-    mean_dev, std = st.population_profile_deviation(ancestors, sub_sample)
+    mean_dev, std = stats.population_profile_deviation(ancestors, sub_sample)
 
     print(f"{frac},{mean_dev},{std},")
 
