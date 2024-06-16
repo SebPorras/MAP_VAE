@@ -3,6 +3,7 @@
 from pandas import DataFrame
 from evoVAE.models.seqVAE import SeqVAE
 from evoVAE.loss.standard_loss import frange_cycle_linear
+from evoVAE.models.tanh_vae import tanhVAE
 import evoVAE.utils.metrics as mt
 import evoVAE.utils.seq_tools as st
 import numpy as np
@@ -127,7 +128,7 @@ def seq_train(
 
 
 def train_loop(
-    model: SeqVAE,
+    model: tanhVAE,
     train_loader: DataLoader,
     optimiser,
     device: str,
@@ -156,27 +157,18 @@ def train_loop(
 
         # forward step
         optimiser.zero_grad()
-        modelOutputs = model(encoding)
 
-        # calculate loss
-        loss, kl, likelihood = model.loss_function(
-            modelOutputs, encoding, weights, epoch, anneal_schedule
-        )
-        # print(loss, kl, likelihood)
+        elbo = model.compute_weighted_elbo(encoding, weights)
 
         # update epoch metrics
-        epoch_loss += loss.item()
-        epoch_kl += kl.item()
-        epoch_likelihood += likelihood.item()
+        epoch_loss += elbo.item()
+        # epoch_kl += kl.item()
+        # epoch_likelihood += likelihood.item()
         batch_count += 1
 
         # update weights
-        loss.backward()
+        elbo.backward()
         # sets max value for gradient
-        if config["max_norm"] != -1:
-            torch.nn.utils.clip_grad_norm_(
-                model.parameters(), max_norm=config["max_norm"]
-            )
         optimiser.step()
 
     scheduler.step()  # adjust learning rate
@@ -200,7 +192,7 @@ def train_loop(
 
 
 def validation_loop(
-    model: SeqVAE,
+    model: tanhVAE,
     val_loader: DataLoader,
     device,
     dms_data: DataFrame,
@@ -235,15 +227,11 @@ def validation_loop(
             encoding_val = encoding_val.float().to(device)
             weight_val = weight_val.float().to(device)
 
-            outputs_val = model(encoding_val)
+            elbo = model.compute_weighted_elbo(encoding_val, weight_val)
 
-            loss_val, kl_val, likelihood_val = model.loss_function(
-                outputs_val, encoding_val, weight_val, current_epoch, anneal_schedule
-            )
-
-            epoch_val_elbo += loss_val.item()
-            epoch_val_kl += kl_val.item()
-            epoch_val_likelihood += likelihood_val.item()
+            epoch_val_elbo += elbo.item()
+            # epoch_val_kl += kl_val.item()
+            # epoch_val_likelihood += likelihood_val.item()
             batch_count += 1
 
     # wandb.log(
@@ -340,12 +328,13 @@ def zero_shot_prediction(
 
 
 def fitness_prediction(
-    model: SeqVAE,
+    model: tanhVAE,
     dms_data: DataFrame,
     mutation_count: int,
     metadata: DataFrame,
     unique_id: str,
     device,
+    n_samples: int = 10,
 ) -> Tuple[float, float, float, float]:
     """
     Briefly, the model produces the representation of the
@@ -372,7 +361,6 @@ def fitness_prediction(
     dms_loader = torch.utils.data.DataLoader(dms_dataset, batch_size=1, shuffle=False)
 
     # encode the wild type
-    n_samples = 500
     wild_type = metadata["target_seq"].to_numpy()[0]
     # add dim to the front to allow model to process it
     wild_one_hot = torch.Tensor(st.seq_to_one_hot(wild_type)).unsqueeze(0).float()
@@ -384,14 +372,16 @@ def fitness_prediction(
     ids = []
     with torch.no_grad():
 
-        wt_elbo_mean = elbo_importance_sampling(model, wild_one_hot, n_samples)
+        wt_elbo_mean = model.compute_elbo_with_multiple_samples(wild_one_hot, n_samples)
 
         for variant_encoding, variant_id, score, score_bin in dms_loader:
 
             variant_encoding = variant_encoding.float().to(device)
-            variant_elbo_mean = elbo_importance_sampling(
-                model, variant_encoding, n_samples
+            variant_elbo_mean = model.compute_elbo_with_multiple_samples(
+                variant_encoding, n_samples
             )
+
+            elbo_importance_sampling(model, variant_encoding, n_samples)
 
             pred_fitness = variant_elbo_mean - wt_elbo_mean
 

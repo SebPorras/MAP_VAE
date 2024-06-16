@@ -1,6 +1,7 @@
 # %%
 from evoVAE.utils.datasets import MSA_Dataset
 from evoVAE.models.seqVAE import SeqVAE
+from evoVAE.models.tanh_vae import tanhVAE
 from evoVAE.trainer.seq_trainer import seq_train, calc_reconstruction_accuracy
 from sklearn.model_selection import train_test_split
 import pandas as pd
@@ -73,7 +74,7 @@ if settings["replicate_csv"] is not None:
 
 # add weights to the sequences
 numpy_aln, _, _ = st.convert_msa_numpy_array(ancestors_extants_aln)
-weights = st.reweight_by_seq_similarity(numpy_aln, settings["seq_theta"])
+weights = st.position_based_seq_weighting(numpy_aln, settings["seq_theta"])
 ancestors_extants_aln["weights"] = weights
 # one-hot encode
 one_hot = ancestors_extants_aln["sequence"].apply(st.seq_to_one_hot)
@@ -117,11 +118,11 @@ input_dims = seq_len * settings["AA_count"]
 log += f"Seq length: {seq_len}\n"
 
 # instantiate the model
-model = SeqVAE(
-    input_dims=input_dims,
-    latent_dims=settings["latent_dims"],
-    hidden_dims=settings["hidden_dims"],
-    config=settings,
+model = tanhVAE(
+    dim_latent_vars=2,
+    dim_msa_vars=input_dims,
+    num_hidden_units=[150, 150],
+    num_aa_type=21,
 )
 # model
 # %% [markdown]
