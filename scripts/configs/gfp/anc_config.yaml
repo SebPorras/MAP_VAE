@@ -1,6 +1,6 @@
 # Dataset info
-alignment: /scratch/user/s4646506/gfp/encoded_weighted/gfp_extants_no_syn_no_dupes.pkl
-info: ./gfp_e
+alignment: /scratch/user/s4646506/gfp/encoded_weighted/gfp_ancestors_no_syn_no_dupes.pkl
+info: ./gfp_a
 replicate_csv: null
 project: null
 seq_theta: 0.2  # reweighting
