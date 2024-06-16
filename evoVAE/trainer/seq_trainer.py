@@ -381,8 +381,6 @@ def fitness_prediction(
                 variant_encoding, n_samples
             )
 
-            elbo_importance_sampling(model, variant_encoding, n_samples)
-
             pred_fitness = variant_elbo_mean - wt_elbo_mean
 
             predicted_fitness.append(pred_fitness.item())

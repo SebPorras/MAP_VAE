@@ -74,7 +74,7 @@ if settings["replicate_csv"] is not None:
 
 # add weights to the sequences
 numpy_aln, _, _ = st.convert_msa_numpy_array(ancestors_extants_aln)
-weights = st.position_based_seq_weighting(numpy_aln, settings["seq_theta"])
+weights = st.position_based_seq_weighting(numpy_aln, n_processes=8)
 ancestors_extants_aln["weights"] = weights
 # one-hot encode
 one_hot = ancestors_extants_aln["sequence"].apply(st.seq_to_one_hot)

@@ -77,7 +77,7 @@ class tanhVAE(nn.Module):
 
     def compute_weighted_elbo(self, x, weight, c_fx_x=2):
 
-        x = x.flatten()
+        x = torch.flatten(x, start_dim=1)
         # sample z from q(z|x)
         mu, sigma = self.encoder(x)
         eps = torch.randn_like(sigma)
@@ -105,8 +105,11 @@ class tanhVAE(nn.Module):
         return elbo
 
     def compute_elbo_with_multiple_samples(self, x, num_samples):
+
         with torch.no_grad():
-            x = x.expand(num_samples, x.shape[0], x.shape[1])
+
+            x = x.expand(num_samples, -1, -1)
+            x = torch.flatten(x, start_dim=1)
             mu, sigma = self.encoder(x)
             eps = torch.randn_like(mu)
             z = mu + sigma * eps
@@ -129,4 +132,13 @@ class tanhVAE(nn.Module):
             log_weight = log_weight - log_weight_max
             weight = torch.exp(log_weight)
             elbo = torch.log(torch.mean(weight, 0)) + log_weight_max
+
             return elbo
+    
+
+    def configure_optimiser(
+        self, learning_rate: float = 1e-2, weight_decay: float = 0.0
+    ):
+        return torch.optim.Adam(
+            self.parameters(), lr=learning_rate, weight_decay=weight_decay
+        )
