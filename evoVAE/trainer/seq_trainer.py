@@ -263,7 +263,7 @@ def validation_loop(
     if (current_epoch == config["epochs"] - 1) or stop_early:
         # predict variant fitnesses
         zero_shot_prediction(
-            model, dms_data, metadata, config, current_epoch, unique_id
+            model, dms_data, metadata, config, current_epoch, unique_id, device
         )
 
     # early_stop, val_elbo, val_kld, val_reconstruction_error
@@ -282,6 +282,7 @@ def zero_shot_prediction(
     config,
     current_epoch: int,
     unique_id: str,
+    device
 ):
     """
     Split the DMS dataset up into subsets based on how many mutations
@@ -294,6 +295,7 @@ def zero_shot_prediction(
     """
 
     # split variants by how many mutations they have
+    """
     subset_dms = split_by_mutations(dms_data)
     for count, subset_mutants in subset_dms.items():
 
@@ -307,7 +309,9 @@ def zero_shot_prediction(
             count,
             metadata,
             unique_id,
+            device
         )
+    """
         # wandb.log(
         #     {
         #         f"{count}_mutations_spearman_rho": sub_spear_rho,
@@ -325,6 +329,7 @@ def zero_shot_prediction(
         None,
         metadata,
         unique_id,
+        device
     )
     # wandb.log(
     #     {
@@ -361,9 +366,9 @@ def fitness_prediction(
     """
 
     dms_dataset = DMS_Dataset(
-        dms_data["encoding"], dms_data["mutant"], dms_data["DMS_score"]
+        dms_data["encoding"], dms_data["mutant"], dms_data["DMS_score"], dms_data["DMS_score_bin"]
     )
-    dms_loader = torch.utils.data.DataLoader(dms_dataset, batch_size=1, shuffle=True)
+    dms_loader = torch.utils.data.DataLoader(dms_dataset, batch_size=1, shuffle=False)
 
     # encode the wild type
     n_samples = 500
@@ -377,12 +382,13 @@ def fitness_prediction(
     predicted_fitness = []
     ids = []
     with torch.no_grad():
-        wt_elbo_mean = mean_elbo(wild_one_hot, n_samples)
+
+        wt_elbo_mean = mean_elbo(model, wild_one_hot, n_samples)
 
         for variant_encoding, variant_id, score, score_bin in dms_loader:
 
             variant_encoding = variant_encoding.float().to(device)
-            variant_elbo_mean = mean_elbo(variant_encoding, n_samples)
+            variant_elbo_mean = mean_elbo(model, variant_encoding, n_samples)
 
             pred_fitness = variant_elbo_mean - wt_elbo_mean
 
@@ -477,6 +483,7 @@ def split_by_mutations(dms_data: DataFrame) -> Dict[int, DataFrame]:
     subframes = dict()
     for count in dms_data["mut_count"].unique():
         subframes[count] = dms_data[dms_data["mut_count"] == count]
+        #subframes[count] = dms_data[dms_data["mut_count"] == count].reset_index(drop=True)
 
     return subframes
 
