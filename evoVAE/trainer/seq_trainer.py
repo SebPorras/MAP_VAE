@@ -1,7 +1,7 @@
 """seq_trainer.py"""
 
 from pandas import DataFrame
-from evoVAE.models.seqVAEv2 import SeqVAE
+from evoVAE.models.seqVAE import SeqVAE
 from evoVAE.loss.standard_loss import frange_cycle_linear
 from evoVAE.models.tanh_vae import tanhVAE
 import evoVAE.utils.metrics as mt

@@ -1,6 +1,6 @@
 # %%
 from evoVAE.utils.datasets import MSA_Dataset
-from evoVAE.models.seqVAEv2 import SeqVAE
+from evoVAE.models.seqVAE import SeqVAE
 from evoVAE.models.tanh_vae import tanhVAE
 from evoVAE.trainer.seq_trainer import seq_train, calc_reconstruction_accuracy
 from sklearn.model_selection import train_test_split
