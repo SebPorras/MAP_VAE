@@ -118,13 +118,15 @@ input_dims = seq_len * settings["AA_count"]
 log += f"Seq length: {seq_len}\n"
 
 # instantiate the model
-# model = tanhVAE(
-#     dim_latent_vars=2,
-#     dim_msa_vars=input_dims,
-#     num_hidden_units=[150, 150],
-#     num_aa_type=21,
-# )
+"""
+model = tanhVAE(
+     dim_latent_vars=2,
+     dim_msa_vars=input_dims,
+     num_hidden_units=[150, 150],
+     num_aa_type=21,
+)
 
+"""
 model = SeqVAE(
     dim_latent_vars=settings["latent_dims"],
     dim_msa_vars=input_dims,
@@ -132,6 +134,7 @@ model = SeqVAE(
     settings=settings,
     num_aa_type=settings["AA_count"],
 )
+
 # model
 # %% [markdown]
 # #### Training Loop

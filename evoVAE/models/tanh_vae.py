@@ -94,7 +94,7 @@ class tanhVAE(nn.Module):
         weight = weight / torch.sum(weight)
         elbo = torch.sum(elbo * weight)
 
-        return elbo
+        return elbo, torch.Tensor([0]), torch.Tensor([0])
 
     def compute_elbo_with_multiple_samples(self, x, num_samples):
         """

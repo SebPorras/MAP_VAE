@@ -77,9 +77,9 @@ class SeqVAE(nn.Module):
         ):
             # feed forward
             h = T(h)
-            h = batch_norm(h)
+            #h = batch_norm(h)
             h = torch.relu(h)
-            h = dropout(h)
+            #h = dropout(h)
 
         mu = self.encoder_mu(h)
         sigma = torch.exp(self.encoder_logsigma(h))
@@ -102,9 +102,9 @@ class SeqVAE(nn.Module):
         h = z.to(torch.float32)
         for i in range(len(self.decoder_layers) - 1):
             h = self.decoder_layers[i](h)
-            h = self.decoder_batch_norm[i](h)
+            #h = self.decoder_batch_norm[i](h)
             h = torch.relu(h)
-            h = self.decoder_dropout[i](h)
+            #h = self.decoder_dropout[i](h)
 
         # final layer output
         h = self.final_layer(h)
