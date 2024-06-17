@@ -150,8 +150,11 @@ class SeqVAE(nn.Module):
         # compute elbo.
         elbo = log_PxGz - kld
         weight = weight / torch.sum(weight)
+
         # compute for the batch
         elbo = torch.sum(elbo * weight)
+        log_PxGz = torch.sum(log_PxGz * weight)
+        kld = torch.sum(kld * weight)
 
         return (elbo, log_PxGz, kld)
 
