@@ -158,7 +158,7 @@ def train_loop(
         # forward step
         optimiser.zero_grad()
 
-        elbo = model.compute_weighted_elbo(encoding, weights)
+        elbo = (-1) * model.compute_weighted_elbo(encoding, weights)
 
         # update epoch metrics
         epoch_loss += elbo.item()
@@ -227,7 +227,7 @@ def validation_loop(
             encoding_val = encoding_val.float().to(device)
             weight_val = weight_val.float().to(device)
 
-            elbo = model.compute_weighted_elbo(encoding_val, weight_val)
+            elbo = (-1) * model.compute_weighted_elbo(encoding_val, weight_val)
 
             epoch_val_elbo += elbo.item()
             # epoch_val_kl += kl_val.item()

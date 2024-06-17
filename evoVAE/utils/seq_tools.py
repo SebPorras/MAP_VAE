@@ -293,7 +293,9 @@ def reweight_by_seq_similarity(sequences: np.ndarray, theta: float) -> np.ndarra
     return weights
 
 
-def position_based_seq_weighting(seq_msa: np.ndarray, n_processes: int) -> np.ndarray:
+def position_based_seq_weighting(
+    seq_msa: np.ndarray, n_processes: int = 2
+) -> np.ndarray:
     """
     Alternative way of reweighting based off
     https://www.nature.com/articles/s41467-019-13633-0#Sec9 and implemented
