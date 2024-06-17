@@ -75,7 +75,7 @@ class tanhVAE(nn.Module):
 
         return log_p
 
-    def compute_weighted_elbo(self, x, weight, c_fx_x=2):
+    def compute_weighted_elbo(self, x, weight, anneal_schedule, epoch, c_fx_x=2):
 
         x = torch.flatten(x, start_dim=1)
         # sample z from q(z|x)
@@ -96,7 +96,7 @@ class tanhVAE(nn.Module):
         c = 1 / c_fx_x
 
         # compute elbo
-        elbo = log_PxGz - torch.sum(
+        elbo = log_PxGz - anneal_schedule[epoch] * torch.sum(
             c * (sigma**2 + mu**2 - 2 * torch.log(sigma) - 1), -1
         )
         weight = weight / torch.sum(weight)

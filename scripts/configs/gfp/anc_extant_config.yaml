@@ -23,7 +23,7 @@ architecture: SeqVAE_reg_softmax
 latent_dims: 3
 hidden_dims: [1024, 512, 256]
 # DMS data
-dms_file: /scratch/user/s4646506/gfp/dms_data//GFP_AEQVI_Sarkisyan_2016_dms_encoded.pkl
+dms_file: /scratch/user/s4646506/gfp/dms_data/GFP_AEQVI_Sarkisyan_2016_dms_encoded.pkl
 extant_aln: /scratch/user/s4646506/gfp/encoded_weighted/gfp_extants_no_syn_no_dupes.pkl
 dms_metadata:  /scratch/user/s4646506/evoVAE/data/DMS_substitutions.csv
 dms_id: GFP_AEQVI_Sarkisyan_2016
