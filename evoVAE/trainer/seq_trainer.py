@@ -1,7 +1,7 @@
 """seq_trainer.py"""
 
 from pandas import DataFrame
-from evoVAE.models.seqVAE import SeqVAE
+from evoVAE.models.seqVAEv2 import SeqVAE
 from evoVAE.loss.standard_loss import frange_cycle_linear
 from evoVAE.models.tanh_vae import tanhVAE
 import evoVAE.utils.metrics as mt
@@ -92,7 +92,7 @@ def seq_train(
 
         for iteration in range(config["epochs"]):
 
-            elbo, kld, recon = train_loop(
+            (elbo, recon, kld) = train_loop(
                 model,
                 train_loader,
                 optimiser,
@@ -145,7 +145,7 @@ def train_loop(
 
     epoch_loss = 0
     epoch_kl = 0
-    epoch_likelihood = 0
+    epoch_log_PxGz = 0
     batch_count = 0
 
     # ignore seq names for now when training
@@ -158,12 +158,17 @@ def train_loop(
         # forward step
         optimiser.zero_grad()
 
-        elbo = (-1) * model.compute_weighted_elbo(encoding, weights, anneal_schedule, epoch)
+        elbo, log_PxGz, kld = model.compute_weighted_elbo(
+            encoding, weights, anneal_schedule, epoch
+        )
+
+        # allows for gradient descent
+        elbo = (-1) * elbo
 
         # update epoch metrics
         epoch_loss += elbo.item()
-        # epoch_kl += kl.item()
-        # epoch_likelihood += likelihood.item()
+        epoch_kl += kld.item()
+        epoch_log_PxGz += log_PxGz.item()
         batch_count += 1
 
         # update weights
@@ -183,11 +188,11 @@ def train_loop(
     #     }
     # )
 
-    # elbo, kld, reconstruction_error
+    # elbo, log_PxGz, kld
     return (
         epoch_loss / batch_count,
+        epoch_log_PxGz / batch_count,
         epoch_kl / batch_count,
-        epoch_likelihood / batch_count,
     )
 
 
@@ -227,11 +232,16 @@ def validation_loop(
             encoding_val = encoding_val.float().to(device)
             weight_val = weight_val.float().to(device)
 
-            elbo = (-1) * model.compute_weighted_elbo(encoding_val, weight_val, anneal_schedule, current_epoch)
+            elbo, log_PxGz, kld = model.compute_weighted_elbo(
+                encoding_val, weight_val, anneal_schedule, current_epoch
+            )
+
+            # allows for gradient descent
+            elbo = (-1) * elbo
 
             epoch_val_elbo += elbo.item()
-            # epoch_val_kl += kl_val.item()
-            # epoch_val_likelihood += likelihood_val.item()
+            epoch_val_kl += kld.item()
+            epoch_val_likelihood += log_PxGz.item()
             batch_count += 1
 
     # wandb.log(
@@ -258,8 +268,8 @@ def validation_loop(
     return (
         stop_early,
         epoch_val_elbo / batch_count,
-        epoch_val_kl / batch_count,
         epoch_val_likelihood / batch_count,
+        epoch_val_kl / batch_count,
     )
 
 

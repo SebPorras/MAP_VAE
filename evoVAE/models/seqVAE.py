@@ -11,6 +11,8 @@ import numpy as np
 class SeqVAE(BaseVAE):
     """
     Most basic sequence VAE.
+    Good at reconstructing sequences but not fitness prediction.
+    Depreciated.
     """
 
     def __init__(

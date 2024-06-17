@@ -1,6 +1,6 @@
 # %%
 from evoVAE.utils.datasets import MSA_Dataset
-from evoVAE.models.seqVAE import SeqVAE
+from evoVAE.models.seqVAEv2 import SeqVAE
 from evoVAE.models.tanh_vae import tanhVAE
 from evoVAE.trainer.seq_trainer import seq_train, calc_reconstruction_accuracy
 from sklearn.model_selection import train_test_split
@@ -118,11 +118,19 @@ input_dims = seq_len * settings["AA_count"]
 log += f"Seq length: {seq_len}\n"
 
 # instantiate the model
-model = tanhVAE(
-    dim_latent_vars=2,
+# model = tanhVAE(
+#     dim_latent_vars=2,
+#     dim_msa_vars=input_dims,
+#     num_hidden_units=[150, 150],
+#     num_aa_type=21,
+# )
+
+model = SeqVAE(
+    dim_latent_vars=settings["latent_dims"],
     dim_msa_vars=input_dims,
-    num_hidden_units=[150, 150],
-    num_aa_type=21,
+    num_hidden_units=settings["hidden_dims"],
+    settings=settings,
+    num_aa_type=settings["AA_count"],
 )
 # model
 # %% [markdown]

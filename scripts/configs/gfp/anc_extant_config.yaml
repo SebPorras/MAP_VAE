@@ -11,17 +11,15 @@ max_mutation: 4  # how many mutations the model will test up to
 learning_rate: 0.01 # ADAM
 weight_decay: 0 # ADAM
 # Hidden units
-momentum: null
 dropout: 0.025
 # Training loop
 epochs: 250
 batch_size: 128
-max_norm: -1  # gradient clipping
 patience: 3
 # Model info - default settings
-architecture: SeqVAE_reg_softmax
+architecture: SeqVAEv2
 latent_dims: 3
-hidden_dims: [1024, 512, 256]
+hidden_dims: [150, 150]
 # DMS data
 dms_file: /scratch/user/s4646506/gfp/dms_data/GFP_AEQVI_Sarkisyan_2016_dms_encoded.pkl
 extant_aln: /scratch/user/s4646506/gfp/encoded_weighted/gfp_extants_no_syn_no_dupes.pkl

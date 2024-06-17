@@ -75,7 +75,7 @@ class tanhVAE(nn.Module):
 
         return log_p
 
-    def compute_weighted_elbo(self, x, weight, anneal_schedule, epoch, c_fx_x=2):
+    def compute_weighted_elbo(self, x, weight, anneal_schedule, epoch):
 
         x = torch.flatten(x, start_dim=1)
         # sample z from q(z|x)
@@ -87,17 +87,9 @@ class tanhVAE(nn.Module):
         log_p = self.decoder(z)
         log_PxGz = torch.sum(x * log_p, -1)
 
-        # Set parameter for training
-        # loss = (x - f(x)) - (1/C * KL(qZ, pZ)
-        #      reconstruction    normalization
-        #         parameter        parameter
-        # The bigger C is more accurate the reconstruction will be
-        # default value is 2.0
-        c = 1 / c_fx_x
-
         # compute elbo
         elbo = log_PxGz - anneal_schedule[epoch] * torch.sum(
-            c * (sigma**2 + mu**2 - 2 * torch.log(sigma) - 1), -1
+            0.5 * (sigma**2 + mu**2 - 2 * torch.log(sigma) - 1), -1
         )
         weight = weight / torch.sum(weight)
         elbo = torch.sum(elbo * weight)
@@ -105,6 +97,17 @@ class tanhVAE(nn.Module):
         return elbo
 
     def compute_elbo_with_multiple_samples(self, x, num_samples):
+        """
+        Approximation of marginal probability of sequence using importance sample.
+
+        Described by Ding et al., https://www.nature.com/articles/s41467-019-13633-0
+
+        Return:
+        log_elbo
+
+        source:
+        https://github.com/loschmidt/vae-dehalogenases/
+        """
 
         with torch.no_grad():
 
@@ -134,7 +137,6 @@ class tanhVAE(nn.Module):
             elbo = torch.log(torch.mean(weight, 0)) + log_weight_max
 
             return elbo
-    
 
     def configure_optimiser(
         self, learning_rate: float = 1e-2, weight_decay: float = 0.0
