@@ -114,6 +114,7 @@ def safe_log(x, eps=1e-10):
 
 
 def calc_shannon_entropy(seqs: pd.DataFrame) -> np.ndarray:
+    """ """
 
     msa, _, _ = st.convert_msa_numpy_array(seqs)
 
