@@ -1,5 +1,5 @@
 AA_count: 21
-alignment: /scratch/user/s4646506/a4/encoded_weighted/a4_extants_no_dupes.pkl
+alignment: /scratch/user/s4646506/a4/encoded_weighted/a4_ancestors_extants_no_dupes.pkl
 architecture: SeqVAEv2
 batch_size: 750
 dms_file: /scratch/user/s4646506/a4/dms_data/A4_HUMAN_Seuma_2022.pkl
@@ -11,7 +11,7 @@ extant_aln: /scratch/user/s4646506/a4/encoded_weighted/a4_extants_no_dupes.pkl
 hidden_dims:
 - 150
 - 150
-info: ./a4_e
+info: ./a4_0.15_extants_sanjana
 latent_dims: 3
 learning_rate: 0.01
 max_mutation: 4
@@ -19,7 +19,7 @@ max_norm: -1
 num_processes: 8
 patience: 3
 project: null
-replicate_csv: null
+replicate_csv: /scratch/user/s4646506/a4/sanjana_reps/a4_0.15_replicates_sanjana.csv
 seq_theta: 0.2
 test_split: 0.2
 weight_decay: 0

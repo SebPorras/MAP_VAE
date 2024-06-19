@@ -344,7 +344,7 @@ def fitness_prediction(
     metadata: DataFrame,
     unique_id: str,
     device,
-    n_samples: int = 10,
+    n_samples: int = 500,
 ) -> Tuple[float, float, float, float]:
     """
     Briefly, the model produces the representation of the

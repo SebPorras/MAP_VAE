@@ -1,7 +1,7 @@
 AA_count: 21
 alignment: /scratch/user/s4646506/a4/encoded_weighted/a4_ancestors_extants_no_dupes.pkl
 architecture: SeqVAEv2
-batch_size: 128
+batch_size: 750
 dms_file: /scratch/user/s4646506/a4/dms_data/A4_HUMAN_Seuma_2022.pkl
 dms_id: A4_HUMAN_Seuma_2022
 dms_metadata: /scratch/user/s4646506/evoVAE/data/DMS_substitutions.csv

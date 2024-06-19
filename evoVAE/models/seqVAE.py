@@ -78,8 +78,6 @@ class SeqVAE(nn.Module):
         """
         decoder transforms latent space z into p, which is the log probability  of x being 1.
 
-        Applies batch norm, relu activation followed by a dropout layer.
-
         Returns:
         log_p
 
@@ -90,7 +88,7 @@ class SeqVAE(nn.Module):
         h = z.to(torch.float32)
         for i in range(len(self.decoder_layers) - 1):
             h = self.decoder_layers[i](h)
-            h = torch.relu(h)
+            h = torch.tanh(h)
 
         # final layer output
         h = self.decoder_layers[-1](h)
@@ -132,6 +130,12 @@ class SeqVAE(nn.Module):
         kld = anneal_schedule[epoch] * torch.sum(
             0.5 * (sigma**2 + mu**2 - 2 * torch.log(sigma) - 1), -1
         )
+        
+        """
+        kld = torch.sum(
+            0.5 * (sigma**2 + mu**2 - 2 * torch.log(sigma) - 1), -1
+        )
+        """
 
         # compute elbo.
         elbo = log_PxGz - kld
@@ -144,7 +148,7 @@ class SeqVAE(nn.Module):
 
         return (elbo, log_PxGz, kld)
 
-    def compute_elbo_with_multiple_samples(self, x: Tensor, num_samples: int = 10):
+    def compute_elbo_with_multiple_samples(self, x: Tensor, num_samples: int = 500):
         """
         Approximation of marginal probability of sequence using importance sampling.
 
