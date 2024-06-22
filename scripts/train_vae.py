@@ -7,7 +7,7 @@ from sklearn.model_selection import train_test_split
 import pandas as pd
 import evoVAE.utils.seq_tools as st
 import torch
-import wandb
+#import wandb
 import sys, yaml, time
 import os
 from datetime import datetime
@@ -59,7 +59,10 @@ if not os.path.exists(unique_id_path):
 
 # %%
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda")
+print(device)
+print("cpus")
+print(os.getenv("SLURM_CPUS_PER_TASK"))
 
 # #### Data loading and preprocessing
 
@@ -74,7 +77,7 @@ if settings["replicate_csv"] is not None:
 
 # add weights to the sequences
 numpy_aln, _, _ = st.convert_msa_numpy_array(ancestors_extants_aln)
-weights = st.position_based_seq_weighting(numpy_aln, n_processes=8)
+weights = st.position_based_seq_weighting(numpy_aln, n_processes=int(os.getenv("SLURM_CPUS_PER_TASK")))
 ancestors_extants_aln["weights"] = weights
 # one-hot encode
 one_hot = ancestors_extants_aln["sequence"].apply(st.seq_to_one_hot)
@@ -118,15 +121,6 @@ input_dims = seq_len * settings["AA_count"]
 log += f"Seq length: {seq_len}\n"
 
 # instantiate the model
-"""
-model = tanhVAE(
-     dim_latent_vars=2,
-     dim_msa_vars=input_dims,
-     num_hidden_units=[150, 150],
-     num_aa_type=21,
-)
-
-"""
 model = SeqVAE(
     dim_latent_vars=settings["latent_dims"],
     dim_msa_vars=input_dims,

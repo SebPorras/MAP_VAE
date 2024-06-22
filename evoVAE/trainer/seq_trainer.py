@@ -11,7 +11,7 @@ import pandas as pd
 import torch
 from typing import Dict, Tuple, List
 from torch.utils.data import DataLoader
-import wandb
+#import wandb
 import matplotlib.pyplot as plt
 from evoVAE.utils.datasets import MSA_Dataset
 import evoVAE.utils.statistics as stats
@@ -19,6 +19,8 @@ from torch import Tensor
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from evoVAE.loss.standard_loss import elbo_importance_sampling
 from evoVAE.utils.datasets import DMS_Dataset
+#import optuna 
+#from optuna.trial import TrialState
 
 
 ### EARLY STOPPING ###
@@ -255,8 +257,11 @@ def validation_loop(
 
     # only check every 10 epochs to account for ruggedness of loss plot.
     stop_early = False
-    if current_epoch % 5 == 0:
+    if current_epoch % 10 == 0:
         stop_early = early_stopper.early_stop((epoch_val_elbo / batch_count))
+
+    stop_early = False
+    #stop_early = early_stopper.early_stop((epoch_val_elbo / batch_count))
 
     if (current_epoch == config["epochs"] - 1) or stop_early:
         # predict variant fitnesses
@@ -324,7 +329,7 @@ def zero_shot_prediction(
 
     # Predict fitness of DMS variants for ENTIRE dataset
     spear_rho, k_recall, ndcg, roc_auc = fitness_prediction(
-        model, dms_data, None, metadata, unique_id, device
+        model, dms_data, None, metadata, unique_id, device, n_samples=50
     )
     # wandb.log(
     #     {
@@ -374,6 +379,7 @@ def fitness_prediction(
     wild_type = metadata["target_seq"].to_numpy()[0]
     # add dim to the front to allow model to process it
     wild_one_hot = torch.Tensor(st.seq_to_one_hot(wild_type)).unsqueeze(0).float()
+    wild_one_hot = wild_one_hot.to(device)
 
     model.eval()
     actual_fitness = []
@@ -387,6 +393,7 @@ def fitness_prediction(
         for variant_encoding, variant_id, score, score_bin in dms_loader:
 
             variant_encoding = variant_encoding.float().to(device)
+
             variant_elbo_mean = model.compute_elbo_with_multiple_samples(
                 variant_encoding, n_samples
             )
@@ -479,25 +486,22 @@ def calc_reconstruction_accuracy(
     model: SeqVAE,
     aln: pd.DataFrame,
     outfile: str,
-    num_samples: int = 50,
+    device,
+    num_samples: int = 100,
     num_processes: int = 2,
 ) -> float:
 
     train_dataset = MSA_Dataset(aln["encoding"], aln["weights"], aln["id"])
     train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=512, shuffle=False
+        train_dataset, batch_size=1, shuffle=False
     )
 
     # sample the latent space and get an average reconstruction for each seq
-    ids, x_hats = sample_latent_space(model, train_loader, num_samples)
-
-    # get those reconstructions back into a sequence format
-    orig_shape = tuple(aln["encoding"].values[0].shape)
-    recons = translate_model_predictions(x_hats, orig_shape)
+    ids, x_hats = sample_latent_space(model, train_loader, device, num_samples)
 
     # find the pairwise covariances of each column in the MSAs
     actual_covar, predicted_covar = calc_covariances(
-        ids, recons, aln, outfile, num_processes
+        ids, x_hats, aln, outfile, num_processes
     )
 
     # Calculate correlation coefficient and save an image to file
@@ -509,7 +513,7 @@ def calc_reconstruction_accuracy(
 
 
 def sample_latent_space(
-    model: SeqVAE, data_loader: MSA_Dataset, num_samples: int
+    model: SeqVAE, data_loader: MSA_Dataset, device, num_samples: int
 ) -> Tuple[List[str], List[Tensor]]:
     """
     Take a trained model and sample the latent space num_samples many times. This gets the average
@@ -523,29 +527,39 @@ def sample_latent_space(
     ids = []
     x_hats = []
     model.eval()
-    for encoding, _, id in data_loader:
+    with torch.no_grad():
+        for x, _, id in data_loader:
 
-        # get into flat format to pass through the model
-        encoding = encoding.float()
-        encoding = torch.flatten(encoding, start_dim=1)
+            # get into flat format to pass through the model
+            x = x.to(device)
+            x = x.expand(num_samples, -1, -1)
+            x = torch.flatten(x, start_dim=1)
 
-        # get encoding and replicate to allow multiple samples from latent space
-        z_mu, z_logvar = model.encode(encoding)
-        z_mu = z_mu.expand(num_samples, z_mu.shape[0], z_mu.shape[1])
-        z_logvar = z_logvar.expand(num_samples, z_logvar.shape[0], z_logvar.shape[1])
+            # get encoding and replicate to allow multiple samples from latent space
+            z_mu, z_sigma = model.encoder(x)
+            eps = torch.randn_like(z_sigma)
+            z_samples = z_mu + z_sigma * eps
 
-        # pass each sample through the latent space and then average and decode
-        z_samples = model.reparameterise(z_mu, z_logvar)
-        mean_z = torch.mean(z_samples, dim=0)
-        x_hat = model.decode(mean_z)
+            mean_z = torch.mean(z_samples, dim=0)
+            log_p = model.decoder(mean_z)
 
-        ids.extend(id)
-        x_hats.extend(x_hat.detach())
+            fixed_shape = tuple(log_p.shape[0:-1])
+
+            # decode the Z sample and get it into a PPM shape
+            x_hat = torch.unsqueeze(log_p, -1)
+            x_hat = x_hat.view(fixed_shape + (-1, 21))
+
+            # Identify most likely residue at each column
+            indices = x_hat.max(dim=-1).indices.tolist()
+            recon = "".join([st.GAPPY_PROTEIN_ALPHABET[x] for x in indices])
+
+            x_hats.append(recon)
+            ids.append(id[0])
 
     return ids, x_hats
 
 
-def translate_model_predictions(x_hats: List[Tensor], orig_shape: Tuple) -> List[str]:
+def translate_model_predictions(x_hats: List[Tensor]) -> List[str]:
     """
     Get the most likely residue for each column in the model reconstruction.
 
@@ -560,10 +574,12 @@ def translate_model_predictions(x_hats: List[Tensor], orig_shape: Tuple) -> List
     reconstructions = []
     for x_hat in x_hats:
 
+        fixed_shape = tuple(x_hat.shape[0:-1])
+        print(fixed_shape)
         # decode the Z sample and get it into a PPM shape
-        x_hat = x_hat.unsqueeze(-1)
-        # print(x_hat.shape)
-        x_hat = x_hat.view(orig_shape)
+        x_hat = torch.unsqueeze(x_hat, -1)
+        print(x_hat.shape)
+        x_hat = x_hat.view(fixed_shape + (-1, 21))
 
         # Identify most likely residue at each column
         indices = x_hat.max(dim=-1).indices.tolist()

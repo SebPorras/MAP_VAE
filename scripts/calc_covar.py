@@ -57,17 +57,22 @@ input_dims = seq_len * settings["AA_count"]
 print(f"Seq length: {seq_len}")
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(device)
+# instantiate the model
+
 # instantiate the model
 model = SeqVAE(
-    input_dims=input_dims,
-    latent_dims=settings["latent_dims"],
-    hidden_dims=settings["hidden_dims"],
-    config=settings,
+    dim_latent_vars=settings["latent_dims"],
+    dim_msa_vars=input_dims,
+    num_hidden_units=settings["hidden_dims"],
+    settings=settings,
+    num_aa_type=settings["AA_count"],
 )
 
 model.load_state_dict(
     torch.load(unique_id_path + f"{unique_id}_model_state.pt", map_location=device)
 )
+model.to(device)
 
 # %% [markdown]
 # #### Training Loop
@@ -76,8 +81,9 @@ pearson = calc_reconstruction_accuracy(
     model,
     extant_aln,
     unique_id_path,
-    settings["latent_samples"],
-    settings["num_processes"],
+    device,
+    num_samples=50,
+    num_processes=int(os.getenv("SLURM_CPUS_PER_TASK"))
 )
 
 final_metrics = pd.read_csv(unique_id_path + "zero_shot_all_variants_final_metrics.csv")
