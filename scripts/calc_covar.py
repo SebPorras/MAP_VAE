@@ -40,7 +40,12 @@ settings["info"] = unique_id_path
 if not os.path.exists(unique_id_path):
     os.mkdir(unique_id_path)
 
-extant_aln = pd.read_pickle(settings["extant_aln"])
+# Read in the datasets and create train and validation sets
+if settings["extant_aln"].split(".")[-1] == "fasta":
+    extant_aln = st.read_aln_file(settings["extant_aln"])
+else:
+    extant_aln = pd.read_pickle(settings["extant_aln"])
+
 
 # add weights to the sequences
 numpy_aln, _, _ = st.convert_msa_numpy_array(extant_aln)

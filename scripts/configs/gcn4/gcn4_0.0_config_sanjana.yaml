@@ -5,18 +5,15 @@ batch_size: 128
 dms_file: /scratch/user/s4646506/gcn4/dms_data/GCN4_YEAST_Staller_2018.pkl
 dms_id: GCN4_YEAST_Staller_2018
 dms_metadata: /scratch/user/s4646506/evoVAE/data/DMS_substitutions.csv
-dropout: 0.025
-epochs: 200
+epochs: 300
 extant_aln: /scratch/user/s4646506/gcn4/encoded_weighted/gcn4_extants_no_dupes.pkl
 hidden_dims:
 - 150
 - 150
 info: ./gcn4_0.0_extants_sanjana
 latent_dims: 3
-learning_rate: 0.01
+learning_rate: 0.0001
 max_mutation: 4
-max_norm: -1
-num_processes: 8
 patience: 3
 project: null
 replicate_csv: /scratch/user/s4646506/gcn4/sanjana_reps/gcn4_0.0_replicates_sanjana.csv

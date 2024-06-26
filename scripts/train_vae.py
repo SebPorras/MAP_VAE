@@ -61,13 +61,14 @@ if not os.path.exists(unique_id_path):
 
 device = torch.device("cuda")
 print(device)
-print("cpus")
-print(os.getenv("SLURM_CPUS_PER_TASK"))
 
 # #### Data loading and preprocessing
 
 # Read in the datasets and create train and validation sets
-ancestors_extants_aln = pd.read_pickle(settings["alignment"])
+if settings["alignment"].split(".")[-1] == "fasta":
+    ancestors_extants_aln = st.read_aln_file(settings["alignment"])
+else:
+    ancestors_extants_aln = pd.read_pickle(settings["alignment"])
 
 if settings["replicate_csv"] is not None:
     replicate_data = pd.read_csv(settings["replicate_csv"])
@@ -106,6 +107,9 @@ val_loader = torch.utils.data.DataLoader(
 
 # Load and subset the DMS data used for fitness prediction
 dms_data = pd.read_pickle(settings["dms_file"])
+one_hot = dms_data["mutated_sequence"].apply(st.seq_to_one_hot)
+dms_data["encoding"] = one_hot
+
 metadata = pd.read_csv(settings["dms_metadata"])
 # grab metadata for current experiment
 metadata = metadata[metadata["DMS_id"] == settings["dms_id"]]
