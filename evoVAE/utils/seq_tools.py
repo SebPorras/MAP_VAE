@@ -80,7 +80,7 @@ def read_fasta_file(filename: str):
 
 def read_aln_file(
     filename: str,
-    encode: bool = True,
+    encode: bool = False,
 ) -> pd.DataFrame:
     """Read in an alignment file in Fasta format and
     return a Pandas DataFrame with sequences and IDs. If encode
