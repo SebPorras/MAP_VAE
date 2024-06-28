@@ -23,7 +23,7 @@ for g, id in zip(groups, ids):
         "architecture": "SeqVAEv2",
         "latent_dims": 3,
         "hidden_dims": [150, 150],
-        "dms_file": "/scratch/user/s4646506/gcn4/dms_data/GCN4_YEAST_Staller_2018.pkl",
+        "dms_file": "/scratch/user/s4646506/gcn4/dms_data/GCN4_YEAST_Staller_2018.csv",
         "dms_metadata": "/scratch/user/s4646506/evoVAE/data/DMS_substitutions.csv",
         "dms_id": "GCN4_YEAST_Staller_2018",
         "replicate_csv": None,

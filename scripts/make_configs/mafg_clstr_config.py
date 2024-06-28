@@ -1,35 +1,34 @@
 import yaml
 
-groups = ["ancestors_extants", "ancestors", "extants"]
-ids = ["ae", "a", "e"]
 
+props = [0.0, 0.05, 0.1, 0.15]
 
-for g, id in zip(groups, ids):
+for p in props:
 
     data = {
-        "alignment": f"/scratch/user/s4646506/a4/encoded_weighted/a4_{g}_no_dupes.pkl",
-        "extant_aln": "/scratch/user/s4646506/a4/encoded_weighted/a4_extants_no_dupes.pkl",
+        "alignment": f"/scratch/user/s4646506/mafg/encoded_weighted/mafg_ancestors_extants_no_dupes.pkl",
+        "extant_aln": "/scratch/user/s4646506/mafg/encoded_weighted/mafg_extants_no_dupes.fasta",
         "AA_count": 21,
-        "info": "./a4_" + id,
+        "info": f"./mafg_{p}",
         "project": None,
         "seq_theta": 0.2,  # reweighting,
         "test_split": 0.2,
         "max_mutation": 4,  # how many mutations the model will test up to,
         "learning_rate": 0.0001,  # ADAM,
         "weight_decay": 0,  # ADAM,
-        "epochs": 500,
+        "epochs": 300,
         "batch_size": 128,
         "patience": 3,
         "architecture": "SeqVAEv2",
         "latent_dims": 3,
         "hidden_dims": [150, 150],
-        "dms_file": "/scratch/user/s4646506/a4/dms_data/A4_HUMAN_Seuma_2022.csv",
+        "dms_file": "/scratch/user/s4646506/mafg/dms_data/MAFG_MOUSE_Tsuboyama_2023_1K1V.csv",
         "dms_metadata": "/scratch/user/s4646506/evoVAE/data/DMS_substitutions.csv",
-        "dms_id": "A4_HUMAN_Seuma_2022",
+        "dms_id": "MAFG_MOUSE_Tsuboyama_2023_1K1V",
         "replicate_csv": None,
     }
 
     yaml_str = yaml.dump(data, default_flow_style=False)
 
-    with open(f"a4_{g}_config.yaml", "w") as file:
+    with open(f"mafg_{p}_config.yaml", "w") as file:
         file.write(yaml_str)

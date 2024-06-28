@@ -22,9 +22,9 @@ for g, id in zip(groups, ids):
         "architecture": "SeqVAEv2",
         "latent_dims": 3,
         "hidden_dims": [150, 150],
-        "dms_file": "/scratch/user/s4646506/mafg/dms_data/ETAMAFG_MOUSE_Tsuboyama_2023_1K1V.csv",
+        "dms_file": "/scratch/user/s4646506/mafg/dms_data/MAFG_MOUSE_Tsuboyama_2023_1K1V.csv",
         "dms_metadata": "/scratch/user/s4646506/evoVAE/data/DMS_substitutions.csv",
-        "dms_id": "MAFG_MOUSE_Tsuboyama_2023_1K1V.csv",
+        "dms_id": "MAFG_MOUSE_Tsuboyama_2023_1K1V",
         "replicate_csv": None,
     }
 

@@ -22,7 +22,7 @@ for g, id in zip(groups, ids):
         "architecture": "SeqVAEv2",
         "latent_dims": 3,
         "hidden_dims": [150, 150],
-        "dms_file": "/scratch/user/s4646506/gfp/dms_data/GFP_AEQVI_Sarkisyan_2016_dms_encoded.pkl",
+        "dms_file": "/scratch/user/s4646506/gfp/dms_data/GFP_AEQVI_Sarkisyan_2016_dms_encoded.csv",
         "dms_metadata": "/scratch/user/s4646506/evoVAE/data/DMS_substitutions.csv",
         "dms_id": "GFP_AEQVI_Sarkisyan_2016",
         "replicate_csv": None,

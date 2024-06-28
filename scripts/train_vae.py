@@ -79,7 +79,9 @@ if settings["replicate_csv"] is not None:
 # add weights to the sequences
 numpy_aln, _, _ = st.convert_msa_numpy_array(ancestors_extants_aln)
 weights = st.position_based_seq_weighting(numpy_aln, n_processes=int(os.getenv("SLURM_CPUS_PER_TASK")))
+#weights = st.reweight_by_seq_similarity(numpy_aln, theta=0.2)
 ancestors_extants_aln["weights"] = weights
+
 # one-hot encode
 one_hot = ancestors_extants_aln["sequence"].apply(st.seq_to_one_hot)
 ancestors_extants_aln["encoding"] = one_hot
@@ -106,7 +108,7 @@ val_loader = torch.utils.data.DataLoader(
 )
 
 # Load and subset the DMS data used for fitness prediction
-dms_data = pd.read_pickle(settings["dms_file"])
+dms_data = pd.read_csv(settings["dms_file"])
 one_hot = dms_data["mutated_sequence"].apply(st.seq_to_one_hot)
 dms_data["encoding"] = one_hot
 

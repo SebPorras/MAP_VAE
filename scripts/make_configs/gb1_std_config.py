@@ -23,7 +23,7 @@ for g, id in zip(groups, ids):
         "architecture": "SeqVAEv2",
         "latent_dims": 3,
         "hidden_dims": [150, 150],
-        "dms_file": "/scratch/user/s4646506/gb1/dms_data/SPG1_STRSG_Wu_2016.pkl",
+        "dms_file": "/scratch/user/s4646506/gb1/dms_data/SPG1_STRSG_Wu_2016.csv",
         "dms_metadata": "/scratch/user/s4646506/evoVAE/data/DMS_substitutions.csv",
         "dms_id": "SPG1_STRSG_Wu_2016",
         "replicate_csv": None,
