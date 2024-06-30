@@ -65,7 +65,7 @@ print(device)
 # #### Data loading and preprocessing
 
 # Read in the datasets and create train and validation sets
-if settings["alignment"].split(".")[-1] == "fasta":
+if settings["alignment"].split(".")[-1] in ["fasta", "aln"]:
     ancestors_extants_aln = st.read_aln_file(settings["alignment"])
 else:
     ancestors_extants_aln = pd.read_pickle(settings["alignment"])
