@@ -1,26 +1,31 @@
 """seq_trainer.py"""
 
-from pandas import DataFrame
+# Package modules
 from evoVAE.models.seqVAE import SeqVAE
 from evoVAE.loss.standard_loss import frange_cycle_linear
-from evoVAE.models.tanh_vae import tanhVAE
 import evoVAE.utils.metrics as mt
 import evoVAE.utils.seq_tools as st
-import numpy as np
-import pandas as pd
-import torch
-from typing import Dict, Tuple, List
-from torch.utils.data import DataLoader
-#import wandb
-import matplotlib.pyplot as plt
 from evoVAE.utils.datasets import MSA_Dataset
 import evoVAE.utils.statistics as stats
+from evoVAE.utils.datasets import DMS_Dataset
+
+# External libraries
+import numpy as np
+import pandas as pd
+from pandas import DataFrame
+import matplotlib.pyplot as plt
+from typing import Dict, Tuple, List
+import torch
 from torch import Tensor
 from torch.optim.lr_scheduler import CosineAnnealingLR
-from evoVAE.loss.standard_loss import elbo_importance_sampling
-from evoVAE.utils.datasets import DMS_Dataset
-#import optuna 
-#from optuna.trial import TrialState
+from torch.utils.data import DataLoader
+import wandb
+
+# constants
+ALL_VARIANTS = 0
+
+# import optuna
+# from optuna.trial import TrialState
 
 
 ### EARLY STOPPING ###
@@ -62,7 +67,7 @@ def seq_train(
     val_loader: DataLoader,
     dms_data: DataFrame,
     metadata: DataFrame,
-    device,
+    device: torch.device,
     config: Dict,
     unique_id: str,
 ) -> SeqVAE:
@@ -74,16 +79,13 @@ def seq_train(
     )
     scheduler = CosineAnnealingLR(optimiser, T_max=config["epochs"])
 
-    """
     wandb.define_metric("epoch")
     wandb.define_metric("ELBO", step_metric="epoch")
     wandb.define_metric("KLD", step_metric="epoch")
     wandb.define_metric("Gauss_likelihood", step_metric="epoch")
-
     wandb.define_metric("val_ELBO", step_metric="epoch")
     wandb.define_metric("val_KLD", step_metric="epoch")
     wandb.define_metric("val_Gauss_likelihood", step_metric="epoch")
-    """
 
     anneal_schedule = frange_cycle_linear(config["epochs"])
     early_stopper = EarlyStopper(patience=config["patience"])
@@ -94,12 +96,11 @@ def seq_train(
 
         for iteration in range(config["epochs"]):
 
-            (elbo, recon, kld) = train_loop(
+            elbo, recon, kld = train_loop(
                 model,
                 train_loader,
                 optimiser,
                 device,
-                config,
                 iteration,
                 anneal_schedule,
                 scheduler,
@@ -130,11 +131,10 @@ def seq_train(
 
 
 def train_loop(
-    model: tanhVAE,
+    model: SeqVAE,
     train_loader: DataLoader,
     optimiser,
     device: str,
-    config,
     epoch: int,
     anneal_schedule: np.ndarray,
     scheduler,
@@ -181,16 +181,15 @@ def train_loop(
     scheduler.step()  # adjust learning rate
 
     # log batch results
-    # wandb.log(
-    #     {
-    #         "ELBO": epoch_loss / batch_count,
-    #         "KLD": epoch_kl / batch_count,
-    #         "Gauss_likelihood": epoch_likelihood / batch_count,
-    #         "epoch": epoch,
-    #     }
-    # )
+    wandb.log(
+        {
+            "ELBO": epoch_loss / batch_count,
+            "KLD": epoch_kl / batch_count,
+            "Gauss_likelihood": epoch_log_PxGz / batch_count,
+            "epoch": epoch,
+        }
+    )
 
-    # elbo, log_PxGz, kld
     return (
         epoch_loss / batch_count,
         epoch_log_PxGz / batch_count,
@@ -199,13 +198,13 @@ def train_loop(
 
 
 def validation_loop(
-    model: tanhVAE,
+    model: SeqVAE,
     val_loader: DataLoader,
     device,
     dms_data: DataFrame,
     metadata: DataFrame,
     current_epoch: int,
-    config,
+    config: Dict,
     anneal_schedule: np.ndarray,
     early_stopper: EarlyStopper,
     unique_id: str,
@@ -246,24 +245,18 @@ def validation_loop(
             epoch_val_likelihood += log_PxGz.item()
             batch_count += 1
 
-    # wandb.log(
-    #     {
-    #         "val_ELBO": epoch_val_elbo / batch_count,
-    #         "val_KLD": epoch_val_kl / batch_count,
-    #         "val_Gauss_likelihood": epoch_val_likelihood / batch_count,
-    #         "epoch": current_epoch,
-    #     }
-    # )
+    wandb.log(
+        {
+            "val_ELBO": epoch_val_elbo / batch_count,
+            "val_KLD": epoch_val_kl / batch_count,
+            "val_Gauss_likelihood": epoch_val_likelihood / batch_count,
+            "epoch": current_epoch,
+        }
+    )
 
-    # only check every 10 epochs to account for ruggedness of loss plot.
-    stop_early = False
-    if current_epoch % 10 == 0:
-        stop_early = early_stopper.early_stop((epoch_val_elbo / batch_count))
+    stop_early = early_stopper.early_stop((epoch_val_elbo / batch_count))
 
-    stop_early = False
-    #stop_early = early_stopper.early_stop((epoch_val_elbo / batch_count))
-
-    if (current_epoch == config["epochs"] - 1) or stop_early:
+    if (current_epoch == config["epochs"] - 1) or stop_early and config["zero_shot"]:
         # predict variant fitnesses
         zero_shot_prediction(
             model, dms_data, metadata, config, current_epoch, unique_id, device
@@ -282,7 +275,7 @@ def zero_shot_prediction(
     model: SeqVAE,
     dms_data: pd.DataFrame,
     metadata: pd.DataFrame,
-    config,
+    config: Dict,
     current_epoch: int,
     unique_id: str,
     device,
@@ -298,7 +291,6 @@ def zero_shot_prediction(
     """
 
     # split variants by how many mutations they have
-
     """
     subset_dms = split_by_mutations(dms_data)
     for count, subset_mutants in subset_dms.items():
@@ -329,26 +321,26 @@ def zero_shot_prediction(
 
     # Predict fitness of DMS variants for ENTIRE dataset
     spear_rho, k_recall, ndcg, roc_auc = fitness_prediction(
-        model, dms_data, None, metadata, unique_id, device, n_samples=50
+        model, dms_data, metadata, unique_id, device, mutation_count=ALL_VARIANTS
     )
-    # wandb.log(
-    #     {
-    #         "spearman_rho": spear_rho,
-    #         "top_k_recall": k_recall,
-    #         "ndcg": ndcg,
-    #         "roc_auc": roc_auc,
-    #         "epoch": current_epoch,
-    #     }
-    # )
+    wandb.log(
+        {
+            "spearman_rho": spear_rho,
+            "top_k_recall": k_recall,
+            "ndcg": ndcg,
+            "roc_auc": roc_auc,
+            "epoch": current_epoch,
+        }
+    )
 
 
 def fitness_prediction(
-    model: tanhVAE,
+    model: SeqVAE,
     dms_data: DataFrame,
-    mutation_count: int,
     metadata: DataFrame,
     unique_id: str,
-    device,
+    device: torch.device,
+    mutation_count: int = 0,
     n_samples: int = 500,
 ) -> Tuple[float, float, float, float]:
     """
@@ -416,9 +408,6 @@ def fitness_prediction(
         actual_binned=actual_fitness_binned,
     )
 
-    # Plot predictions vs actual fitness values but only on final epoch
-    # or if early stopping has been triggered.
-
     # save the final metrics to file.
     final_metrics = pd.DataFrame(
         {
@@ -432,7 +421,7 @@ def fitness_prediction(
 
     # construct a plot of all the predictions
     title = "zero_shot"
-    if mutation_count is None:
+    if mutation_count == ALL_VARIANTS:
         title += "_all_variants"
     else:
         title += f"_{mutation_count}_mutations"
@@ -454,7 +443,6 @@ def fitness_prediction(
     plt.xlabel("Actual")
     plt.ylabel("Prediction")
     plt.savefig(unique_id + title + ".png")
-    # wandb.log({title: fig})
 
     return spear_rho, k_recall, ndcg, roc_auc
 
@@ -547,7 +535,7 @@ def sample_latent_space(
 
             # decode the Z sample and get it into a PPM shape
             x_hat = torch.unsqueeze(log_p, -1)
-            x_hat = x_hat.view(fixed_shape + (-1, 21))
+            x_hat = x_hat.view(fixed_shape + (-1, st.GAPPY_ALPHABET_LEN))
 
             # Identify most likely residue at each column
             indices = x_hat.max(dim=-1).indices.tolist()
@@ -557,36 +545,6 @@ def sample_latent_space(
             ids.append(id[0])
 
     return ids, x_hats
-
-
-def translate_model_predictions(x_hats: List[Tensor]) -> List[str]:
-    """
-    Get the most likely residue for each column in the model reconstruction.
-
-    Inputs:
-    x_hats (List[Tensor]): The model outputs
-    orig_shape (Tuple): The shape for a PWM represenation of the sequence.
-
-    Returns (List[str]):
-    The string representation of each sequence.
-    """
-
-    reconstructions = []
-    for x_hat in x_hats:
-
-        fixed_shape = tuple(x_hat.shape[0:-1])
-        print(fixed_shape)
-        # decode the Z sample and get it into a PPM shape
-        x_hat = torch.unsqueeze(x_hat, -1)
-        print(x_hat.shape)
-        x_hat = x_hat.view(fixed_shape + (-1, 21))
-
-        # Identify most likely residue at each column
-        indices = x_hat.max(dim=-1).indices.tolist()
-        recon = "".join([st.GAPPY_PROTEIN_ALPHABET[x] for x in indices])
-        reconstructions.append(recon)
-
-    return reconstructions
 
 
 def calc_covariances(

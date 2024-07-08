@@ -25,7 +25,7 @@ class MSA_Dataset(Dataset):
 
 
 class DMS_Dataset(Dataset):
-    """Hold data for a deep mutational scanning dataset"""
+    """Holds data for a deep mutational scanning dataset"""
 
     def __init__(
         self,

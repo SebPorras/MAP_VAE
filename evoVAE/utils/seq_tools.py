@@ -37,7 +37,7 @@ GAPPY_PROTEIN_ALPHABET = [
     "W",
 ]
 
-INVALID_PROTEIN_CHARS = ["B", "J", "X", "Z", "U"]
+INVALID_PROTEIN_CHARS = ["B", "J", "Z", "U"]
 RE_INVALID_PROTEIN_CHARS = "|".join(map(re.escape, INVALID_PROTEIN_CHARS))
 
 GAPPY_ALPHABET_LEN = len(GAPPY_PROTEIN_ALPHABET)
@@ -94,7 +94,9 @@ def read_aln_file(
 
     # handles at a2m file format
     to_upper = lambda x: x.upper().replace(".", "-")
+    remove_x = lambda x: x.upper().replace("X", "-")
     df["sequence"] = df["sequence"].apply(to_upper)
+    df["sequence"] = df["sequence"].apply(remove_x)
 
     # remove sequences with bad characters using regular expressions
     print(f"Checking for bad characters: {INVALID_PROTEIN_CHARS}")
