@@ -3,7 +3,7 @@ import random
 import pandas as pd
 
 seq_count = 10000
-seq_len = 448
+seq_len = 770
 seqs = []
 ids = []
 count = 0
@@ -13,5 +13,5 @@ for i in range(1, seq_count+1):
     ids.append(f"{i}_rand")
  
 df = pd.DataFrame({"id": ids, "sequence": seqs})
-st.write_fasta_file("gb1_random_seqs.aln", df)
+st.write_fasta_file("a4_random_seqs.aln", df)
 
