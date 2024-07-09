@@ -19,7 +19,6 @@ import torch
 from torch import Tensor
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
-import wandb
 
 # constants
 ALL_VARIANTS = 0
@@ -78,14 +77,6 @@ def seq_train(
         learning_rate=config["learning_rate"], weight_decay=config["weight_decay"]
     )
     scheduler = CosineAnnealingLR(optimiser, T_max=config["epochs"])
-
-    wandb.define_metric("epoch")
-    wandb.define_metric("ELBO", step_metric="epoch")
-    wandb.define_metric("KLD", step_metric="epoch")
-    wandb.define_metric("Gauss_likelihood", step_metric="epoch")
-    wandb.define_metric("val_ELBO", step_metric="epoch")
-    wandb.define_metric("val_KLD", step_metric="epoch")
-    wandb.define_metric("val_Gauss_likelihood", step_metric="epoch")
 
     anneal_schedule = frange_cycle_linear(config["epochs"])
     early_stopper = EarlyStopper(patience=config["patience"])
@@ -180,16 +171,6 @@ def train_loop(
 
     scheduler.step()  # adjust learning rate
 
-    # log batch results
-    wandb.log(
-        {
-            "ELBO": epoch_loss / batch_count,
-            "KLD": epoch_kl / batch_count,
-            "Gauss_likelihood": epoch_log_PxGz / batch_count,
-            "epoch": epoch,
-        }
-    )
-
     return (
         epoch_loss / batch_count,
         epoch_log_PxGz / batch_count,
@@ -245,18 +226,10 @@ def validation_loop(
             epoch_val_likelihood += log_PxGz.item()
             batch_count += 1
 
-    wandb.log(
-        {
-            "val_ELBO": epoch_val_elbo / batch_count,
-            "val_KLD": epoch_val_kl / batch_count,
-            "val_Gauss_likelihood": epoch_val_likelihood / batch_count,
-            "epoch": current_epoch,
-        }
-    )
+    #stop_early = early_stopper.early_stop((epoch_val_elbo / batch_count))
+    stop_early = False
 
-    stop_early = early_stopper.early_stop((epoch_val_elbo / batch_count))
-
-    if (current_epoch == config["epochs"] - 1) or stop_early and config["zero_shot"]:
+    if config["zero_shot"] and (current_epoch == (config["epochs"] - 1) or stop_early):
         # predict variant fitnesses
         zero_shot_prediction(
             model, dms_data, metadata, config, current_epoch, unique_id, device
@@ -309,28 +282,10 @@ def zero_shot_prediction(
         )
     """
 
-    # wandb.log(
-    #     {
-    #         f"{count}_mutations_spearman_rho": sub_spear_rho,
-    #         f"{count}_top_k_recall": sub_k_recall,
-    #         f"{count}_ndcg": sub_ndcg,
-    #         f"{count}_roc_auc": sub_roc_auc,
-    #         "epoch": current_epoch,
-    #     }
-    # )
 
     # Predict fitness of DMS variants for ENTIRE dataset
     spear_rho, k_recall, ndcg, roc_auc = fitness_prediction(
         model, dms_data, metadata, unique_id, device, mutation_count=ALL_VARIANTS
-    )
-    wandb.log(
-        {
-            "spearman_rho": spear_rho,
-            "top_k_recall": k_recall,
-            "ndcg": ndcg,
-            "roc_auc": roc_auc,
-            "epoch": current_epoch,
-        }
     )
 
 

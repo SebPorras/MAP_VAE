@@ -7,7 +7,6 @@ from sklearn.model_selection import train_test_split
 import pandas as pd
 import evoVAE.utils.seq_tools as st
 
-import wandb
 import sys, yaml, time, os, torch, argparse
 from datetime import datetime
 import matplotlib.pyplot as plt
@@ -37,21 +36,16 @@ def main() -> int:
 
     # If flag is included, zero shot prediction will occur
     settings["zero_shot"] = args.zero_shot
+    # overwrite the alignment in the config file
+    if args.aln is not None:
+        settings["alignment"] = args.aln
 
-    wandb.login()
 
     start = time.time()
 
     # create the output directory
     unique_id_path = Path(args.output + "_r" + args.replicate)
     unique_id_path.mkdir(parents=True, exist_ok=True)
-
-    wandb.init(
-        project=settings["project"],
-        # hyperparameters
-        config=settings,
-        name=str(unique_id_path),
-    )
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
@@ -99,13 +93,15 @@ def main() -> int:
     )
 
     # Load and subset the DMS data used for fitness prediction
-    dms_data = pd.read_csv(settings["dms_file"])
-    one_hot = dms_data["mutated_sequence"].apply(st.seq_to_one_hot)
-    dms_data["encoding"] = one_hot
+    dms_data = None
+    metadata = None
+    if settings["dms_file"] and settings["dms_metadata"]:
+        dms_data = pd.read_csv(settings["dms_file"])
+        one_hot = dms_data["mutated_sequence"].apply(st.seq_to_one_hot)
+        dms_data["encoding"] = one_hot
 
-    # grab metadata for current experiment
-    metadata = pd.read_csv(settings["dms_metadata"])
-    metadata = metadata[metadata["DMS_id"] == settings["dms_id"]]
+        metadata = pd.read_csv(settings["dms_metadata"])
+        metadata = metadata[metadata["DMS_id"] == settings["dms_id"]]
 
     # get the sequence length from first sequence
     seq_len = train_dataset[BATCH_ZERO][SEQ_ZERO].shape[SEQ_LEN]
@@ -170,7 +166,6 @@ def main() -> int:
         file.write("###TIME###\n")
         file.write(f"{(time.time() - start) / 60} minutes\n")
 
-    wandb.finish()
 
     return SUCCESS
 
@@ -203,6 +198,14 @@ def setup_parser() -> argparse.Namespace:
         action="store",
         metavar="config.yaml",
         help="A YAML file with required settings",
+    )
+
+    parser.add_argument(
+        "-a",
+        "--aln",
+        action="store",
+        metavar="example.aln",
+        help="The alignment to train on in FASTA format"
     )
 
     parser.add_argument(
