@@ -77,9 +77,6 @@ model.load_state_dict(
 )
 model.to(device)
 
-# %% [markdown]
-# #### Training Loop
-
 pearson = calc_reconstruction_accuracy(
     model,
     extant_aln,

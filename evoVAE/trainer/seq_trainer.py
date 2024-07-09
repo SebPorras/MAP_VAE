@@ -88,7 +88,6 @@ def seq_train(
                 model,
                 train_loader,
                 optimiser,
-                device,
                 iteration,
                 anneal_schedule,
                 scheduler,
@@ -122,7 +121,6 @@ def train_loop(
     model: SeqVAE,
     train_loader: DataLoader,
     optimiser,
-    device: str,
     epoch: int,
     anneal_schedule: np.ndarray,
     scheduler,
@@ -142,10 +140,6 @@ def train_loop(
     model.train()
     for encoding, weights, _ in train_loader:
 
-        encoding = encoding.float().to(device)
-        weights = weights.float().to(device)
-
-        # forward step
         optimiser.zero_grad()
 
         elbo, log_PxGz, kld = model.compute_weighted_elbo(
@@ -163,7 +157,6 @@ def train_loop(
 
         # update weights
         elbo.backward()
-        # sets max value for gradient
         optimiser.step()
 
     scheduler.step()  # adjust learning rate
@@ -222,8 +215,9 @@ def validation_loop(
 
     # stop_early = early_stopper.early_stop((epoch_val_elbo / batch_count))
     stop_early = False
+    # predict variant fitnesses only on the final epoch or if we stop early.
     if config["zero_shot"] and (current_epoch == (config["epochs"] - 1) or stop_early):
-        # predict variant fitnesses
+
         spear_rho, k_recall, ndcg, roc_auc = fitness_prediction(
             model,
             dms_data,
@@ -357,16 +351,14 @@ def fitness_prediction(
 def calc_reconstruction_accuracy(
     model: SeqVAE,
     aln: pd.DataFrame,
+    dataset: MSA_Dataset,
     outfile: str,
-    device,
+    device: torch.device,
     num_samples: int = 100,
     num_processes: int = 2,
 ) -> float:
 
-    train_dataset = MSA_Dataset(aln["encoding"], aln["weights"], aln["id"])
-    train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=1, shuffle=False
-    )
+    train_loader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False)
 
     # sample the latent space and get an average reconstruction for each seq
     ids, x_hats = sample_latent_space(model, train_loader, device, num_samples)
@@ -385,7 +377,7 @@ def calc_reconstruction_accuracy(
 
 
 def sample_latent_space(
-    model: SeqVAE, data_loader: MSA_Dataset, device, num_samples: int
+    model: SeqVAE, data_loader: MSA_Dataset, num_samples: int
 ) -> Tuple[List[str], List[Tensor]]:
     """
     Take a trained model and sample the latent space num_samples many times. This gets the average
