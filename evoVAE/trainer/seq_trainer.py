@@ -389,6 +389,7 @@ def sample_latent_space(
     """
 
     ids = []
+
     x_hats = []
     model.eval()
     with torch.no_grad():
@@ -423,10 +424,8 @@ def sample_latent_space(
 
 
 def calc_covariances(
-    ids: List[str],
-    reconstructions: List[Tensor],
+    reconstructions: pd.DataFrame,
     aln: pd.DataFrame,
-    outfile: str,
     num_processes: int = 2,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
@@ -440,14 +439,8 @@ def calc_covariances(
     actual_covariances, predicted_covariances
     """
 
-    recons_df = pd.DataFrame({"id": ids, "sequence": reconstructions})
-    recon_msa, _, _ = st.convert_msa_numpy_array(recons_df)
+    recon_msa, _, _ = st.convert_msa_numpy_array(reconstructions)
     predicted_covar = stats.pair_wise_covariances_parallel(recon_msa, num_processes)
-
-    # save reconstruction vs actual for visualisation with MSA later
-    recons_df["sequence"] = aln["sequence"]
-    recons_df["reconstructions"] = reconstructions
-    recons_df.to_pickle(outfile + "recon_seqs.pkl")
 
     msa, _, _ = st.convert_msa_numpy_array(aln)
     actual_covar = stats.pair_wise_covariances_parallel(msa, num_processes)
@@ -487,7 +480,7 @@ def plot_and_save_covariances(
     # remove directory '/' and './'
     plt.title(outfile[2:-1])
 
-    plt.savefig(outfile + "covar.png")
+    plt.savefig(outfile + "_covar.png")
 
     return correlation_coefficient
 

@@ -1,11 +1,12 @@
-# %%
 from evoVAE.models.seqVAE import SeqVAE
-from evoVAE.trainer.seq_trainer import calc_reconstruction_accuracy
+from evoVAE.trainer.seq_trainer import (
+    calc_covariances,
+    plot_and_save_covariances,
+)
 import pandas as pd
 import evoVAE.utils.seq_tools as st
-import torch
-import sys, yaml, time
-import os
+import yaml, time, os, torch, argparse, sys
+from pathlib import Path
 
 CONFIG_FILE = 1
 ARRAY_ID = 2
@@ -17,79 +18,120 @@ SEQ_LEN = 0
 BATCH_ZERO = 0
 SEQ_ZERO = 0
 
-# %% [markdown]
-# #### Config
-
-start = time.time()
-
-with open(sys.argv[CONFIG_FILE], "r") as stream:
-    settings = yaml.safe_load(stream)
-
-# slurm array task id
-if len(sys.argv) == MULTIPLE_REPS:
-    replicate = sys.argv[ARRAY_ID]
-    unique_id_path = settings["info"] + "_r" + replicate + "/"
-    settings["replicate"] = int(replicate)
-else:
-    unique_id_path = settings["info"] + "/"
-
-unique_id = unique_id_path[2:-1]
-settings["info"] = unique_id_path
-
-# create output directory for data
-if not os.path.exists(unique_id_path):
-    os.mkdir(unique_id_path)
-
-# Read in the datasets and create train and validation sets
-if settings["extant_aln"].split(".")[-1] in ["fasta", "aln"]:
-    extant_aln = st.read_aln_file(settings["extant_aln"])
-else:
-    extant_aln = pd.read_pickle(settings["extant_aln"])
+# errors
+SUCCESS = 0
+INVALID_FILE = 2
 
 
-# add weights to the sequences
-numpy_aln, _, _ = st.convert_msa_numpy_array(extant_aln)
-weights = st.reweight_by_seq_similarity(numpy_aln, settings["seq_theta"])
-extant_aln["weights"] = weights
+def main():
 
-# one-hot encode
-one_hot = extant_aln["sequence"].apply(st.seq_to_one_hot)
-extant_aln["encoding"] = one_hot
+    args = setup_parser()
 
-seq_len = numpy_aln.shape[1]
-input_dims = seq_len * settings["AA_count"]
-print(f"Seq length: {seq_len}")
+    # read in the config file
+    with open(args.config, "r") as stream:
+        settings = yaml.safe_load(stream)
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    unique_id_path = Path(f"{args.output}_r{args.replicate}_fold_{args.fold}")
+    recons = pd.read_pickle(unique_id_path / "_reconstructions.pkl")
+
+    if args.aln is not None:
+        settings["alignment"] = args.aln
+
+    # Read in the training dataset
+    if settings["alignment"].split(".")[-1] in ["fasta", "aln"]:
+        aln = st.read_aln_file(settings["alignment"])
+    else:
+        aln = pd.read_pickle(settings["alignment"])
+
+    aln = aln[aln["id"].isin(recons["id"])]
+
+    start = time.time()
+    # find the pairwise covariances of each column in the MSAs
+    actual_covar, predicted_covar = calc_covariances(
+        recons, aln, int(os.getenv("SLURM_CPUS_PER_TASK"))
+    )
+
+    # Calculate correlation coefficient and save an image to file
+    correlation_coefficient = plot_and_save_covariances(
+        actual_covar, predicted_covar, unique_id_path
+    )
+
+    final_metrics = pd.DataFrame({"pearson": correlation_coefficient})
+    final_metrics.to_csv(
+        unique_id_path + "_zero_shot_all_variants_final_metrics.csv", index=False
+    )
+
+    print(f"elapsed minutes: {(time.time() - start) / 60}")
 
 
-# instantiate the model
-model = SeqVAE(
-    dim_latent_vars=settings["latent_dims"],
-    dim_msa_vars=input_dims,
-    num_hidden_units=settings["hidden_dims"],
-    settings=settings,
-    num_aa_type=settings["AA_count"],
-)
+def validate_file(path):
+    """Check that a valid file has been provided,
+    otherwise exits with error code INVALID_FILE"""
 
-model.load_state_dict(
-    torch.load(unique_id_path + f"{unique_id}_model_state.pt", map_location=device)
-)
-model.to(device)
+    if (file := Path(path)).is_file():
+        return file
 
-pearson = calc_reconstruction_accuracy(
-    model,
-    extant_aln,
-    unique_id_path,
-    device,
-    num_samples=50,
-    num_processes=int(os.getenv("SLURM_CPUS_PER_TASK")),
-)
+    print(f"{path} is not a valid file. Aborting...")
+    exit(INVALID_FILE)
 
-final_metrics = pd.read_csv(unique_id_path + "zero_shot_all_variants_final_metrics.csv")
-final_metrics["pearson"] = [pearson]
-final_metrics.to_csv(
-    unique_id_path + "zero_shot_all_variants_final_metrics.csv", index=False
-)
 
-print(f"elapsed minutes: {(time.time() - start) / 60}")
+def setup_parser() -> argparse.Namespace:
+    """use argpase to sort CLI arguments and
+    return the args."""
+
+    parser = argparse.ArgumentParser(
+        prog="Multiplxed Ancestral Phylogeny (MAP)",
+        description="K-fold Train an instance of a VAE using ancestors",
+    )
+
+    parser.add_argument(
+        "-c",
+        "--config",
+        type=validate_file,
+        required=True,
+        action="store",
+        metavar="config.yaml",
+        help="A YAML file with required settings",
+    )
+
+    parser.add_argument(
+        "-a",
+        "--aln",
+        action="store",
+        metavar="example.aln",
+        help="The alignment where the reconstructions originate from",
+    )
+
+    parser.add_argument(
+        "-o",
+        "--output",
+        default="output",
+        action="store",
+        help="output directory. If not \
+        specified, a directory called output will be created in the current working directory.",
+    )
+
+    parser.add_argument(
+        "-r",
+        "--replicate",
+        default="1",
+        action="store",
+        help="specifies which replicate this run is. If a replicate indices file is provided \
+        in the YAML config, this argument specifies which replicate column to use. Will default \
+        to 1 if no argument is provided.",
+    )
+
+    parser.add_argument(
+        "-f",
+        "--folds",
+        action="store",
+        default=5,
+        type=int,
+        help="Number of k-folds. Defaults to 5 if not specified",
+    )
+
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    main()

@@ -188,7 +188,7 @@ def seq_to_one_hot(seq: str) -> np.ndarray:
     return encoding
 
 
-def one_hot_to_seq(encoding: torch.Tensor, is_tensor: True) -> str:
+def one_hot_to_seq(encoding: torch.Tensor, is_tensor: bool = True) -> str:
     """Take a 2D array with shape (SeqLen, AA_LEN)
     and convert it back to a string."""
 

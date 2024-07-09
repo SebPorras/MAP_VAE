@@ -130,15 +130,16 @@ def main() -> int:
             batch_size=1,  # will expand to num_samples so need only 1 per batch
             sampler=torch.utils.data.SubsetRandomSampler(test_idx),
         )
+
         # get the reconstruction of the test set.
         ids, x_hats = sample_latent_space(trained_model, test_loader, num_samples)
         # save for later as we don't need the GPU
-        recon = pd.DataFrame({"id": ids, "sequence": x_hats})
+        recon = pd.DataFrame({"id": ids, "reconstructions": x_hats})
         recon.to_pickle(f"{unique_id_path}_fold_{fold + 1}_reconstructions.pkl")
 
     # save config for the run
     yaml_str = yaml.dump(settings, default_flow_style=False)
-    with open(unique_id_path / "log.txt", "w") as file:
+    with open(f"{unique_id_path}_fold_{fold + 1}_log.txt", "w") as file:
         file.write(f"run_id: {unique_id_path}\n")
         file.write(f"time: {datetime.now()}\n")
         file.write("###CONFIG###\n")
