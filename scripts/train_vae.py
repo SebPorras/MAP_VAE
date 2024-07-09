@@ -1,5 +1,4 @@
 # %%
-from numpy import require
 from evoVAE.utils.datasets import MSA_Dataset
 from evoVAE.models.seqVAE import SeqVAE
 from evoVAE.trainer.seq_trainer import seq_train
@@ -39,7 +38,6 @@ def main() -> int:
     # overwrite the alignment in the config file
     if args.aln is not None:
         settings["alignment"] = args.aln
-
 
     start = time.time()
 
@@ -81,8 +79,13 @@ def main() -> int:
     )
 
     # training/validation
-    train_dataset = MSA_Dataset(train["encoding"], train["weights"], train["id"])
-    val_dataset = MSA_Dataset(val["encoding"], val["weights"], val["id"])
+    train_dataset = MSA_Dataset(
+        train["encoding"], train["weights"], train["id"], device
+    )
+    val_dataset = (
+        MSA_Dataset(val["encoding"], val["weights"], val["id"]),
+        device,
+    )
 
     # DATA LOADERS
     train_loader = torch.utils.data.DataLoader(
@@ -166,7 +169,6 @@ def main() -> int:
         file.write("###TIME###\n")
         file.write(f"{(time.time() - start) / 60} minutes\n")
 
-
     return SUCCESS
 
 
@@ -182,11 +184,11 @@ def validate_file(path):
 
 
 def setup_parser() -> argparse.Namespace:
-    """use the stdlib argpase to sort CLI arguments and
+    """use argpase to sort CLI arguments and
     return the args."""
 
     parser = argparse.ArgumentParser(
-        prog="Multiplxed ancestral phylogeny (MAP)",
+        prog="Multiplxed Ancestral Phylogeny (MAP)",
         description="Train an instance of a VAE using ancestors",
     )
 
@@ -205,7 +207,7 @@ def setup_parser() -> argparse.Namespace:
         "--aln",
         action="store",
         metavar="example.aln",
-        help="The alignment to train on in FASTA format"
+        help="The alignment to train on in FASTA format",
     )
 
     parser.add_argument(

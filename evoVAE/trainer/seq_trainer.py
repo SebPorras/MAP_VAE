@@ -23,9 +23,6 @@ from torch.utils.data import DataLoader
 # constants
 ALL_VARIANTS = 0
 
-# import optuna
-# from optuna.trial import TrialState
-
 
 ### EARLY STOPPING ###
 class EarlyStopper:
@@ -211,9 +208,6 @@ def validation_loop(
         for encoding_val, weight_val, _ in val_loader:
 
             # Calculate ELBO on validation set
-            encoding_val = encoding_val.float().to(device)
-            weight_val = weight_val.float().to(device)
-
             elbo, log_PxGz, kld = model.compute_weighted_elbo(
                 encoding_val, weight_val, anneal_schedule, current_epoch
             )
@@ -226,66 +220,25 @@ def validation_loop(
             epoch_val_likelihood += log_PxGz.item()
             batch_count += 1
 
-    #stop_early = early_stopper.early_stop((epoch_val_elbo / batch_count))
+    # stop_early = early_stopper.early_stop((epoch_val_elbo / batch_count))
     stop_early = False
-
     if config["zero_shot"] and (current_epoch == (config["epochs"] - 1) or stop_early):
         # predict variant fitnesses
-        zero_shot_prediction(
-            model, dms_data, metadata, config, current_epoch, unique_id, device
+        spear_rho, k_recall, ndcg, roc_auc = fitness_prediction(
+            model,
+            dms_data,
+            metadata,
+            unique_id,
+            device,
+            mutation_count=ALL_VARIANTS,
+            n_samples=500,
         )
 
-    # early_stop, val_elbo, val_kld, val_reconstruction_error
     return (
         stop_early,
         epoch_val_elbo / batch_count,
         epoch_val_likelihood / batch_count,
         epoch_val_kl / batch_count,
-    )
-
-
-def zero_shot_prediction(
-    model: SeqVAE,
-    dms_data: pd.DataFrame,
-    metadata: pd.DataFrame,
-    config: Dict,
-    current_epoch: int,
-    unique_id: str,
-    device,
-):
-    """
-    Split the DMS dataset up into subsets based on how many mutations
-    each variant has. Measure performance metrics on model predictions
-    on these subsets. Then get metrics for performance on the entire
-    dataset.
-
-    Returns:
-    None, all metrics are logged with WandB.
-    """
-
-    # split variants by how many mutations they have
-    """
-    subset_dms = split_by_mutations(dms_data)
-    for count, subset_mutants in subset_dms.items():
-
-        # Predict fitness of DMS variants with {count} mutations dataset
-        if count > config["max_mutation"]:
-            continue
-
-        sub_spear_rho, sub_k_recall, sub_ndcg, sub_roc_auc = fitness_prediction(
-            model,
-            subset_mutants,
-            count,
-            metadata,
-            unique_id,
-            device
-        )
-    """
-
-
-    # Predict fitness of DMS variants for ENTIRE dataset
-    spear_rho, k_recall, ndcg, roc_auc = fitness_prediction(
-        model, dms_data, metadata, unique_id, device, mutation_count=ALL_VARIANTS
     )
 
 
@@ -318,6 +271,7 @@ def fitness_prediction(
         dms_data["mutant"],
         dms_data["DMS_score"],
         dms_data["DMS_score_bin"],
+        device,
     )
 
     dms_loader = torch.utils.data.DataLoader(dms_dataset, batch_size=1, shuffle=False)
@@ -325,8 +279,8 @@ def fitness_prediction(
     # encode the wild type
     wild_type = metadata["target_seq"].to_numpy()[0]
     # add dim to the front to allow model to process it
-    wild_one_hot = torch.Tensor(st.seq_to_one_hot(wild_type)).unsqueeze(0).float()
-    wild_one_hot = wild_one_hot.to(device)
+    wild_one_hot = torch.Tensor(st.seq_to_one_hot(wild_type)).unsqueeze(0)
+    wild_one_hot = wild_one_hot.float().to(device)
 
     model.eval()
     actual_fitness = []
@@ -338,8 +292,6 @@ def fitness_prediction(
         wt_elbo_mean = model.compute_elbo_with_multiple_samples(wild_one_hot, n_samples)
 
         for variant_encoding, variant_id, score, score_bin in dms_loader:
-
-            variant_encoding = variant_encoding.float().to(device)
 
             variant_elbo_mean = model.compute_elbo_with_multiple_samples(
                 variant_encoding, n_samples
@@ -402,29 +354,6 @@ def fitness_prediction(
     return spear_rho, k_recall, ndcg, roc_auc
 
 
-def split_by_mutations(dms_data: DataFrame) -> Dict[int, DataFrame]:
-    """
-    Create a subset of the mutation DataFrames based on how many mutations
-    are in the variant.
-
-    Return:
-    A dictionary mapping mutation count to subset dataframe
-    """
-
-    # define a function for counting mutations
-    splitter = lambda x: len(x.split(":"))
-    dms_data["mut_count"] = dms_data["mutant"].apply(splitter)
-
-    subframes = dict()
-    for count in dms_data["mut_count"].unique():
-        # subframes[count] = dms_data[dms_data["mut_count"] == count]
-        subframes[count] = dms_data[dms_data["mut_count"] == count].reset_index(
-            drop=True
-        )
-
-    return subframes
-
-
 def calc_reconstruction_accuracy(
     model: SeqVAE,
     aln: pd.DataFrame,
@@ -474,7 +403,6 @@ def sample_latent_space(
         for x, _, id in data_loader:
 
             # get into flat format to pass through the model
-            x = x.to(device)
             x = x.expand(num_samples, -1, -1)
             x = torch.flatten(x, start_dim=1)
 
@@ -570,3 +498,70 @@ def plot_and_save_covariances(
     plt.savefig(outfile + "covar.png")
 
     return correlation_coefficient
+
+
+# def zero_shot_prediction(
+#     model: SeqVAE,
+#     dms_data: pd.DataFrame,
+#     metadata: pd.DataFrame,
+#     config: Dict,
+#     current_epoch: int,
+#     unique_id: str,
+#     device,
+# ):
+#     """
+#     Split the DMS dataset up into subsets based on how many mutations
+#     each variant has. Measure performance metrics on model predictions
+#     on these subsets. Then get metrics for performance on the entire
+#     dataset.
+
+#     Returns:
+#     None, all metrics are logged with WandB.
+#     """
+
+#     # split variants by how many mutations they have
+#     """
+#     subset_dms = split_by_mutations(dms_data)
+#     for count, subset_mutants in subset_dms.items():
+
+#         # Predict fitness of DMS variants with {count} mutations dataset
+#         if count > config["max_mutation"]:
+#             continue
+
+#         sub_spear_rho, sub_k_recall, sub_ndcg, sub_roc_auc = fitness_prediction(
+#             model,
+#             subset_mutants,
+#             count,
+#             metadata,
+#             unique_id,
+#             device
+#         )
+#     """
+
+#     # Predict fitness of DMS variants for ENTIRE dataset
+#     spear_rho, k_recall, ndcg, roc_auc = fitness_prediction(
+#         model, dms_data, metadata, unique_id, device, mutation_count=ALL_VARIANTS
+#     )
+
+
+# def split_by_mutations(dms_data: DataFrame) -> Dict[int, DataFrame]:
+#     """
+#     Create a subset of the mutation DataFrames based on how many mutations
+#     are in the variant.
+
+#     Return:
+#     A dictionary mapping mutation count to subset dataframe
+#     """
+
+#     # define a function for counting mutations
+#     splitter = lambda x: len(x.split(":"))
+#     dms_data["mut_count"] = dms_data["mutant"].apply(splitter)
+
+#     subframes = dict()
+#     for count in dms_data["mut_count"].unique():
+#         # subframes[count] = dms_data[dms_data["mut_count"] == count]
+#         subframes[count] = dms_data[dms_data["mut_count"] == count].reset_index(
+#             drop=True
+#         )
+
+#     return subframes

@@ -1,20 +1,41 @@
 import numpy as np
-from typing import Tuple
+from typing import Tuple, Union
 import torch
 from torch.utils.data import Dataset
+import pandas as pd
 
 
 class MSA_Dataset(Dataset):
+    """
+    Custom PyTorch Dataset for holding each sequence in a MSA.
+
+    Before loading values, it will send data to the specified device.
+
+    Inputs:
+    encodings: The one-hot encodings of the sequences
+    weights: The reweightings of the sequences.
+    ids: The sequence id names
+    device: The device to send data to.
+
+    Returns:
+    encodings, weights, ids
+    """
 
     def __init__(
-        self, encodings: np.ndarray, weights: np.ndarray, ids: np.ndarray
+        self,
+        encodings: np.ndarray,
+        # TODO: make this consistent when training as well
+        weights: np.ndarray,
+        ids: np.ndarray,
+        device: torch.device,
     ) -> None:
 
         assert encodings.shape[0] == len(weights)
         assert encodings.shape[0] == len(ids)
 
-        self.encodings = torch.tensor(np.stack(encodings))
-        self.weights = torch.tensor(weights.values)
+        self.encodings = torch.tensor(np.stack(encodings)).float().to(device)
+        self.weights = torch.tensor(weights).float().to(device)
+
         self.ids = ids.values
 
     def __len__(self):
@@ -33,16 +54,17 @@ class DMS_Dataset(Dataset):
         ids: np.ndarray,
         fitness: np.ndarray,
         fitness_bin: np.ndarray,
+        device: torch.device,
     ) -> None:
 
         assert encodings.shape[0] == len(ids)
         assert encodings.shape[0] == len(fitness)
         assert encodings.shape[0] == len(fitness_bin)
 
-        self.encodings = torch.tensor(np.stack(encodings))
+        self.encodings = torch.tensor(np.stack(encodings)).float().to(device)
         self.ids = ids.values
-        self.fitness = torch.tensor(fitness.values)
-        self.fitness_bin = torch.tensor(fitness_bin.values)
+        self.fitness = torch.tensor(fitness.values).float().to(device)
+        self.fitness_bin = torch.tensor(fitness_bin.values).float().to(device)
 
     def __len__(self):
         return self.encodings.shape[0]

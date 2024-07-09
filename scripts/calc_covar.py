@@ -56,14 +56,12 @@ extant_aln["weights"] = weights
 one_hot = extant_aln["sequence"].apply(st.seq_to_one_hot)
 extant_aln["encoding"] = one_hot
 
-
 seq_len = numpy_aln.shape[1]
 input_dims = seq_len * settings["AA_count"]
 print(f"Seq length: {seq_len}")
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(device)
-# instantiate the model
+
 
 # instantiate the model
 model = SeqVAE(
@@ -88,7 +86,7 @@ pearson = calc_reconstruction_accuracy(
     unique_id_path,
     device,
     num_samples=50,
-    num_processes=int(os.getenv("SLURM_CPUS_PER_TASK"))
+    num_processes=int(os.getenv("SLURM_CPUS_PER_TASK")),
 )
 
 final_metrics = pd.read_csv(unique_id_path + "zero_shot_all_variants_final_metrics.csv")
