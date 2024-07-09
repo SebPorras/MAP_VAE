@@ -80,11 +80,11 @@ def main() -> int:
 
     # training/validation
     train_dataset = MSA_Dataset(
-        train["encoding"], train["weights"], train["id"], device
+        train["encoding"].to_numpy(), train["weights"].to_numpy(), train["id"], device
     )
-    val_dataset = (
-        MSA_Dataset(val["encoding"], val["weights"], val["id"]),
-        device,
+
+    val_dataset = MSA_Dataset(
+        val["encoding"].to_numpy(), val["weights"].to_numpy(), val["id"], device
     )
 
     # DATA LOADERS

@@ -24,7 +24,6 @@ class MSA_Dataset(Dataset):
     def __init__(
         self,
         encodings: np.ndarray,
-        # TODO: make this consistent when training as well
         weights: np.ndarray,
         ids: np.ndarray,
         device: torch.device,
