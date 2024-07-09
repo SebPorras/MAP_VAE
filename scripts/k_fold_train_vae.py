@@ -42,9 +42,8 @@ def main() -> int:
 
     start = time.time()
 
-    # create the output directory
+    # unique identifier for this experiment
     unique_id_path = Path(args.output + "_r" + args.replicate)
-    unique_id_path.mkdir(parents=True, exist_ok=True)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
@@ -86,17 +85,17 @@ def main() -> int:
         train_loader = torch.utils.data.DataLoader(
             train_dataset,
             batch_size=settings["batch_size"],
-            sampler=torch.utils.data.SubsetRandomSample(train_idx),
+            sampler=torch.utils.data.SubsetRandomSampler(train_idx),
         )
 
         val_loader = torch.utils.data.DataLoader(
             train_dataset,
             batch_size=settings["batch_size"],
-            sampler=torch.utils.data.SubsetRandomSample(test_idx),
+            sampler=torch.utils.data.SubsetRandomSampler(test_idx),
         )
 
-        log += f"Train shape: {train_loader.shape}\n"
-        log += f"Validation shape: {val_loader.shape}\n"
+        log += f"Train shape: {len(train_loader)}\n"
+        log += f"Validation shape: {len(val_loader)}\n"
 
         # instantiate the model
         model = SeqVAE(
@@ -116,12 +115,12 @@ def main() -> int:
             metadata=None,
             device=device,
             config=settings,
-            unique_id=str(unique_id_path) + f"fold_{fold}/",
+            unique_id=f"{unique_id_path}_fold_{fold + 1}_",
         )
 
         torch.save(
             trained_model.state_dict(),
-            unique_id_path / f"{unique_id_path}_fold_{fold}_model_state.pt",
+            f"{unique_id_path}_fold_{fold + 1}_model_state.pt",
         )
 
         # Model performance
@@ -129,15 +128,13 @@ def main() -> int:
         test_loader = torch.utils.data.DataLoader(
             train_dataset,
             batch_size=1,  # will expand to num_samples so need only 1 per batch
-            sampler=torch.utils.data.SubsetRandomSample(test_idx),
+            sampler=torch.utils.data.SubsetRandomSampler(test_idx),
         )
         # get the reconstruction of the test set.
         ids, x_hats = sample_latent_space(trained_model, test_loader, num_samples)
         # save for later as we don't need the GPU
         recon = pd.DataFrame({"id": ids, "sequence": x_hats})
-        recon.to_pickle(
-            unique_id_path / f"{unique_id_path}_fold_{fold}_reconstructions.pkl"
-        )
+        recon.to_pickle(f"{unique_id_path}_fold_{fold + 1}_reconstructions.pkl")
 
     # save config for the run
     yaml_str = yaml.dump(settings, default_flow_style=False)
@@ -225,6 +222,7 @@ def setup_parser() -> argparse.Namespace:
         "--folds",
         action="store",
         default=5,
+        type=int,
         help="Number of k-folds. Defaults to 5 if not specified",
     )
 
