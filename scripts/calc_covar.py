@@ -31,8 +31,8 @@ def main():
     with open(args.config, "r") as stream:
         settings = yaml.safe_load(stream)
 
-    unique_id_path = Path(f"{args.output}_r{args.replicate}_fold_{args.fold}")
-    recons = pd.read_pickle(unique_id_path / "_reconstructions.pkl")
+    unique_id_path = Path(f"{args.output}_r{args.replicate}_fold_{args.folds}")
+    recons = pd.read_pickle(f"{unique_id_path}_reconstructions.pkl")
 
     if args.aln is not None:
         settings["alignment"] = args.aln

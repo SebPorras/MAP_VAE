@@ -54,33 +54,42 @@ def main() -> int:
     else:
         aln = pd.read_pickle(settings["alignment"])
 
-    # add weights to the sequences
-    numpy_aln, _, _ = st.convert_msa_numpy_array(aln)
-    weights = st.position_based_seq_weighting(
-        numpy_aln, n_processes=int(os.getenv("SLURM_CPUS_PER_TASK"))
-    )
-    # weights = st.reweight_by_seq_similarity(numpy_aln, theta=0.2)
-    aln["weights"] = weights
-
-    # one-hot encode
-    one_hot = aln["sequence"].apply(st.seq_to_one_hot)
-    aln["encoding"] = one_hot
-
-    train_dataset = MSA_Dataset(
-        aln["encoding"].to_numpy(), aln["weights"].to_numpy(), aln["id"], device
-    )
-
-    # get the sequence length from first sequence
+        # get the sequence length from first sequence
     seq_len = train_dataset[BATCH_ZERO][SEQ_ZERO].shape[SEQ_LEN]
     input_dims = seq_len * settings["AA_count"]
 
     log = ""
     log += f"Seq length: {seq_len}\n"
+    
+    num_seq = len(train_dataset)
+    num_seq_subset = num_seq // args.folds + 1
+    idx_subset = []
+    random_idx = np.random.permutation(range(num_seq))
+    for i in range(args.folds):
+        idx_subset.append(random_idx[i*num_seq_subset:(i+1)*num_seq_subset])
 
-    kf = KFold(n_splits=args.folds, shuffle=True, random_state=42)
-    for fold, (train_idx, test_idx) in enumerate(kf.split(train_dataset)):
-        log += f"Fold {fold + 1}"
-        log += "-------"
+
+    for fold in range(args.folds):
+        log += f"Fold {fold + 1}\n"
+        log += "-------\n"
+
+        train_
+
+        # add weights to the sequences
+        numpy_aln, _, _ = st.convert_msa_numpy_array(aln)
+        weights = st.position_based_seq_weighting(
+            numpy_aln, n_processes=int(os.getenv("SLURM_CPUS_PER_TASK"))
+        )
+        # weights = st.reweight_by_seq_similarity(numpy_aln, theta=0.2)
+        aln["weights"] = weights
+
+        # one-hot encode
+        one_hot = aln["sequence"].apply(st.seq_to_one_hot)
+        aln["encoding"] = one_hot
+
+        train_dataset = MSA_Dataset(
+            aln["encoding"].to_numpy(), aln["weights"].to_numpy(), aln["id"], device
+        )
 
         train_loader = torch.utils.data.DataLoader(
             train_dataset,
@@ -94,8 +103,8 @@ def main() -> int:
             sampler=torch.utils.data.SubsetRandomSampler(test_idx),
         )
 
-        log += f"Train shape: {len(train_loader)}\n"
-        log += f"Validation shape: {len(val_loader)}\n"
+        log += f"Test index: {test_idx}\n"
+        log += f"Validation index: {test_idx}\n"
 
         # instantiate the model
         model = SeqVAE(
@@ -139,7 +148,7 @@ def main() -> int:
 
     # save config for the run
     yaml_str = yaml.dump(settings, default_flow_style=False)
-    with open(f"{unique_id_path}_fold_{fold + 1}_log.txt", "w") as file:
+    with open(f"{unique_id_path}_log.txt", "w") as file:
         file.write(f"run_id: {unique_id_path}\n")
         file.write(f"time: {datetime.now()}\n")
         file.write("###CONFIG###\n")
