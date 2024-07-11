@@ -8,9 +8,11 @@ import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 
 
+@torch.no_grad()
 def get_mu(model, data_loader) -> pd.DataFrame:
 
     ids = []
+
     for x, _, name in data_loader:
         x = torch.flatten(x, start_dim=1)
         mu, sigma = model.encoder(x)
@@ -142,11 +144,9 @@ def get_model_embeddings(
 
 
 def latent_tree_to_itol(
-    protein_name,
+    filename,
     tree_seq_path,
-    ae_state_dict,
-    a_state_dict,
-    e_state_dict,
+    state_dict,
     settings,
 ) -> None:
 
@@ -163,7 +163,9 @@ def latent_tree_to_itol(
         device=device,
     )
 
-    tree_loader = torch.utils.data.DataLoader(tree_dataset, batch_size=1, shuffle=False)
+    tree_loader = torch.utils.data.DataLoader(
+        tree_dataset, batch_size=len(tree_dataset), shuffle=False
+    )
 
     seq_len = tree_dataset[0][0].shape[0]
     input_dims = seq_len * settings["AA_count"]
@@ -178,35 +180,15 @@ def latent_tree_to_itol(
 
     model = model.to(device)
 
-    model.load_state_dict(torch.load(ae_state_dict, map_location=device))
-    ae_latent = get_mu(model, tree_loader)
+    model.load_state_dict(torch.load(state_dict, map_location=device))
+    latent = get_mu(model, tree_loader)
     ae_rgb = [
         rgb_to_hex_normalized(*((z - np.min(z)) / (np.max(z) - np.min(z))))
-        for z in ae_latent["mu"]
+        for z in latent["mu"]
     ]
-    ae_latent["COLOR"] = ae_rgb
-    ae_latent.drop(columns=["mu"], inplace=True)
-    write_itol_dataset_symbol(f"{protein_name}_ae_model_itol.csv", ae_latent)
-
-    model.load_state_dict(torch.load(a_state_dict, map_location=device))
-    a_latent = get_mu(model, tree_loader)
-    a_rgb = [
-        rgb_to_hex_normalized(*((z - np.min(z)) / (np.max(z) - np.min(z))))
-        for z in a_latent["mu"]
-    ]
-    a_latent["COLOR"] = a_rgb
-    a_latent.drop(columns=["mu"], inplace=True)
-    write_itol_dataset_symbol(f"{protein_name}_a_model_itol.csv", a_latent)
-
-    model.load_state_dict(torch.load(e_state_dict, map_location=device))
-    e_latent = get_mu(model, tree_loader)
-    e_rgb = [
-        rgb_to_hex_normalized(*((z - np.min(z)) / (np.max(z) - np.min(z))))
-        for z in e_latent["z"]
-    ]
-    e_latent["COLOR"] = e_rgb
-    e_latent.drop(columns=["mu"], inplace=True)
-    write_itol_dataset_symbol(f"{protein_name}_e_model_itol.csv", e_latent)
+    latent["COLOR"] = ae_rgb
+    latent.drop(columns=["mu"], inplace=True)
+    write_itol_dataset_symbol(f"{filename}_itol.csv", latent)
 
 
 def vis_tree(
@@ -215,7 +197,6 @@ def vis_tree(
     state_dict,
     settings,
     title,
-    n_samples=10,
     rgb=True,
     lower_2d=False,
 ) -> None:
@@ -311,7 +292,7 @@ def tree_vis_3d(data, wt_id, rgb, ax):
         label="Ancestors",
         s=50,
         marker=">",
-        alpha=0.5,
+        alpha=1,
     )
     ax.scatter(
         ex_zs[:, 0],
@@ -321,7 +302,7 @@ def tree_vis_3d(data, wt_id, rgb, ax):
         label="Extants",
         s=50,
         marker="o",
-        alpha=0.5,
+        alpha=1,
     )
     if wt_id:
         ax.scatter(
@@ -380,7 +361,7 @@ def tree_vis_2d(data, wt_id, rgb, ax):
         label="Ancestors",
         s=50,
         marker=">",
-        alpha=0.5,
+        alpha=1,
     )
     ax.scatter(
         np.vstack(extants["pca"].values)[:, 0],
@@ -389,7 +370,7 @@ def tree_vis_2d(data, wt_id, rgb, ax):
         label="Extants",
         s=50,
         marker="o",
-        alpha=0.5,
+        alpha=1,
     )
     if wt_id:
         ax.scatter(

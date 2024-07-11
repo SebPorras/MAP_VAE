@@ -20,7 +20,6 @@ from torch import Tensor
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
 
-# constants
 ALL_VARIANTS = 0
 
 
@@ -55,20 +54,13 @@ class EarlyStopper:
 
 
 ### TRAINING SCRIPTS ###
-
-
 def seq_train(
     model: SeqVAE,
     train_loader: DataLoader,
     val_loader: DataLoader,
-    dms_data: DataFrame,
-    metadata: DataFrame,
-    device: torch.device,
     config: Dict,
     unique_id: str,
 ) -> SeqVAE:
-
-    model = model.to(device)
 
     optimiser = model.configure_optimiser(
         learning_rate=config["learning_rate"], weight_decay=config["weight_decay"]
@@ -78,17 +70,17 @@ def seq_train(
     anneal_schedule = frange_cycle_linear(config["epochs"])
     early_stopper = EarlyStopper(patience=config["patience"])
 
-    with open(unique_id + "loss.csv", "w") as file:
+    with open(unique_id + "_loss.csv", "w") as file:
         file.write("epoch,elbo,kld,recon,val_elbo,val_kld,val_recon\n")
         file.flush()
 
-        for iteration in range(config["epochs"]):
+        for current_epoch in range(config["epochs"]):
 
             elbo, recon, kld = train_loop(
                 model,
                 train_loader,
                 optimiser,
-                iteration,
+                current_epoch,
                 anneal_schedule,
                 scheduler,
             )
@@ -96,18 +88,13 @@ def seq_train(
             stop_early, val_elbo, val_kld, val_recon = validation_loop(
                 model,
                 val_loader,
-                device,
-                dms_data,
-                metadata,
-                iteration,
-                config,
+                current_epoch,
                 anneal_schedule,
                 early_stopper,
-                unique_id,
             )
 
             file.write(
-                f"{iteration},{elbo},{kld},{recon},{val_elbo},{val_kld},{val_recon}\n"
+                f"{current_epoch},{elbo},{kld},{recon},{val_elbo},{val_kld},{val_recon}\n"
             )
             file.flush()
 
@@ -171,14 +158,9 @@ def train_loop(
 def validation_loop(
     model: SeqVAE,
     val_loader: DataLoader,
-    device,
-    dms_data: DataFrame,
-    metadata: DataFrame,
     current_epoch: int,
-    config: Dict,
     anneal_schedule: np.ndarray,
     early_stopper: EarlyStopper,
-    unique_id: str,
 ) -> Tuple[bool, float, float, float]:
     """
     Calculate loss on validation set. Will also evaluate how well
@@ -215,18 +197,6 @@ def validation_loop(
 
     # stop_early = early_stopper.early_stop((epoch_val_elbo / batch_count))
     stop_early = False
-    # predict variant fitnesses only on the final epoch or if we stop early.
-    if config["zero_shot"] and (current_epoch == (config["epochs"] - 1) or stop_early):
-
-        spear_rho, k_recall, ndcg, roc_auc = fitness_prediction(
-            model,
-            dms_data,
-            metadata,
-            unique_id,
-            device,
-            mutation_count=ALL_VARIANTS,
-            n_samples=500,
-        )
 
     return (
         stop_early,
@@ -238,11 +208,11 @@ def validation_loop(
 
 def fitness_prediction(
     model: SeqVAE,
-    dms_data: DataFrame,
-    metadata: DataFrame,
+    dms_data: pd.DataFrame,
+    metadata: pd.DataFrame,
     unique_id: str,
     device: torch.device,
-    mutation_count: int = 0,
+    mutation_count: int = ALL_VARIANTS,
     n_samples: int = 500,
 ) -> Tuple[float, float, float, float]:
     """
@@ -268,6 +238,8 @@ def fitness_prediction(
         device,
     )
 
+    # because we will do n_samples per observation, batch size is 1.
+    # TODO investigate a way to allow batching even with multiple samples
     dms_loader = torch.utils.data.DataLoader(dms_dataset, batch_size=1, shuffle=False)
 
     # encode the wild type
@@ -291,6 +263,7 @@ def fitness_prediction(
                 variant_encoding, n_samples
             )
 
+            # do a log likelihood ratio against the wild type.
             pred_fitness = variant_elbo_mean - wt_elbo_mean
 
             predicted_fitness.append(pred_fitness.item())
@@ -303,21 +276,11 @@ def fitness_prediction(
     actual_fitness = pd.Series(actual_fitness)
     actual_fitness_binned = pd.Series(actual_fitness_binned)
 
+    # calculate all the metrics we are interested in
     spear_rho, k_recall, ndcg, roc_auc = mt.summary_stats(
         predictions=predicted_fitness,
         actual=actual_fitness,
         actual_binned=actual_fitness_binned,
-    )
-
-    # save the final metrics to file.
-    final_metrics = pd.DataFrame(
-        {
-            "unique_id": [unique_id],
-            "spearman_rho": [spear_rho],
-            "top_k_recall": [k_recall],
-            "ndcg": [ndcg],
-            "roc_auc": [roc_auc],
-        }
     )
 
     # construct a plot of all the predictions
@@ -337,7 +300,6 @@ def fitness_prediction(
     )
 
     raw_data.to_csv(unique_id + title + ".csv", index=False)
-    final_metrics.to_csv(unique_id + title + "_final_metrics.csv", index=False)
 
     ax.scatter(actual_fitness, predicted_fitness)
     plt.title(title + "_" + unique_id[2:-1])

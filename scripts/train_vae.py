@@ -144,7 +144,7 @@ def main() -> int:
     # plot the loss for visualtion of learning
     losses = pd.read_csv(unique_id_path / "loss.csv")
 
-    plt.figure()
+    plt.figure(figsize=(12, 8))
     plt.plot(losses["epoch"], losses["elbo"], label="train", marker="o", color="b")
     plt.plot(
         losses["epoch"], losses["val_elbo"], label="validation", marker="x", color="r"
