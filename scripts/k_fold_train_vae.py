@@ -33,7 +33,7 @@ def prepare_dataset(
     original_aln: pd.DataFrame, subset_indices: np.array, device: torch.device
 ) -> MSA_Dataset:
 
-    train_aln = original_aln.loc[subset_indices]
+    train_aln = original_aln.iloc[subset_indices].copy()
     # add weights to the sequences
     numpy_aln, _, _ = st.convert_msa_numpy_array(train_aln)
     weights = st.position_based_seq_weighting(
@@ -43,8 +43,7 @@ def prepare_dataset(
     train_aln["weights"] = weights
 
     # one-hot encode
-    one_hot = train_aln["sequence"].apply(st.seq_to_one_hot)
-    train_aln["encoding"] = one_hot
+    train_aln["encoding"] = train_aln["sequence"].apply(st.seq_to_one_hot)
 
     train_dataset = MSA_Dataset(
         train_aln["encoding"].to_numpy(),
@@ -114,13 +113,6 @@ def setup_parser() -> argparse.Namespace:
     )
 
     parser.add_argument(
-        "--zero-shot",
-        action="store_true",
-        help="When specified, zero-shot prediction will be performed. This assumes you have \
-            specified a DMS file fitness values.",
-    )
-
-    parser.add_argument(
         "-f",
         "--folds",
         action="store",
@@ -147,14 +139,6 @@ args = setup_parser()
 with open(args.config, "r") as stream:
     settings = yaml.safe_load(stream)
 
-# store our metrics
-all_metrics = pd.DataFrame(
-    {
-        "unique_id": [],
-        "pearson": [],
-        "fold": [],
-    }
-)
 
 # If flag is included, zero shot prediction will occur.
 # Must be specified in config.yaml
@@ -167,16 +151,20 @@ if args.zero_shot:
     metadata = pd.read_csv(settings["dms_metadata"])
     metadata = metadata[metadata["DMS_id"] == settings["dms_id"]]
 
-    # add columns for zero-shot
-    all_metrics["spearman_rho"] = []
-    all_metrics["top_k_recall"] = []
-    all_metrics["ndcg"] = []
-    all_metrics["roc_auc"] = []
+    # will hold our metrics 
+    unique_name = []
+    spear = []
+    k_recalls = []
+    ndcgs = []
+    roc = []
+
 
 
 # overwrite the alignment in the config file
 if args.aln is not None:
     settings["alignment"] = args.aln
+
+print(settings["alignment"])
 
 # Read in the training dataset
 if settings["alignment"].split(".")[-1] in ["fasta", "aln"]:
@@ -195,11 +183,12 @@ print(f"Using device: {device}")
 # get the sequence length from first sequence
 seq_len = len(aln["sequence"][0])
 num_seq = aln.shape[0]
-input_dims = seq_len * settings["AA_count"]
+input_dims = seq_len * 21
 
 log = ""
 log += f"Seq length: {seq_len}\n"
 log += f"Original aln size : {num_seq}\n"
+print(log)
 
 # work out each index for the k-folds
 num_seq_subset = num_seq // args.folds + 1
@@ -210,13 +199,14 @@ for i in range(args.folds):
 
 log += f"Number of folds : {args.folds}\n"
 log += f"Fold size: {len(idx_subset[0])}\n"
+print(log)
 
 for fold in range(args.folds):
     log += f"Fold {fold + 1}\n"
     log += "-------\n"
 
     val_idx = idx_subset[fold]
-    train_idx = np.array(list(set(range(num_seq)))) - set(val_idx)
+    train_idx = np.array(list(set(range(num_seq)) - set(val_idx)))
 
     # one-hot encodes and weights seqs before sending to device
     train_dataset = prepare_dataset(aln, train_idx, device)
@@ -251,7 +241,7 @@ for fold in range(args.folds):
     )
 
     # plot the loss for visualtion of learning
-    losses = pd.read_csv(f"{unique_id_path}_fold_{fold + 1}_loss.png")
+    losses = pd.read_csv(f"{unique_id_path}_fold_{fold + 1}_loss.csv")
 
     plt.figure(figsize=(12, 8))
     plt.plot(losses["epoch"], losses["elbo"], label="train", marker="o", color="b")
@@ -270,24 +260,25 @@ for fold in range(args.folds):
     )
 
     if settings["zero_shot"]:
-        # will also create a plot of actual vs predicted.
+
+                # will also create a plot of actual vs predicted.
         # TODO: Add the code to scale up for different numbers of mutations
         spear_rho, k_recall, ndcg, roc_auc = fitness_prediction(
             trained_model,
             dms_data,
             metadata,
-            f"{unique_id_path}_fold_{fold + 1}_model_state.pt",
+            f"{unique_id_path}_fold_{fold + 1}",
             device,
             mutation_count=ALL_VARIANTS,
             n_samples=5000,
         )
 
         # save the final metrics to file.
-        all_metrics["unique_id"].append([f"{unique_id_path}_fold_{fold + 1}"])
-        all_metrics["spearman_rho"].append([spear_rho])
-        all_metrics["top_k_recall"].append([k_recall])
-        all_metrics["ndcg"].append([ndcg])
-        all_metrics["roc_auc"].append([roc_auc])
+        unique_name.append(f"{unique_id_path}_fold_{fold + 1}")
+        spear.append(spear_rho)
+        k_recalls.append(k_recall)
+        ndcgs.append(ndcg)
+        roc.append(roc_auc)
 
     ### reconstruction of the validation set ###
     # need to use batch size of one to allow for multiple samples of each data point
@@ -343,10 +334,7 @@ for fold in range(args.folds):
     recon.to_pickle(f"{unique_id_path}_fold_{fold + 1}_extant_recons.pkl")
 
 
-all_metrics.to_csv(
-    f"{unique_id_path}_metrics.csv",
-    index=False,
-)
+print(len(unique_name), len(spear), len(k_recalls), len(ndcgs), len(roc))
 
 # save config for the run
 yaml_str = yaml.dump(settings, default_flow_style=False)
@@ -361,3 +349,20 @@ with open(f"{unique_id_path}_log.txt", "w") as file:
     file.write(f"{str(model)}\n")
     file.write("###TIME###\n")
     file.write(f"{(time.time() - start) / 60} minutes\n")
+
+# store our metrics
+all_metrics = pd.DataFrame(
+    {
+        "unique_id": unique_name,
+        "spearman_rho": spear,
+        "top_k_recall": k_recalls,
+        "ndcg": ndcgs,
+        "roc_auc": roc,
+    }
+)
+
+all_metrics.to_csv(
+    f"{unique_id_path}_metrics.csv",
+    index=False,
+)
+

@@ -284,7 +284,7 @@ def fitness_prediction(
     )
 
     # construct a plot of all the predictions
-    title = "zero_shot"
+    title = "_zero_shot"
     if mutation_count == ALL_VARIANTS:
         title += "_all_variants"
     else:
