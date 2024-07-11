@@ -3,15 +3,11 @@
 import torch.utils
 from evoVAE.utils.datasets import MSA_Dataset
 from evoVAE.models.seqVAE import SeqVAE
-from evoVAE.trainer.seq_trainer import seq_train, fitness_prediction
 import pandas as pd
 import evoVAE.utils.seq_tools as st
-from evoVAE.trainer.seq_trainer import sample_latent_space
-from datetime import datetime
-import yaml, time, os, torch, argparse
+import yaml, os, torch, argparse
 from pathlib import Path
 import numpy as np
-import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from evoVAE.loss.standard_loss import frange_cycle_linear
