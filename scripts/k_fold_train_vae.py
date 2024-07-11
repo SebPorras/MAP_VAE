@@ -1,6 +1,5 @@
 """k_fold_train_vae.py"""
 
-from random import shuffle
 import torch.utils
 from evoVAE.utils.datasets import MSA_Dataset
 from evoVAE.models.seqVAE import SeqVAE
@@ -139,7 +138,6 @@ args = setup_parser()
 with open(args.config, "r") as stream:
     settings = yaml.safe_load(stream)
 
-
 # If flag is included, zero shot prediction will occur.
 # Must be specified in config.yaml
 settings["zero_shot"] = args.zero_shot
@@ -152,7 +150,6 @@ if args.zero_shot:
     metadata = metadata[metadata["DMS_id"] == settings["dms_id"]]
 
     # will hold our metrics
-    unique_name = []
     spear = []
     k_recalls = []
     ndcgs = []
@@ -185,22 +182,28 @@ input_dims = seq_len * 21
 log = ""
 log += f"Seq length: {seq_len}\n"
 log += f"Original aln size : {num_seq}\n"
-print(log)
 
 # work out each index for the k-folds
 num_seq_subset = num_seq // args.folds + 1
 idx_subset = []
 random_idx = np.random.permutation(range(num_seq))
+
+# hold ids and marginal probability of the validation set
+fold_elbos = []
+unique_name = []
+
 for i in range(args.folds):
     idx_subset.append(random_idx[i * num_seq_subset : (i + 1) * num_seq_subset])
 
 log += f"Number of folds : {args.folds}\n"
 log += f"Fold size: {len(idx_subset[0])}\n"
-print(log)
 
 for fold in range(args.folds):
     log += f"Fold {fold + 1}\n"
     log += "-------\n"
+
+    # save the final metrics to file.
+    unique_name.append(f"{unique_id_path}_fold_{fold + 1}")
 
     val_idx = idx_subset[fold]
     train_idx = np.array(list(set(range(num_seq)) - set(val_idx)))
@@ -270,8 +273,6 @@ for fold in range(args.folds):
             n_samples=5000,
         )
 
-        # save the final metrics to file.
-        unique_name.append(f"{unique_id_path}_fold_{fold + 1}")
         spear.append(spear_rho)
         k_recalls.append(k_recall)
         ndcgs.append(ndcg)
@@ -292,6 +293,21 @@ for fold in range(args.folds):
         }
     )
     recon.to_pickle(f"{unique_id_path}_fold_{fold + 1}_val_recons.pkl")
+
+    ### Estimate marginal probability assigned to validation sequences.
+    trained_model.eval()
+    with torch.no_grad():
+        # can reuse the recon loader with a single batch size for multiple samples
+        elbos = []
+        for x, _, _ in recon_loader:
+            log_elbo = trained_model.compute_elbo_with_multiple_samples(
+                x, num_samples=5000
+            )
+            elbos.append(log_elbo.item())
+
+        # get average log ELBO for the validation set
+        mean_elbo = np.mean(elbos)
+        fold_elbos.append(mean_elbo)
 
     ### Reconstruction of extant aln ###
     if settings["extant_aln"].split(".")[-1] in ["fasta", "aln"]:
@@ -330,9 +346,6 @@ for fold in range(args.folds):
     )
     recon.to_pickle(f"{unique_id_path}_fold_{fold + 1}_extant_recons.pkl")
 
-
-print(len(unique_name), len(spear), len(k_recalls), len(ndcgs), len(roc))
-
 # save config for the run
 yaml_str = yaml.dump(settings, default_flow_style=False)
 with open(f"{unique_id_path}_log.txt", "w") as file:
@@ -351,12 +364,14 @@ with open(f"{unique_id_path}_log.txt", "w") as file:
 all_metrics = pd.DataFrame(
     {
         "unique_id": unique_name,
-        "spearman_rho": spear,
-        "top_k_recall": k_recalls,
-        "ndcg": ndcgs,
-        "roc_auc": roc,
+        "marginal": fold_elbos,
     }
 )
+if args.zero_shot:
+    all_metrics["spearman_rho"] = spear
+    all_metrics["top_k_recall"] = k_recalls
+    all_metrics["ndcg"] = ndcgs
+    all_metrics["roc_auc"] = roc
 
 all_metrics.to_csv(
     f"{unique_id_path}_metrics.csv",
