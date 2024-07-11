@@ -151,7 +151,7 @@ if args.zero_shot:
     metadata = pd.read_csv(settings["dms_metadata"])
     metadata = metadata[metadata["DMS_id"] == settings["dms_id"]]
 
-    # will hold our metrics 
+    # will hold our metrics
     unique_name = []
     spear = []
     k_recalls = []
@@ -159,12 +159,9 @@ if args.zero_shot:
     roc = []
 
 
-
 # overwrite the alignment in the config file
 if args.aln is not None:
     settings["alignment"] = args.aln
-
-print(settings["alignment"])
 
 # Read in the training dataset
 if settings["alignment"].split(".")[-1] in ["fasta", "aln"]:
@@ -261,7 +258,7 @@ for fold in range(args.folds):
 
     if settings["zero_shot"]:
 
-                # will also create a plot of actual vs predicted.
+        # will also create a plot of actual vs predicted.
         # TODO: Add the code to scale up for different numbers of mutations
         spear_rho, k_recall, ndcg, roc_auc = fitness_prediction(
             trained_model,
@@ -365,4 +362,3 @@ all_metrics.to_csv(
     f"{unique_id_path}_metrics.csv",
     index=False,
 )
-
