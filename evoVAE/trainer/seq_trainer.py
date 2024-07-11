@@ -12,7 +12,6 @@ from evoVAE.utils.datasets import DMS_Dataset
 # External libraries
 import numpy as np
 import pandas as pd
-from pandas import DataFrame
 import matplotlib.pyplot as plt
 from typing import Dict, Tuple, List
 import torch
