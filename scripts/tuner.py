@@ -201,7 +201,7 @@ def objective(trial, aln, device, args):
                 log_elbo = model.compute_elbo_with_multiple_samples(x, num_samples=5000)
                 elbos.append(log_elbo.item())
 
-            # get average log ELBO for the validation set
+        # get average log ELBO for the validation set
         mean_val_elbo = np.mean(elbos)
         trial.report(mean_val_elbo, current_epoch)
         # Handle pruning based on the intermediate value.
@@ -229,26 +229,29 @@ if __name__ == "__main__":
     else:
         aln = pd.read_pickle(settings["alignment"])
 
+    f = open(args.output, "w") 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device: {device}")
+    f.write(f"Using device: {device}\n")
 
     study = optuna.create_study(direction="maximize")
     obj = partial(objective, aln=aln, device=device, args=args)
-    study.optimize(obj, n_trials=100, timeout=600)
+    study.optimize(obj, n_trials=100, timeout=1200)
 
     pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
     complete_trials = study.get_trials(deepcopy=False, states=[TrialState.COMPLETE])
 
-    print("Study statistics: ")
-    print("  Number of finished trials: ", len(study.trials))
-    print("  Number of pruned trials: ", len(pruned_trials))
-    print("  Number of complete trials: ", len(complete_trials))
+    f.write("Study statistics: \n")
+    f.write(f"Number of finished trials: {len(study.trials)}\n")
+    f.write(f"Number of pruned trials: {len(pruned_trials)}\n")
+    f.write(f"Number of complete trials: {len(complete_trials)}\n")
 
-    print("Best trial:")
+    f.write("Best trial:\n")
     trial = study.best_trial
 
-    print("  Value: ", trial.value)
+    f.write(f"Value: {trial.value}\n")
 
-    print("  Params: ")
+    f.write("Params: \n")
     for key, value in trial.params.items():
-        print("    {}: {}".format(key, value))
+        f.write("{}: {}\n".format(key, value))
+
+    f.close()

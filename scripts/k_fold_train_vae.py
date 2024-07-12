@@ -128,6 +128,17 @@ def setup_parser() -> argparse.Namespace:
             specified a DMS file and a corresponding metadata file",
     )
 
+    parser.add_argument(
+        "-w",
+        "--weight-decay",
+        action="store",
+        default=0.0,
+        type=float,
+        help="Weight decay. Defaults to zero",
+    )
+
+
+
     return parser.parse_args()
 
 
@@ -141,6 +152,8 @@ with open(args.config, "r") as stream:
 # If flag is included, zero shot prediction will occur.
 # Must be specified in config.yaml
 settings["zero_shot"] = args.zero_shot
+settings["weight_decay"] = args.weight_decay
+
 if args.zero_shot:
     dms_data = pd.read_csv(settings["dms_file"])
     one_hot = dms_data["mutated_sequence"].apply(st.seq_to_one_hot)
@@ -169,19 +182,21 @@ else:
 start = time.time()
 
 # unique identifier for this experiment
-unique_id_path = Path(args.output + "_r" + args.replicate)
+unique_id_path = f"{args.output}_r{args.replicate}_wd_{args.weight_decay}"
+
+# open log
+f = open(f"{unique_id_path}_log.txt", "w")
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(f"Using device: {device}")
+f.write(f"Using device: {device}\n")
 
 # get the sequence length from first sequence
 seq_len = len(aln["sequence"][0])
 num_seq = aln.shape[0]
 input_dims = seq_len * 21
 
-log = ""
-log += f"Seq length: {seq_len}\n"
-log += f"Original aln size : {num_seq}\n"
+f.write(f"Seq length: {seq_len}\n")
+f.write(f"Original aln size : {num_seq}\n")
 
 # work out each index for the k-folds
 num_seq_subset = num_seq // args.folds + 1
@@ -195,12 +210,12 @@ unique_name = []
 for i in range(args.folds):
     idx_subset.append(random_idx[i * num_seq_subset : (i + 1) * num_seq_subset])
 
-log += f"Number of folds : {args.folds}\n"
-log += f"Fold size: {len(idx_subset[0])}\n"
+f.write(f"Number of folds : {args.folds}\n")
+f.write(f"Fold size: {len(idx_subset[0])}\n")
 
 for fold in range(args.folds):
-    log += f"Fold {fold + 1}\n"
-    log += "-------\n"
+    f.write(f"Fold {fold + 1}\n")
+    f.write("-------\n")
 
     # save the final metrics to file.
     unique_name.append(f"{unique_id_path}_fold_{fold + 1}")
@@ -232,6 +247,7 @@ for fold in range(args.folds):
     model = model.to(device)
 
     # Training Loop
+    f.write("Training model...\n")
     trained_model = seq_train(
         model,
         train_loader=train_loader,
@@ -258,8 +274,10 @@ for fold in range(args.folds):
         trained_model.state_dict(),
         f"{unique_id_path}_fold_{fold + 1}_model_state.pt",
     )
+    f.write("Model saved\n")
 
     if settings["zero_shot"]:
+        f.write("Starting zero-shot prediction\n")
 
         # will also create a plot of actual vs predicted.
         # TODO: Add the code to scale up for different numbers of mutations
@@ -279,6 +297,7 @@ for fold in range(args.folds):
         roc.append(roc_auc)
 
     ### reconstruction of the validation set ###
+    f.write("Reconstructing validation seqs\n")
     # need to use batch size of one to allow for multiple samples of each data point
     recon_loader = torch.utils.data.DataLoader(val_dataset, batch_size=1, shuffle=False)
     ids, x_hats = sample_latent_space(
@@ -295,6 +314,7 @@ for fold in range(args.folds):
     recon.to_pickle(f"{unique_id_path}_fold_{fold + 1}_val_recons.pkl")
 
     ### Estimate marginal probability assigned to validation sequences.
+    f.write("Estimating marginal probability\n")
     trained_model.eval()
     with torch.no_grad():
         # can reuse the recon loader with a single batch size for multiple samples
@@ -310,6 +330,7 @@ for fold in range(args.folds):
         fold_elbos.append(mean_elbo)
 
     ### Reconstruction of extant aln ###
+    f.write("Reconstructing extant alignment\n")
     if settings["extant_aln"].split(".")[-1] in ["fasta", "aln"]:
         extant_aln = st.read_aln_file(settings["extant_aln"])
     else:
@@ -345,20 +366,8 @@ for fold in range(args.folds):
         }
     )
     recon.to_pickle(f"{unique_id_path}_fold_{fold + 1}_extant_recons.pkl")
-
-# save config for the run
-yaml_str = yaml.dump(settings, default_flow_style=False)
-with open(f"{unique_id_path}_log.txt", "w") as file:
-    file.write(f"Run_id: {unique_id_path}\n")
-    file.write(f"Time: {datetime.now()}\n")
-    file.write("###CONFIG###\n")
-    file.write(f"{yaml_str}\n")
-    file.write("###RUN INFO###\n")
-    file.write(log)
-    file.write("###MODEL###\n")
-    file.write(f"{str(model)}\n")
-    file.write("###TIME###\n")
-    file.write(f"{(time.time() - start) / 60} minutes\n")
+    f.write(f"Elapsed time: {(time.time() - start) / 60} minutes\n")
+    f.flush()
 
 # store our metrics
 all_metrics = pd.DataFrame(
@@ -367,6 +376,7 @@ all_metrics = pd.DataFrame(
         "marginal": fold_elbos,
     }
 )
+
 if args.zero_shot:
     all_metrics["spearman_rho"] = spear
     all_metrics["top_k_recall"] = k_recalls
@@ -377,3 +387,17 @@ all_metrics.to_csv(
     f"{unique_id_path}_metrics.csv",
     index=False,
 )
+
+# save config for the run
+yaml_str = yaml.dump(settings, default_flow_style=False)
+f.write(f"Run_id: {unique_id_path}\n")
+f.write(f"Time: {datetime.now()}\n")
+f.write("###CONFIG###\n")
+f.write(f"{yaml_str}\n")
+f.write("###MODEL###\n")
+f.write(f"{str(model)}\n")
+f.write("###TIME###\n")
+f.write(f"{(time.time() - start) / 60} minutes\n")
+
+f.close()
+
