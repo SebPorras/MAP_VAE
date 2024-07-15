@@ -1,16 +1,17 @@
-# %%
+from sklearn.model_selection import train_test_split
+import torch.utils
 from evoVAE.utils.datasets import MSA_Dataset
 from evoVAE.models.seqVAE import SeqVAE
-from evoVAE.trainer.seq_trainer import seq_train
-from sklearn.model_selection import train_test_split
+from evoVAE.trainer.seq_trainer import seq_train, fitness_prediction
 import pandas as pd
 import evoVAE.utils.seq_tools as st
-
-import sys, yaml, time, os, torch, argparse
+from evoVAE.trainer.seq_trainer import sample_latent_space
 from datetime import datetime
-import matplotlib.pyplot as plt
+import yaml, time, os, torch, argparse
 from pathlib import Path
-
+import numpy as np
+import matplotlib.pyplot as plt
+import logging
 
 CONFIG_FILE = 1
 ARRAY_ID = 2
@@ -23,153 +24,30 @@ SEQ_ZERO = 0
 # errors
 SUCCESS = 0
 INVALID_FILE = 2
+ALL_VARIANTS = 0
 
 
-def main() -> int:
-
-    args = setup_parser()
-
-    # read in the config file
-    with open(args.config, "r") as stream:
-        settings = yaml.safe_load(stream)
-
-    # If flag is included, zero shot prediction will occur
-    settings["zero_shot"] = args.zero_shot
-    # overwrite the alignment in the config file
-    if args.aln is not None:
-        settings["alignment"] = args.aln
-
-    start = time.time()
-
-    # create the output directory
-    unique_id_path = Path(args.output + "_r" + args.replicate)
-    unique_id_path.mkdir(parents=True, exist_ok=True)
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device: {device}")
-
-    # Read in the training dataset
-    if settings["alignment"].split(".")[-1] in ["fasta", "aln"]:
-        ancestors_extants_aln = st.read_aln_file(settings["alignment"])
-    else:
-        ancestors_extants_aln = pd.read_pickle(settings["alignment"])
-
-    # if a replicate file has been provided, subset the data using indices in the file
-    if settings["replicate_csv"] is not None:
-        replicate_data = pd.read_csv(settings["replicate_csv"])
-        # subset based on random sample
-        indices = replicate_data["rep_" + args.replicate]
-        ancestors_extants_aln = ancestors_extants_aln.loc[indices]
+def prepare_dataset(original_aln: pd.DataFrame, device: torch.device) -> MSA_Dataset:
 
     # add weights to the sequences
-    numpy_aln, _, _ = st.convert_msa_numpy_array(ancestors_extants_aln)
+    numpy_aln, _, _ = st.convert_msa_numpy_array(original_aln)
     weights = st.position_based_seq_weighting(
         numpy_aln, n_processes=int(os.getenv("SLURM_CPUS_PER_TASK"))
     )
     # weights = st.reweight_by_seq_similarity(numpy_aln, theta=0.2)
-    ancestors_extants_aln["weights"] = weights
+    original_aln["weights"] = weights
 
     # one-hot encode
-    one_hot = ancestors_extants_aln["sequence"].apply(st.seq_to_one_hot)
-    ancestors_extants_aln["encoding"] = one_hot
+    original_aln["encoding"] = original_aln["sequence"].apply(st.seq_to_one_hot)
 
-    # subset the data
-    train, val = train_test_split(
-        ancestors_extants_aln, test_size=settings["test_split"]
-    )
-
-    # training/validation
     train_dataset = MSA_Dataset(
-        train["encoding"].to_numpy(), train["weights"].to_numpy(), train["id"], device
+        original_aln["encoding"].to_numpy(),
+        original_aln["weights"].to_numpy(),
+        original_aln["id"],
+        device,
     )
 
-    val_dataset = MSA_Dataset(
-        val["encoding"].to_numpy(), val["weights"].to_numpy(), val["id"], device
-    )
-
-    # DATA LOADERS
-    train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=settings["batch_size"], shuffle=True
-    )
-    val_loader = torch.utils.data.DataLoader(
-        val_dataset, batch_size=settings["batch_size"], shuffle=True
-    )
-
-    # Load and subset the DMS data used for fitness prediction
-    dms_data = None
-    metadata = None
-    if settings["dms_file"] and settings["dms_metadata"]:
-        dms_data = pd.read_csv(settings["dms_file"])
-        one_hot = dms_data["mutated_sequence"].apply(st.seq_to_one_hot)
-        dms_data["encoding"] = one_hot
-
-        metadata = pd.read_csv(settings["dms_metadata"])
-        metadata = metadata[metadata["DMS_id"] == settings["dms_id"]]
-
-    # get the sequence length from first sequence
-    seq_len = train_dataset[BATCH_ZERO][SEQ_ZERO].shape[SEQ_LEN]
-    input_dims = seq_len * settings["AA_count"]
-
-    log = ""
-    log += f"Train shape: {train.shape}\n"
-    log += f"Validation shape: {val.shape}\n"
-    log += f"Seq length: {seq_len}\n"
-
-    # instantiate the model
-    model = SeqVAE(
-        dim_latent_vars=settings["latent_dims"],
-        dim_msa_vars=input_dims,
-        num_hidden_units=settings["hidden_dims"],
-        settings=settings,
-        num_aa_type=settings["AA_count"],
-    )
-
-    # #### Training Loop
-    trained_model = seq_train(
-        model,
-        train_loader=train_loader,
-        val_loader=val_loader,
-        dms_data=dms_data,
-        metadata=metadata,
-        device=device,
-        config=settings,
-        unique_id=str(unique_id_path) + "/",
-    )
-
-    torch.save(
-        trained_model.state_dict(),
-        unique_id_path / f"{unique_id_path}_model_state.pt",
-    )
-
-    # plot the loss for visualtion of learning
-    losses = pd.read_csv(unique_id_path / "loss.csv")
-
-    plt.figure(figsize=(12, 8))
-    plt.plot(losses["epoch"], losses["elbo"], label="train", marker="o", color="b")
-    plt.plot(
-        losses["epoch"], losses["val_elbo"], label="validation", marker="x", color="r"
-    )
-    plt.xlabel("epoch")
-    plt.ylabel("ELBO")
-    plt.legend()
-    plt.title(unique_id_path)
-    plt.savefig(unique_id_path / "loss.png", dpi=300)
-
-    # save config for the run
-    yaml_str = yaml.dump(settings, default_flow_style=False)
-    with open(unique_id_path / "log.txt", "w") as file:
-        file.write(f"run_id: {unique_id_path}\n")
-        file.write(f"time: {datetime.now()}\n")
-        file.write("###CONFIG###\n")
-        file.write(f"{yaml_str}\n")
-        file.write("###RUN INFO###\n")
-        file.write(log)
-        file.write("###MODEL###\n")
-        file.write(f"{str(model)}\n")
-        file.write("###TIME###\n")
-        file.write(f"{(time.time() - start) / 60} minutes\n")
-
-    return SUCCESS
+    return train_dataset
 
 
 def validate_file(path):
@@ -189,7 +67,7 @@ def setup_parser() -> argparse.Namespace:
 
     parser = argparse.ArgumentParser(
         prog="Multiplxed Ancestral Phylogeny (MAP)",
-        description="Train an instance of a VAE using ancestors",
+        description="K-fold Train an instance of a VAE using ancestors",
     )
 
     parser.add_argument(
@@ -230,14 +108,259 @@ def setup_parser() -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "-z",
         "--zero-shot",
         action="store_true",
         help="When specified, zero-shot prediction will be performed. This assumes you have \
-            specified a DMS file fitness values.",
+            specified a DMS file and a corresponding metadata file",
+    )
+
+    parser.add_argument(
+        "-w",
+        "--weight-decay",
+        action="store",
+        default=0.0,
+        type=float,
+        help="Weight decay. Defaults to zero",
     )
 
     return parser.parse_args()
 
 
-if __name__ == "__main__":
-    main()
+args = setup_parser()
+
+
+# read in the config file
+with open(args.config, "r") as stream:
+    settings = yaml.safe_load(stream)
+
+# If flag is included, zero shot prediction will occur.
+# Must be specified in config.yaml
+settings["zero_shot"] = args.zero_shot
+settings["weight_decay"] = args.weight_decay
+
+if args.zero_shot:
+    dms_data = pd.read_csv(settings["dms_file"])
+    one_hot = dms_data["mutated_sequence"].apply(st.seq_to_one_hot)
+    dms_data["encoding"] = one_hot
+
+    metadata = pd.read_csv(settings["dms_metadata"])
+    metadata = metadata[metadata["DMS_id"] == settings["dms_id"]]
+
+    # will hold our metrics
+    spear = []
+    k_recalls = []
+    ndcgs = []
+    roc = []
+
+
+# overwrite the alignment in the config file
+if args.aln is not None:
+    settings["alignment"] = args.aln
+
+# Read in the training dataset
+if settings["alignment"].split(".")[-1] in ["fasta", "aln"]:
+    aln = st.read_aln_file(settings["alignment"])
+else:
+    aln = pd.read_pickle(settings["alignment"])
+
+start = time.time()
+
+# unique identifier for this experiment
+unique_id_path = f"{args.output}_r{args.replicate}_wd_{args.weight_decay}"
+
+logging.basicConfig(
+    level=logging.DEBUG,  # Set the logging level
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",  # Format the log messages
+    datefmt="%Y-%m-%d %H:%M:%S",  # Date format
+    filename="app.log",  # Log file name
+    filemode="w",  # Write mode (overwrites the log file each time the program runs)
+)
+logger = logging.getLogger("my_logger")
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
+logger.debug(f"Using device: {device}\n")
+
+# get the sequence length from first sequence
+seq_len = len(aln["sequence"][0])
+num_seq = aln.shape[0]
+input_dims = seq_len * 21
+
+logger.debug(f"Seq length: {seq_len}\n")
+logger.debug(f"Original aln size : {num_seq}\n")
+
+
+# subset the data
+train, val = train_test_split(aln, test_size=settings["test_split"])
+
+# one-hot encodes and weights seqs before sending to device
+train_dataset = prepare_dataset(train, device)
+train_loader = torch.utils.data.DataLoader(
+    train_dataset,
+    batch_size=settings["batch_size"],
+)
+
+val_dataset = prepare_dataset(val, device)
+val_loader = torch.utils.data.DataLoader(
+    val_dataset,
+    batch_size=settings["batch_size"],
+)
+
+# instantiate the model
+model = SeqVAE(
+    dim_latent_vars=settings["latent_dims"],
+    dim_msa_vars=input_dims,
+    num_hidden_units=settings["hidden_dims"],
+    settings=settings,
+    num_aa_type=settings["AA_count"],
+)
+model = model.to(device)
+
+# Training Loop
+logger.debug("Training model...\n")
+trained_model = seq_train(
+    model,
+    train_loader=train_loader,
+    val_loader=val_loader,
+    config=settings,
+    unique_id=unique_id_path,
+)
+
+# plot the loss for visualtion of learning
+losses = pd.read_csv(f"{unique_id_path}_loss.csv")
+
+plt.figure(figsize=(12, 8))
+plt.plot(losses["epoch"], losses["elbo"], label="train", marker="o", color="b")
+plt.plot(losses["epoch"], losses["val_elbo"], label="validation", marker="x", color="r")
+plt.xlabel("Epoch")
+plt.ylabel("ELBO")
+plt.legend()
+plt.title(f"{unique_id_path}")
+plt.savefig(f"{unique_id_path}_loss.png", dpi=300)
+
+torch.save(
+    trained_model.state_dict(),
+    f"{unique_id_path}_model_state.pt",
+)
+logger.debug("Model saved\n")
+
+if settings["zero_shot"]:
+    logger.debug("Starting zero-shot prediction\n")
+
+    # will also create a plot of actual vs predicted.
+    # TODO: Add the code to scale up for different numbers of mutations
+    spear_rho, k_recall, ndcg, roc_auc = fitness_prediction(
+        trained_model,
+        dms_data,
+        metadata,
+        f"{unique_id_path}",
+        device,
+        mutation_count=ALL_VARIANTS,
+        n_samples=5000,
+    )
+
+    spear.append(spear_rho)
+    k_recalls.append(k_recall)
+    ndcgs.append(ndcg)
+    roc.append(roc_auc)
+
+### reconstruction of the validation set ###
+logger.debug("Reconstructing validation seqs\n")
+# need to use batch size of one to allow for multiple samples of each data point
+recon_loader = torch.utils.data.DataLoader(val_dataset, batch_size=1, shuffle=False)
+ids, x_hats = sample_latent_space(
+    model=trained_model, data_loader=recon_loader, num_samples=100
+)
+# save for later as we don't need the GPU
+recon = pd.DataFrame(
+    {
+        "id": ids,
+        "sequence": aln[aln["id"].isin(ids)]["sequence"],
+        "reconstruction": x_hats,
+    }
+)
+recon.to_pickle(f"{unique_id_path}_val_recons.pkl")
+
+### Estimate marginal probability assigned to validation sequences.
+logger.debug("Estimating marginal probability\n")
+trained_model.eval()
+with torch.no_grad():
+    # can reuse the recon loader with a single batch size for multiple samples
+    elbos = []
+    for x, _, _ in recon_loader:
+        log_elbo = trained_model.compute_elbo_with_multiple_samples(x, num_samples=5000)
+        elbos.append(log_elbo.item())
+
+    # get average log ELBO for the validation set
+    mean_elbo = np.mean(elbos)
+
+
+### Reconstruction of extant aln ###
+logger.debug("Reconstructing extant alignment\n")
+if settings["extant_aln"].split(".")[-1] in ["fasta", "aln"]:
+    extant_aln = st.read_aln_file(settings["extant_aln"])
+else:
+    extant_aln = pd.read_pickle(settings["extant_aln"])
+
+numpy_aln, _, _ = st.convert_msa_numpy_array(extant_aln)
+weights = st.position_based_seq_weighting(
+    numpy_aln, n_processes=int(os.getenv("SLURM_CPUS_PER_TASK"))
+)
+# weights = st.reweight_by_seq_similarity(numpy_aln, theta=0.2)
+extant_aln["weights"] = weights
+extant_aln["encoding"] = extant_aln["sequence"].apply(st.seq_to_one_hot)
+
+extant_dataset = MSA_Dataset(
+    extant_aln["encoding"].to_numpy(),
+    extant_aln["weights"].to_numpy(),
+    extant_aln["id"],
+    device,
+)
+
+extant_loader = torch.utils.data.DataLoader(extant_dataset, batch_size=1, shuffle=False)
+ids, x_hats = sample_latent_space(
+    model=trained_model, data_loader=extant_loader, num_samples=100
+)
+# save for later as we don't need the GPU
+recon = pd.DataFrame(
+    {
+        "id": ids,
+        "sequence": extant_aln[extant_aln["id"].isin(ids)]["sequence"],
+        "reconstruction": x_hats,
+    }
+)
+recon.to_pickle(f"{unique_id_path}_extant_recons.pkl")
+logger.debug(f"Elapsed time: {(time.time() - start) / 60} minutes\n")
+
+
+# store our metrics
+all_metrics = pd.DataFrame(
+    {
+        "unique_id": unique_id_path,
+        "marginal": mean_elbo,
+    }
+)
+
+if args.zero_shot:
+    all_metrics["spearman_rho"] = spear
+    all_metrics["top_k_recall"] = k_recalls
+    all_metrics["ndcg"] = ndcgs
+    all_metrics["roc_auc"] = roc
+
+all_metrics.to_csv(
+    f"{unique_id_path}_metrics.csv",
+    index=False,
+)
+
+# save config for the run
+yaml_str = yaml.dump(settings, default_flow_style=False)
+logger.debug(f"Run_id: {unique_id_path}\n")
+logger.debug(f"Time: {datetime.now()}\n")
+logger.debug("###CONFIG###\n")
+logger.debug(f"{yaml_str}\n")
+logger.debug("###MODEL###\n")
+logger.debug(f"{str(model)}\n")
+logger.debug("###TIME###\n")
+logger.debug(f"{(time.time() - start) / 60} minutes\n")
