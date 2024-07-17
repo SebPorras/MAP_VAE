@@ -9,10 +9,10 @@ from sklearn.decomposition import PCA
 
 
 @torch.no_grad()
-def get_mu(model, data_loader) -> pd.DataFrame:
+def get_mu(model: SeqVAE, data_loader) -> pd.DataFrame:
 
     ids = []
-
+    model.eval()
     for x, _, name in data_loader:
         x = torch.flatten(x, start_dim=1)
         mu, sigma = model.encoder(x)
@@ -271,18 +271,44 @@ def tree_vis_3d(data, wt_id, rgb, ax):
     an_rgb = "red"
     ex_rgb = "blue"
     if rgb:
-        an_rgb = np.array(
-            [
-                rgb_to_hex_normalized(*((z - np.min(z)) / (np.max(z) - np.min(z))))
-                for z in an_zs
-            ]
-        )
+
+        min_r = np.min(np.stack(data["mu"])[:, 0])
+        max_r = np.max(np.stack(data["mu"])[:, 0])
+        min_g = np.min(np.stack(data["mu"])[:, 1])
+        max_g = np.max(np.stack(data["mu"])[:, 1])
+        min_b = np.min(np.stack(data["mu"])[:, 2])
+        max_b = np.max(np.stack(data["mu"])[:, 2])
+
+        an_rgb = [
+            (
+                (r - min_r) / (max_r - min_r),
+                (g - min_g) / (max_g - min_g),
+                (b - min_b) / (max_b - min_b),
+            )
+            for r, g, b in zip(
+                np.stack(an_zs)[:, 0],
+                np.stack(an_zs)[:, 1],
+                np.stack(an_zs)[:, 2],
+            )
+        ]
+        # an_rgb = np.array([rgb_to_hex_normalized(*x) for x in scaled_an_rgb])
+
         ex_rgb = np.array(
             [
-                rgb_to_hex_normalized(*((z - np.min(z)) / (np.max(z) - np.min(z))))
-                for z in ex_zs
+                (
+                    (r - min_r) / (max_r - min_r),
+                    (g - min_g) / (max_g - min_g),
+                    (b - min_b) / (max_b - min_b),
+                )
+                for r, g, b in zip(
+                    np.stack(ex_zs)[:, 0],
+                    np.stack(ex_zs)[:, 1],
+                    np.stack(ex_zs)[:, 2],
+                )
             ]
         )
+
+        # ex_rgb = np.array([rgb_to_hex_normalized(*x) for x in scaled_ex_rgb])
 
     ax.scatter(
         an_zs[:, 0],
@@ -337,22 +363,46 @@ def tree_vis_2d(data, wt_id, rgb, ax):
 
     an_zs = np.array([z for z in ancestors["mu"]])
     ex_zs = np.array([z for z in extants["mu"]])
-    if wt_id:
-        wt_zs = np.array([z for z in wt["mu"]])
 
     if rgb:
-        an_rgb = np.array(
-            [
-                rgb_to_hex_normalized(*((z - np.min(z)) / (np.max(z) - np.min(z))))
-                for z in an_zs
-            ]
-        )
+
+        min_r = np.min(np.stack(data["mu"])[:, 0])
+        max_r = np.max(np.stack(data["mu"])[:, 0])
+        min_g = np.min(np.stack(data["mu"])[:, 1])
+        max_g = np.max(np.stack(data["mu"])[:, 1])
+        min_b = np.min(np.stack(data["mu"])[:, 2])
+        max_b = np.max(np.stack(data["mu"])[:, 2])
+
+        an_rgb = [
+            (
+                (r - min_r) / (max_r - min_r),
+                (g - min_g) / (max_g - min_g),
+                (b - min_b) / (max_b - min_b),
+            )
+            for r, g, b in zip(
+                np.stack(an_zs)[:, 0],
+                np.stack(an_zs)[:, 1],
+                np.stack(an_zs)[:, 2],
+            )
+        ]
+        # an_rgb = np.array([rgb_to_hex_normalized(*x) for x in scaled_an_rgb])
+
         ex_rgb = np.array(
             [
-                rgb_to_hex_normalized(*((z - np.min(z)) / (np.max(z) - np.min(z))))
-                for z in ex_zs
+                (
+                    (r - min_r) / (max_r - min_r),
+                    (g - min_g) / (max_g - min_g),
+                    (b - min_b) / (max_b - min_b),
+                )
+                for r, g, b in zip(
+                    np.stack(ex_zs)[:, 0],
+                    np.stack(ex_zs)[:, 1],
+                    np.stack(ex_zs)[:, 2],
+                )
             ]
         )
+
+        # ex_rgb = np.array([rgb_to_hex_normalized(*x) for x in scaled_ex_rgb])
 
     ax.scatter(
         np.vstack(ancestors["pca"].values)[:, 0],
