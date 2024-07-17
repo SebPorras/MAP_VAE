@@ -182,7 +182,7 @@ else:
 start = time.time()
 
 # unique identifier for this experiment
-unique_id_path = f"{args.output}_r{args.replicate}_wd_{args.weight_decay}"
+unique_id_path = f"{args.output}_r{args.replicate}"
 
 # open log
 f = open(f"{unique_id_path}_log.txt", "w")
