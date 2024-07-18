@@ -15,6 +15,8 @@ import optuna
 from evoVAE.trainer.seq_trainer import train_loop
 from optuna.trial import TrialState
 from functools import partial
+import logging
+from datetime import datetime
 
 
 CONFIG_FILE = 1
@@ -25,35 +27,23 @@ SEQ_LEN = 0
 BATCH_ZERO = 0
 SEQ_ZERO = 0
 ALL_VARIANTS = 0
+FOLDS = 5
 
 # errors
 SUCCESS = 0
 INVALID_FILE = 2
 
-def plot_losses(unique_id_path: str, fold: int):
-  # plot the loss for visualtion of learning
-    losses = pd.read_csv(f"{unique_id_path}_fold_{fold + 1}_loss.csv")
 
-    plt.figure(figsize=(12, 8))
-    plt.plot(losses["epoch"], losses["elbo"], label="train", marker="o", color="b")
-    plt.plot(
-        losses["epoch"], losses["val_elbo"], label="validation", marker="x", color="r"
-    )
-    plt.xlabel("Epoch")
-    plt.ylabel("ELBO")
-    plt.legend()
-    plt.title(f"{unique_id_path}_fold_{fold + 1}")
-    plt.savefig(f"{unique_id_path}_fold_{fold + 1}_loss.png", dpi=300)
 
 def prepare_dataset(
-    original_aln: pd.DataFrame, device: torch.device
+    original_aln: pd.DataFrame, subset_indices: np.array, device: torch.device
 ) -> MSA_Dataset:
 
-    train_aln = original_aln.copy()
+    train_aln = original_aln.iloc[subset_indices].copy()
     # add weights to the sequences
     numpy_aln, _, _ = st.convert_msa_numpy_array(train_aln)
     weights = st.position_based_seq_weighting(
-        numpy_aln, n_processes=int(os.getenv("SLURM_CPUS_PER_TASK"))
+        numpy_aln, n_processes=2 #int(os.getenv("SLURM_CPUS_PER_TASK"))
     )
     # weights = st.reweight_by_seq_similarity(numpy_aln, theta=0.2)
     train_aln["weights"] = weights
@@ -88,7 +78,7 @@ def setup_parser() -> argparse.Namespace:
 
     parser = argparse.ArgumentParser(
         prog="Multiplxed Ancestral Phylogeny (MAP)",
-        description="K-fold Train an instance of a VAE using ancestors",
+        description="Uses Optuna to find hyperparamter settings",
     )
 
     parser.add_argument(
@@ -116,39 +106,63 @@ def setup_parser() -> argparse.Namespace:
         default="output",
     )
 
-
     return parser.parse_args()
 
-def objective(trial, aln, device, unique_id_path):
+def objective_cv(trial, aln, device, logger):
 
     # get the sequence length from first sequence
     seq_len = len(aln["sequence"][0])
     num_seq = aln.shape[0]
     input_dims = seq_len * 21
 
-    log = ""
-    log += f"Seq length: {seq_len}\n"
-    log += f"Original aln size : {num_seq}\n"
+    # work out each index for the k-folds
+    num_seq_subset = num_seq // FOLDS + 1
+    idx_subset = []
+    np.random.seed(42)
+    random_idx = np.random.permutation(range(num_seq))
+    for i in range(FOLDS):
+        idx_subset.append(random_idx[i * num_seq_subset : (i + 1) * num_seq_subset])
 
-    # subset the data
-    train, val = train_test_split(aln, test_size=0.2, random_state=42)
+    logger.info("-------")
+    logger.info(f"Total training size: {num_seq}")
+    logger.info(f"Number of folds : {FOLDS}")
+    logger.info(f"Fold size: {len(idx_subset[0])}")
+    logger.info("-------")
 
-    # one-hot encodes and weights seqs before sending to device
-    train_dataset = prepare_dataset(train, device)
-    train_loader = torch.utils.data.DataLoader(
-        train_dataset,
-        batch_size=settings["batch_size"],
-    )
+    # hold ids and marginal probability of the validation set
+    fold_elbos = []
+    for fold in range(FOLDS):
+        logger.info(f"Fold {fold + 1}")
+        logger.info("-------")
+        
+        val_idx = idx_subset[fold]
+        train_idx = np.array(list(set(range(num_seq)) - set(val_idx)))
 
-    val_dataset = prepare_dataset(val, device)
-    # use batch size of 1 because we will estimate marginal with many samples
-    val_loader = torch.utils.data.DataLoader(
-        val_dataset,
-        batch_size=1,
-    )
+        # one-hot encodes and weights seqs before sending to device
+        train_dataset = prepare_dataset(aln, train_idx, device)
+        train_loader = torch.utils.data.DataLoader(
+            train_dataset,
+            batch_size=settings["batch_size"],
+        )
+
+        val_dataset = prepare_dataset(aln, val_idx, device)
+        val_loader = torch.utils.data.DataLoader(
+            val_dataset,
+            batch_size=1,
+        )
+
+        elbo = objective(trial, input_dims, train_loader, val_loader)
+        fold_elbos.append(elbo)
+
+
+    return np.mean(fold_elbos)
+
+
+def objective(trial, input_dims, train_loader, val_loader):
 
     latent_dims = trial.suggest_int("latent_dims", 3, 10)
     settings["latent_dims"] = latent_dims
+   
     # instantiate the model
     model = SeqVAE(
         dim_latent_vars=latent_dims,
@@ -179,26 +193,17 @@ def objective(trial, aln, device, unique_id_path):
             scheduler,
         )
 
-        ### Estimate marginal probability assigned to validation sequences. ###
-        model.eval()
-        with torch.no_grad():
-            # can reuse the recon loader with a single batch size for multiple samples
-            elbos = []
-            for x, _, _ in val_loader:
-                log_elbo = model.compute_elbo_with_multiple_samples(
-                    x, num_samples=5000
-                )
-                elbos.append(log_elbo.item())
+    ### Estimate marginal probability assigned to validation sequences. ###
+    model.eval()
+    elbos = []
+    with torch.no_grad():
+        for x, _, _ in val_loader:
+            log_elbo = model.compute_elbo_with_multiple_samples(
+                x, num_samples=2000
+            )
+            elbos.append(log_elbo.item())
 
-        # get average log ELBO for the validation set
-        mean_elbo = np.mean(elbos)
-
-        trial.report(mean_elbo, current_epoch)
-        # Handle pruning based on the intermediate value.
-        if trial.should_prune():
-            raise optuna.exceptions.TrialPruned()
-
-    return mean_elbo
+    return np.mean(elbos)
 
 
 if __name__ == "__main__":
@@ -222,33 +227,46 @@ if __name__ == "__main__":
     # unique identifier for this experiment
     unique_id_path = args.output 
 
+    logging.basicConfig(
+    level=logging.DEBUG,  # Set the logging level
+    format="%(asctime)s - %(message)s",  # Format the log messages
+    datefmt="%H:%M:%S",  # Date format
+    filename=f"{unique_id_path}.log",  # Log file name
+    filemode="w",  # Write mode (overwrites the log file each time the program runs)
+    )
+    logger = logging.getLogger(__name__)
+    logger.info(f"Run_id: {unique_id_path}")
+    logger.info(f"Start time: {datetime.now()}")
+
     train_val, test = train_test_split(aln, test_size=0.2, random_state=42)
+
     print(f"Train/Val shape: {train_val.shape}")
     print(f"Test shape: {test.shape}")
 
-    f = open(unique_id_path + ".log", "w") 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    f.write(f"Using device: {device}\n")
+    logger.info(f"Using device: {device}\n")
 
     study = optuna.create_study(direction="maximize")
-    obj = partial(objective, aln=train_val, device=device, unique_id_path=unique_id_path)
+    
+    obj = partial(objective_cv, aln=train_val, device=device, logger=logger)
+
     study.optimize(obj, n_trials=100, timeout=1200)
 
     pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
     complete_trials = study.get_trials(deepcopy=False, states=[TrialState.COMPLETE])
 
-    f.write("Study statistics: \n")
-    f.write(f"Number of finished trials: {len(study.trials)}\n")
-    f.write(f"Number of pruned trials: {len(pruned_trials)}\n")
-    f.write(f"Number of complete trials: {len(complete_trials)}\n")
+    logger.info("Study statistics: \n")
+    logger.info(f"Number of finished trials: {len(study.trials)}\n")
+    logger.info(f"Number of pruned trials: {len(pruned_trials)}\n")
+    logger.info(f"Number of complete trials: {len(complete_trials)}\n")
 
-    f.write("Best trial:\n")
+    logger.info("Best trial:\n")
     trial = study.best_trial
 
-    f.write(f"Value: {trial.value}\n")
+    logger.info(f"Value: {trial.value}\n")
 
-    f.write("Params: \n")
+    logger.info("Params: \n")
     for key, value in trial.params.items():
-        f.write("{}: {}\n".format(key, value))
+        logger.info("{}: {}\n".format(key, value))
 
-    f.close()
+

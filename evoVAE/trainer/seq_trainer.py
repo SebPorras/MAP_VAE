@@ -170,8 +170,9 @@ def validation_loop(
     Returns:
     early_stop: True if the model should stop early if validation loss is
     increasing, otherwise False.
-
-    val_elbo, val_kld, val_reconstruction_error
+    val_elbo,
+    val_likelihood,
+    val_kl 
     """
 
     epoch_val_elbo = 0
