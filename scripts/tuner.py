@@ -46,10 +46,10 @@ def plot_losses(unique_id_path: str, fold: int):
     plt.savefig(f"{unique_id_path}_fold_{fold + 1}_loss.png", dpi=300)
 
 def prepare_dataset(
-    original_aln: pd.DataFrame, subset_indices: np.array, device: torch.device
+    original_aln: pd.DataFrame, device: torch.device
 ) -> MSA_Dataset:
 
-    train_aln = original_aln.iloc[subset_indices].copy()
+    train_aln = original_aln.copy()
     # add weights to the sequences
     numpy_aln, _, _ = st.convert_msa_numpy_array(train_aln)
     weights = st.position_based_seq_weighting(
@@ -108,8 +108,15 @@ def setup_parser() -> argparse.Namespace:
         metavar="example.aln",
         help="The alignment to train on in FASTA format",
     )
+    
+    parser.add_argument(
+        "-o",
+        "--output",
+        action="store",
+        default="output",
+    )
 
-  
+
     return parser.parse_args()
 
 def objective(trial, aln, device, unique_id_path):
@@ -213,7 +220,7 @@ if __name__ == "__main__":
         aln = pd.read_pickle(settings["alignment"])
 
     # unique identifier for this experiment
-    unique_id_path = f"{args.output}_r{args.replicate}"
+    unique_id_path = args.output 
 
     train_val, test = train_test_split(aln, test_size=0.2, random_state=42)
     print(f"Train/Val shape: {train_val.shape}")
