@@ -171,9 +171,9 @@ unique_id_path = f"{args.output}_r{args.replicate}_wd_{args.weight_decay}"
 
 logging.basicConfig(
     level=logging.DEBUG,  # Set the logging level
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",  # Format the log messages
+    format="%(asctime)s - %(levelname)s - %(message)s",  # Format the log messages
     datefmt="%Y-%m-%d %H:%M:%S",  # Date format
-    filename="app.log",  # Log file name
+    filename=f"{unique_id_path}.log",  # Log file name
     filemode="w",  # Write mode (overwrites the log file each time the program runs)
 )
 logger = logging.getLogger("my_logger")
@@ -338,8 +338,8 @@ logger.debug(f"Elapsed time: {(time.time() - start) / 60} minutes\n")
 # store our metrics
 all_metrics = pd.DataFrame(
     {
-        "unique_id": unique_id_path,
-        "marginal": mean_elbo,
+        "unique_id": [unique_id_path],
+        "marginal": [mean_elbo],
     }
 )
 
