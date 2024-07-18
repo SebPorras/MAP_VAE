@@ -26,3 +26,6 @@ evoVAE/_version.py
 .vscode/
 .DS_Store
 .ipynb_checkpoints
+
+# ignore ipynb files
+notebooks/*.ipynb
