@@ -59,11 +59,13 @@ def seq_train(
     val_loader: DataLoader,
     config: Dict,
     unique_id: str,
+
 ) -> SeqVAE:
 
     optimiser = model.configure_optimiser(
         learning_rate=config["learning_rate"], weight_decay=config["weight_decay"]
     )
+
     scheduler = CosineAnnealingLR(optimiser, T_max=config["epochs"])
 
     anneal_schedule = frange_cycle_linear(config["epochs"])

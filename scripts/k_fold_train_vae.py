@@ -202,7 +202,6 @@ logger.info("###CONFIG###")
 yaml_str = yaml.dump(settings, default_flow_style=False)
 logger.info(yaml_str)
 
-
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 logger.info(f"Using device: {device}")
 
