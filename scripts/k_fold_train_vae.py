@@ -3,16 +3,15 @@
 import torch.utils
 from evoVAE.utils.datasets import MSA_Dataset
 from evoVAE.models.seqVAE import SeqVAE
-from evoVAE.trainer.seq_trainer import seq_train, fitness_prediction
+from evoVAE.trainer.seq_trainer import seq_train
 import pandas as pd
 import evoVAE.utils.seq_tools as st
-from evoVAE.trainer.seq_trainer import sample_latent_space
 from datetime import datetime
 import yaml, time, os, torch, argparse
 from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
-
+import logging
 
 CONFIG_FILE = 1
 ARRAY_ID = 2
@@ -27,6 +26,20 @@ ALL_VARIANTS = 0
 SUCCESS = 0
 INVALID_FILE = 2
 
+def plot_losses(unique_id_path: str, fold: int):
+  # plot the loss for visualtion of learning
+    losses = pd.read_csv(f"{unique_id_path}_fold_{fold + 1}_loss.csv")
+
+    plt.figure(figsize=(12, 8))
+    plt.plot(losses["epoch"], losses["elbo"], label="train", marker="o", color="b")
+    plt.plot(
+        losses["epoch"], losses["val_elbo"], label="validation", marker="x", color="r"
+    )
+    plt.xlabel("Epoch")
+    plt.ylabel("ELBO")
+    plt.legend()
+    plt.title(f"{unique_id_path}_fold_{fold + 1}")
+    plt.savefig(f"{unique_id_path}_fold_{fold + 1}_loss.png", dpi=300)
 
 def prepare_dataset(
     original_aln: pd.DataFrame, subset_indices: np.array, device: torch.device
@@ -120,14 +133,7 @@ def setup_parser() -> argparse.Namespace:
         help="Number of k-folds. Defaults to 5 if not specified",
     )
 
-    parser.add_argument(
-        "-z",
-        "--zero-shot",
-        action="store_true",
-        help="When specified, zero-shot prediction will be performed. This assumes you have \
-            specified a DMS file and a corresponding metadata file",
-    )
-
+ 
     parser.add_argument(
         "-w",
         "--weight-decay",
@@ -135,6 +141,15 @@ def setup_parser() -> argparse.Namespace:
         default=0.0,
         type=float,
         help="Weight decay. Defaults to zero",
+    )
+
+    parser.add_argument(
+        "-l",
+        "--latent-dims",
+        action="store",
+        default=3,
+        type=int,
+        help="Latent dims. Defaults to 3",
     )
 
 
@@ -145,30 +160,16 @@ def setup_parser() -> argparse.Namespace:
 ### MAIN PROGRAM ###
 args = setup_parser()
 
+
+
 # read in the config file
 with open(args.config, "r") as stream:
     settings = yaml.safe_load(stream)
 
 # If flag is included, zero shot prediction will occur.
 # Must be specified in config.yaml
-settings["zero_shot"] = args.zero_shot
 settings["weight_decay"] = args.weight_decay
-
-if args.zero_shot:
-    dms_data = pd.read_csv(settings["dms_file"])
-    one_hot = dms_data["mutated_sequence"].apply(st.seq_to_one_hot)
-    dms_data["encoding"] = one_hot
-
-    metadata = pd.read_csv(settings["dms_metadata"])
-    metadata = metadata[metadata["DMS_id"] == settings["dms_id"]]
-
-    # will hold our metrics
-    spear = []
-    k_recalls = []
-    ndcgs = []
-    roc = []
-
-
+settings["latent_dims"] = args.latent_dims
 # overwrite the alignment in the config file
 if args.aln is not None:
     settings["alignment"] = args.aln
@@ -184,38 +185,52 @@ start = time.time()
 # unique identifier for this experiment
 unique_id_path = f"{args.output}_r{args.replicate}"
 
-# open log
-f = open(f"{unique_id_path}_log.txt", "w")
+
+logging.basicConfig(
+    level=logging.DEBUG,  # Set the logging level
+    format="%(asctime)s - %(message)s",  # Format the log messages
+    datefmt="%H:%M:%S",  # Date format
+    filename=f"{unique_id_path}.log",  # Log file name
+    filemode="w",  # Write mode (overwrites the log file each time the program runs)
+)
+logger = logging.getLogger(__name__)
+logger.info(f"Run_id: {unique_id_path}")
+logger.info(f"Start time: {datetime.now()}")
+
+# save config for the run
+logger.info("###CONFIG###")
+yaml_str = yaml.dump(settings, default_flow_style=False)
+logger.info(yaml_str)
+
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-f.write(f"Using device: {device}\n")
+logger.info(f"Using device: {device}")
 
 # get the sequence length from first sequence
 seq_len = len(aln["sequence"][0])
 num_seq = aln.shape[0]
-input_dims = seq_len * 21
+input_dims = seq_len * st.GAPPY_ALPHABET_LEN
 
-f.write(f"Seq length: {seq_len}\n")
-f.write(f"Original aln size : {num_seq}\n")
+logger.info(f"Seq length: {seq_len}")
+logger.info(f"Original aln size : {num_seq}")
 
 # work out each index for the k-folds
 num_seq_subset = num_seq // args.folds + 1
 idx_subset = []
+np.random.seed(42)
 random_idx = np.random.permutation(range(num_seq))
+for i in range(args.folds):
+    idx_subset.append(random_idx[i * num_seq_subset : (i + 1) * num_seq_subset])
+
+logger.info(f"Number of folds : {args.folds}")
+logger.info(f"Fold size: {len(idx_subset[0])}")
 
 # hold ids and marginal probability of the validation set
 fold_elbos = []
 unique_name = []
-
-for i in range(args.folds):
-    idx_subset.append(random_idx[i * num_seq_subset : (i + 1) * num_seq_subset])
-
-f.write(f"Number of folds : {args.folds}\n")
-f.write(f"Fold size: {len(idx_subset[0])}\n")
-
 for fold in range(args.folds):
-    f.write(f"Fold {fold + 1}\n")
-    f.write("-------\n")
+    logger.info(f"Fold {fold + 1}")
+    logger.info("-------")
 
     # save the final metrics to file.
     unique_name.append(f"{unique_id_path}_fold_{fold + 1}")
@@ -247,7 +262,7 @@ for fold in range(args.folds):
     model = model.to(device)
 
     # Training Loop
-    f.write("Training model...\n")
+    logger.info("Training model")
     trained_model = seq_train(
         model,
         train_loader=train_loader,
@@ -257,64 +272,20 @@ for fold in range(args.folds):
     )
 
     # plot the loss for visualtion of learning
-    losses = pd.read_csv(f"{unique_id_path}_fold_{fold + 1}_loss.csv")
-
-    plt.figure(figsize=(12, 8))
-    plt.plot(losses["epoch"], losses["elbo"], label="train", marker="o", color="b")
-    plt.plot(
-        losses["epoch"], losses["val_elbo"], label="validation", marker="x", color="r"
-    )
-    plt.xlabel("Epoch")
-    plt.ylabel("ELBO")
-    plt.legend()
-    plt.title(f"{unique_id_path}_fold_{fold + 1}")
-    plt.savefig(f"{unique_id_path}_fold_{fold + 1}_loss.png", dpi=300)
+    plot_losses(unique_id_path, fold)
+    logger.info("Loss plotted")
 
     torch.save(
         trained_model.state_dict(),
         f"{unique_id_path}_fold_{fold + 1}_model_state.pt",
     )
-    f.write("Model saved\n")
+    logger.info("Model saved")
 
-    if settings["zero_shot"]:
-        f.write("Starting zero-shot prediction\n")
 
-        # will also create a plot of actual vs predicted.
-        # TODO: Add the code to scale up for different numbers of mutations
-        spear_rho, k_recall, ndcg, roc_auc = fitness_prediction(
-            trained_model,
-            dms_data,
-            metadata,
-            f"{unique_id_path}_fold_{fold + 1}",
-            device,
-            mutation_count=ALL_VARIANTS,
-            n_samples=5000,
-        )
-
-        spear.append(spear_rho)
-        k_recalls.append(k_recall)
-        ndcgs.append(ndcg)
-        roc.append(roc_auc)
-
-    ### reconstruction of the validation set ###
-    f.write("Reconstructing validation seqs\n")
+    ### Estimate marginal probability assigned to validation sequences. ###
     # need to use batch size of one to allow for multiple samples of each data point
     recon_loader = torch.utils.data.DataLoader(val_dataset, batch_size=1, shuffle=False)
-    ids, x_hats = sample_latent_space(
-        model=trained_model, data_loader=recon_loader, num_samples=100
-    )
-    # save for later as we don't need the GPU
-    recon = pd.DataFrame(
-        {
-            "id": ids,
-            "sequence": aln[aln["id"].isin(ids)]["sequence"],
-            "reconstruction": x_hats,
-        }
-    )
-    recon.to_pickle(f"{unique_id_path}_fold_{fold + 1}_val_recons.pkl")
-
-    ### Estimate marginal probability assigned to validation sequences.
-    f.write("Estimating marginal probability\n")
+    logger.info("Estimating marginal probability")
     trained_model.eval()
     with torch.no_grad():
         # can reuse the recon loader with a single batch size for multiple samples
@@ -329,47 +300,11 @@ for fold in range(args.folds):
         mean_elbo = np.mean(elbos)
         fold_elbos.append(mean_elbo)
 
-    ### Reconstruction of extant aln ###
-    f.write("Reconstructing extant alignment\n")
-    if settings["extant_aln"].split(".")[-1] in ["fasta", "aln"]:
-        extant_aln = st.read_aln_file(settings["extant_aln"])
-    else:
-        extant_aln = pd.read_pickle(settings["extant_aln"])
-
-    numpy_aln, _, _ = st.convert_msa_numpy_array(extant_aln)
-    weights = st.position_based_seq_weighting(
-        numpy_aln, n_processes=int(os.getenv("SLURM_CPUS_PER_TASK"))
-    )
-    # weights = st.reweight_by_seq_similarity(numpy_aln, theta=0.2)
-    extant_aln["weights"] = weights
-    extant_aln["encoding"] = extant_aln["sequence"].apply(st.seq_to_one_hot)
-
-    extant_dataset = MSA_Dataset(
-        extant_aln["encoding"].to_numpy(),
-        extant_aln["weights"].to_numpy(),
-        extant_aln["id"],
-        device,
-    )
-
-    extant_loader = torch.utils.data.DataLoader(
-        extant_dataset, batch_size=1, shuffle=False
-    )
-    ids, x_hats = sample_latent_space(
-        model=trained_model, data_loader=extant_loader, num_samples=100
-    )
-    # save for later as we don't need the GPU
-    recon = pd.DataFrame(
-        {
-            "id": ids,
-            "sequence": extant_aln[extant_aln["id"].isin(ids)]["sequence"],
-            "reconstruction": x_hats,
-        }
-    )
-    recon.to_pickle(f"{unique_id_path}_fold_{fold + 1}_extant_recons.pkl")
-    f.write(f"Elapsed time: {(time.time() - start) / 60} minutes\n")
-    f.flush()
+    logger.info(f"Elapsed time: {(time.time() - start) / 60} minutes")
 
 # store our metrics
+unique_name.extend(["mean", "std"]),
+fold_elbos.extend([np.mean(fold_elbos), np.std(fold_elbos)])
 all_metrics = pd.DataFrame(
     {
         "unique_id": unique_name,
@@ -377,27 +312,11 @@ all_metrics = pd.DataFrame(
     }
 )
 
-if args.zero_shot:
-    all_metrics["spearman_rho"] = spear
-    all_metrics["top_k_recall"] = k_recalls
-    all_metrics["ndcg"] = ndcgs
-    all_metrics["roc_auc"] = roc
-
 all_metrics.to_csv(
     f"{unique_id_path}_metrics.csv",
     index=False,
 )
 
-# save config for the run
-yaml_str = yaml.dump(settings, default_flow_style=False)
-f.write(f"Run_id: {unique_id_path}\n")
-f.write(f"Time: {datetime.now()}\n")
-f.write("###CONFIG###\n")
-f.write(f"{yaml_str}\n")
-f.write("###MODEL###\n")
-f.write(f"{str(model)}\n")
-f.write("###TIME###\n")
-f.write(f"{(time.time() - start) / 60} minutes\n")
-
-f.close()
-
+logger.info("###MODEL###")
+logger.info(f"{str(model)}")
+logger.info(f"Job length: {(time.time() - start) / 60} minutes")
