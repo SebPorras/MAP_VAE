@@ -1,3 +1,5 @@
+"""train_vae.py"""
+
 from sklearn.model_selection import train_test_split
 import torch.utils
 from evoVAE.utils.datasets import MSA_Dataset
@@ -124,243 +126,262 @@ def setup_parser() -> argparse.Namespace:
         help="Weight decay. Defaults to zero",
     )
 
+    parser.add_argument(
+        "-l",
+        "--latent-dims",
+        action="store",
+        default=3,
+        type=int,
+        help="Number of latent dimensions. Defaults to 3",
+    )
+    
+    parser.add_argument(
+        "-d",
+        "--dms",
+        action="store",
+        help="Deep Mutational Scanning dataset",
+    )
+
     return parser.parse_args()
 
 
-args = setup_parser()
+if __name__ == "__main__":
 
+    args = setup_parser()
 
-# read in the config file
-with open(args.config, "r") as stream:
-    settings = yaml.safe_load(stream)
+    # read in the config file
+    with open(args.config, "r") as stream:
+        settings = yaml.safe_load(stream)
 
-# If flag is included, zero shot prediction will occur.
-# Must be specified in config.yaml
-settings["zero_shot"] = args.zero_shot
-settings["weight_decay"] = args.weight_decay
+    # If flag is included, zero shot prediction will occur.
+    # Must be specified in config.yaml
+    settings["zero_shot"] = args.zero_shot
+    settings["weight_decay"] = args.weight_decay
+    settings["latent_dims"] = args.latent_dims
 
-if args.zero_shot:
-    dms_data = pd.read_csv(settings["dms_file"])
-    one_hot = dms_data["mutated_sequence"].apply(st.seq_to_one_hot)
-    dms_data["encoding"] = one_hot
+    if args.zero_shot:
 
-    metadata = pd.read_csv(settings["dms_metadata"])
-    metadata = metadata[metadata["DMS_id"] == settings["dms_id"]]
+        if args.dms is not None:
+            print(args.dms)
+            settings["dms_file"] = args.dms
 
-    # will hold our metrics
-    spear = []
-    k_recalls = []
-    ndcgs = []
-    roc = []
+        dms_data = pd.read_csv(settings["dms_file"])
+        one_hot = dms_data["mutated_sequence"].apply(st.seq_to_one_hot)
+        dms_data["encoding"] = one_hot
 
+        metadata = pd.read_csv(settings["dms_metadata"])
+        metadata = metadata[metadata["DMS_id"] == settings["dms_id"]]
 
-# overwrite the alignment in the config file
-if args.aln is not None:
-    settings["alignment"] = args.aln
+        # will hold our metrics
+        spear = []
+        k_recalls = []
+        ndcgs = []
+        roc = []
 
-# Read in the training dataset
-if settings["alignment"].split(".")[-1] in ["fasta", "aln"]:
-    aln = st.read_aln_file(settings["alignment"])
-else:
-    aln = pd.read_pickle(settings["alignment"])
+    # overwrite the alignment in the config file
+    if args.aln is not None:
+        settings["alignment"] = args.aln
 
-start = time.time()
+    # Read in the training dataset
+    if settings["alignment"].split(".")[-1] in ["fasta", "aln"]:
+        aln = st.read_aln_file(settings["alignment"])
+    else:
+        aln = pd.read_pickle(settings["alignment"])
 
-# unique identifier for this experiment
-unique_id_path = f"{args.output}_r{args.replicate}_wd_{args.weight_decay}"
+    start = time.time()
 
-logging.basicConfig(
+    # unique identifier for this experiment
+    unique_id_path = f"{args.output}_r{args.replicate}"
+
+    logging.basicConfig(
     level=logging.DEBUG,  # Set the logging level
-    format="%(asctime)s - %(levelname)s - %(message)s",  # Format the log messages
-    datefmt="%Y-%m-%d %H:%M:%S",  # Date format
+    format="%(asctime)s - %(message)s",  # Format the log messages
+    datefmt="%H:%M:%S",  # Date format
     filename=f"{unique_id_path}.log",  # Log file name
     filemode="w",  # Write mode (overwrites the log file each time the program runs)
-)
-logger = logging.getLogger("my_logger")
+    )
+    logger = logging.getLogger(__name__)
+    logger.info(f"Run_id: {unique_id_path}")
+    logger.info(f"Start time: {datetime.now()}")
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+    # get the sequence length from first sequence
+    seq_len = len(aln["sequence"][0])
+    num_seq = aln.shape[0]
+    input_dims = seq_len * st.GAPPY_ALPHABET_LEN
 
-logger.debug(f"Using device: {device}\n")
+    # subset the data
+    train, val = train_test_split(aln, test_size=settings["test_split"], random_state=42)
+    logger.info(f"Train/Val shape: {train.shape}")
 
-# get the sequence length from first sequence
-seq_len = len(aln["sequence"][0])
-num_seq = aln.shape[0]
-input_dims = seq_len * 21
+    logger.info(f"Alignment: {args.aln}")
+    logger.info(f"Seq length: {seq_len}")
+    logger.info(f"Original aln size : {num_seq}")
+    logger.info(f"Test shape: {val.shape}")
+    logger.info(f"Using device: {device}")
 
-logger.debug(f"Seq length: {seq_len}\n")
-logger.debug(f"Original aln size : {num_seq}\n")
-
-
-# subset the data
-train, val = train_test_split(aln, test_size=settings["test_split"])
-
-# one-hot encodes and weights seqs before sending to device
-train_dataset = prepare_dataset(train, device)
-train_loader = torch.utils.data.DataLoader(
-    train_dataset,
-    batch_size=settings["batch_size"],
-)
-
-val_dataset = prepare_dataset(val, device)
-val_loader = torch.utils.data.DataLoader(
-    val_dataset,
-    batch_size=settings["batch_size"],
-)
-
-# instantiate the model
-model = SeqVAE(
-    dim_latent_vars=settings["latent_dims"],
-    dim_msa_vars=input_dims,
-    num_hidden_units=settings["hidden_dims"],
-    settings=settings,
-    num_aa_type=settings["AA_count"],
-)
-model = model.to(device)
-
-# Training Loop
-logger.debug("Training model...\n")
-trained_model = seq_train(
-    model,
-    train_loader=train_loader,
-    val_loader=val_loader,
-    config=settings,
-    unique_id=unique_id_path,
-)
-
-# plot the loss for visualtion of learning
-losses = pd.read_csv(f"{unique_id_path}_loss.csv")
-
-plt.figure(figsize=(12, 8))
-plt.plot(losses["epoch"], losses["elbo"], label="train", marker="o", color="b")
-plt.plot(losses["epoch"], losses["val_elbo"], label="validation", marker="x", color="r")
-plt.xlabel("Epoch")
-plt.ylabel("ELBO")
-plt.legend()
-plt.title(f"{unique_id_path}")
-plt.savefig(f"{unique_id_path}_loss.png", dpi=300)
-
-torch.save(
-    trained_model.state_dict(),
-    f"{unique_id_path}_model_state.pt",
-)
-logger.debug("Model saved\n")
-
-if settings["zero_shot"]:
-    logger.debug("Starting zero-shot prediction\n")
-
-    # will also create a plot of actual vs predicted.
-    # TODO: Add the code to scale up for different numbers of mutations
-    spear_rho, k_recall, ndcg, roc_auc = fitness_prediction(
-        trained_model,
-        dms_data,
-        metadata,
-        f"{unique_id_path}",
-        device,
-        mutation_count=ALL_VARIANTS,
-        n_samples=5000,
+    # one-hot encodes and weights seqs before sending to device
+    train_dataset = prepare_dataset(train, device)
+    train_loader = torch.utils.data.DataLoader(
+        train_dataset,
+        batch_size=settings["batch_size"],
     )
 
-    spear.append(spear_rho)
-    k_recalls.append(k_recall)
-    ndcgs.append(ndcg)
-    roc.append(roc_auc)
+    val_dataset = prepare_dataset(val, device)
+    val_loader = torch.utils.data.DataLoader(
+        val_dataset,
+        batch_size=settings["batch_size"],
+    )
 
-### reconstruction of the validation set ###
-logger.debug("Reconstructing validation seqs\n")
-# need to use batch size of one to allow for multiple samples of each data point
-recon_loader = torch.utils.data.DataLoader(val_dataset, batch_size=1, shuffle=False)
-ids, x_hats = sample_latent_space(
-    model=trained_model, data_loader=recon_loader, num_samples=100
-)
-# save for later as we don't need the GPU
-recon = pd.DataFrame(
-    {
-        "id": ids,
-        "sequence": aln[aln["id"].isin(ids)]["sequence"],
-        "reconstruction": x_hats,
-    }
-)
-recon.to_pickle(f"{unique_id_path}_val_recons.pkl")
+    # instantiate the model
+    model = SeqVAE(
+        dim_latent_vars=settings["latent_dims"],
+        dim_msa_vars=input_dims,
+        num_hidden_units=settings["hidden_dims"],
+        settings=settings,
+        num_aa_type=settings["AA_count"],
+    )
+    model = model.to(device)
 
-### Estimate marginal probability assigned to validation sequences.
-logger.debug("Estimating marginal probability\n")
-trained_model.eval()
-with torch.no_grad():
-    # can reuse the recon loader with a single batch size for multiple samples
+    # Training Loop
+    logger.info("Training model")
+
+    trained_model = seq_train(
+        model,
+        train_loader=train_loader,
+        val_loader=val_loader,
+        config=settings,
+        unique_id=unique_id_path,
+    )
+
+    # plot the loss for visualtion of learning
+    losses = pd.read_csv(f"{unique_id_path}_loss.csv")
+    logging.getLogger('matplotlib.font_manager').setLevel(logging.WARNING)
+    plt.figure(figsize=(12, 8))
+    plt.plot(losses["epoch"], losses["elbo"], label="train", marker="o", color="b")
+    plt.plot(losses["epoch"], losses["val_elbo"], label="validation", marker="x", color="r")
+    plt.xlabel("Epoch")
+    plt.ylabel("ELBO")
+    plt.legend()
+    plt.title(f"{unique_id_path}")
+    plt.savefig(f"{unique_id_path}_loss.png", dpi=300)
+
+    torch.save(
+        trained_model.state_dict(),
+        f"{unique_id_path}_model_state.pt",
+    )
+    logger.info("Model saved")
+
+    if settings["zero_shot"]:
+        logger.debug("Starting zero-shot prediction")
+
+        # will also create a plot of actual vs predicted.
+        # TODO: Add the code to scale up for different numbers of mutations
+        spear_rho, k_recall, ndcg, roc_auc = fitness_prediction(
+            trained_model,
+            dms_data,
+            metadata,
+            f"{unique_id_path}",
+            device,
+            mutation_count=ALL_VARIANTS,
+            n_samples=5000,
+        )
+
+        spear.append(spear_rho)
+        k_recalls.append(k_recall)
+        ndcgs.append(ndcg)
+        roc.append(roc_auc)
+
+    ### reconstruction of the validation set ###
+    logger.info("Reconstructing validation seqs")
+    # need to use batch size of one to allow for multiple samples of each data point
+    recon_loader = torch.utils.data.DataLoader(val_dataset, batch_size=1, shuffle=False)
+    ids, x_hats = sample_latent_space(
+        model=trained_model, data_loader=recon_loader, num_samples=100
+    )
+    # save for later as we don't need the GPU
+    recon = pd.DataFrame(
+        {
+            "id": ids,
+            "sequence": aln[aln["id"].isin(ids)]["sequence"],
+            "reconstruction": x_hats,
+        }
+    )
+    recon.to_pickle(f"{unique_id_path}_val_recons.pkl")
+
+    ### Estimate marginal probability assigned to validation sequences.
+    logger.debug("Estimating marginal probability\n")
+    trained_model.eval()
     elbos = []
-    for x, _, _ in recon_loader:
-        log_elbo = trained_model.compute_elbo_with_multiple_samples(x, num_samples=5000)
-        elbos.append(log_elbo.item())
+    with torch.no_grad():
+        # can reuse the recon loader with a single batch size for multiple samples
+        for x, _, _ in recon_loader:
+            log_elbo = trained_model.compute_elbo_with_multiple_samples(x, num_samples=5000)
+            elbos.append(log_elbo.item())
 
     # get average log ELBO for the validation set
     mean_elbo = np.mean(elbos)
 
+    ### Reconstruction of extant aln ###
+    logger.info("Reconstructing extant alignment\n")
+    if settings["extant_aln"].split(".")[-1] in ["fasta", "aln"]:
+        extant_aln = st.read_aln_file(settings["extant_aln"])
+    else:
+        extant_aln = pd.read_pickle(settings["extant_aln"])
 
-### Reconstruction of extant aln ###
-logger.debug("Reconstructing extant alignment\n")
-if settings["extant_aln"].split(".")[-1] in ["fasta", "aln"]:
-    extant_aln = st.read_aln_file(settings["extant_aln"])
-else:
-    extant_aln = pd.read_pickle(settings["extant_aln"])
+    numpy_aln, _, _ = st.convert_msa_numpy_array(extant_aln)
+    weights = st.position_based_seq_weighting(
+        numpy_aln, n_processes=int(os.getenv("SLURM_CPUS_PER_TASK"))
+    )
+    # weights = st.reweight_by_seq_similarity(numpy_aln, theta=0.2)
+    extant_aln["weights"] = weights
+    extant_aln["encoding"] = extant_aln["sequence"].apply(st.seq_to_one_hot)
 
-numpy_aln, _, _ = st.convert_msa_numpy_array(extant_aln)
-weights = st.position_based_seq_weighting(
-    numpy_aln, n_processes=int(os.getenv("SLURM_CPUS_PER_TASK"))
-)
-# weights = st.reweight_by_seq_similarity(numpy_aln, theta=0.2)
-extant_aln["weights"] = weights
-extant_aln["encoding"] = extant_aln["sequence"].apply(st.seq_to_one_hot)
+    extant_dataset = MSA_Dataset(
+        extant_aln["encoding"].to_numpy(),
+        extant_aln["weights"].to_numpy(),
+        extant_aln["id"],
+        device,
+    )
 
-extant_dataset = MSA_Dataset(
-    extant_aln["encoding"].to_numpy(),
-    extant_aln["weights"].to_numpy(),
-    extant_aln["id"],
-    device,
-)
-
-extant_loader = torch.utils.data.DataLoader(extant_dataset, batch_size=1, shuffle=False)
-ids, x_hats = sample_latent_space(
-    model=trained_model, data_loader=extant_loader, num_samples=100
-)
-# save for later as we don't need the GPU
-recon = pd.DataFrame(
-    {
-        "id": ids,
-        "sequence": extant_aln[extant_aln["id"].isin(ids)]["sequence"],
-        "reconstruction": x_hats,
-    }
-)
-recon.to_pickle(f"{unique_id_path}_extant_recons.pkl")
-logger.debug(f"Elapsed time: {(time.time() - start) / 60} minutes\n")
+    extant_loader = torch.utils.data.DataLoader(extant_dataset, batch_size=1, shuffle=False)
+    ids, x_hats = sample_latent_space(
+        model=trained_model, data_loader=extant_loader, num_samples=100
+    )
+    # save for later as we don't need the GPU
+    recon = pd.DataFrame(
+        {
+            "id": ids,
+            "sequence": extant_aln[extant_aln["id"].isin(ids)]["sequence"],
+            "reconstruction": x_hats,
+        }
+    )
+    recon.to_pickle(f"{unique_id_path}_extant_recons.pkl")
+    logger.debug(f"Elapsed time: {(time.time() - start) / 60} minutes\n")
 
 
-# store our metrics
-all_metrics = pd.DataFrame(
-    {
-        "unique_id": [unique_id_path],
-        "marginal": [mean_elbo],
-    }
-)
+    # store our metrics
+    all_metrics = pd.DataFrame(
+        {
+            "unique_id": [unique_id_path],
+            "marginal": [mean_elbo],
+        }
+    )
 
-if args.zero_shot:
-    all_metrics["spearman_rho"] = spear
-    all_metrics["top_k_recall"] = k_recalls
-    all_metrics["ndcg"] = ndcgs
-    all_metrics["roc_auc"] = roc
+    if args.zero_shot:
+        all_metrics["spearman_rho"] = spear
+        all_metrics["top_k_recall"] = k_recalls
+        all_metrics["ndcg"] = ndcgs
+        all_metrics["roc_auc"] = roc
 
-all_metrics.to_csv(
-    f"{unique_id_path}_metrics.csv",
-    index=False,
-)
+    all_metrics.to_csv(
+        f"{unique_id_path}_metrics.csv",
+        index=False,
+    )
 
-# save config for the run
-yaml_str = yaml.dump(settings, default_flow_style=False)
-logger.debug(f"Run_id: {unique_id_path}\n")
-logger.debug(f"Time: {datetime.now()}\n")
-logger.debug("###CONFIG###\n")
-logger.debug(f"{yaml_str}\n")
-logger.debug("###MODEL###\n")
-logger.debug(f"{str(model)}\n")
-logger.debug("###TIME###\n")
-logger.debug(f"{(time.time() - start) / 60} minutes\n")
+    logger.info("###MODEL###")
+    logger.info(f"{str(model)}")
+    logger.info(f"Job length: {(time.time() - start) / 60} minutes")
+    logger.info("###CONFIG###\n")
+    logger.info(f"{yaml.dump(settings, default_flow_style=False)}\n")

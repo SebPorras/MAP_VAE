@@ -59,7 +59,6 @@ def seq_train(
     val_loader: DataLoader,
     config: Dict,
     unique_id: str,
-
 ) -> SeqVAE:
 
     optimiser = model.configure_optimiser(
