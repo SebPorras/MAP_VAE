@@ -106,6 +106,24 @@ def setup_parser() -> argparse.Namespace:
         default="output",
     )
 
+    parser.add_argument(
+        "-w",
+        "--weight-decay",
+        action="store",
+        default=0.0,
+        type=float,
+        help="Weight decay. Defaults to zero",
+    )
+
+    parser.add_argument(
+        "-l",
+        "--latent-dims",
+        action="store",
+        default=3,
+        type=int,
+        help="Number of latent dimensions. Defaults to 3",
+    )
+
     return parser.parse_args()
 
 def objective_cv(trial, aln, device, logger):
@@ -270,5 +288,3 @@ if __name__ == "__main__":
     logger.info("Params: \n")
     for key, value in trial.params.items():
         logger.info("{}: {}\n".format(key, value))
-
-
