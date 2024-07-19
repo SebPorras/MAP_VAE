@@ -111,7 +111,7 @@ def setup_parser() -> argparse.Namespace:
 def objective_cv(trial, aln, device, logger):
 
     # get the sequence length from first sequence
-    seq_len = len(aln["sequence"][0])
+    seq_len = len(aln["sequence"].values[0])
     num_seq = aln.shape[0]
     input_dims = seq_len * 21
 
@@ -240,8 +240,9 @@ if __name__ == "__main__":
 
     train_val, test = train_test_split(aln, test_size=0.2, random_state=42)
 
-    print(f"Train/Val shape: {train_val.shape}")
-    print(f"Test shape: {test.shape}")
+    logger.info(f"Alignment: {args.aln}")
+    logger.info(f"Train/Val shape: {train_val.shape}")
+    logger.info(f"Test shape: {test.shape}")
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logger.info(f"Using device: {device}\n")
@@ -250,7 +251,8 @@ if __name__ == "__main__":
     
     obj = partial(objective_cv, aln=train_val, device=device, logger=logger)
 
-    study.optimize(obj, n_trials=100, timeout=1200)
+    minutes = 90 # largest models take about 1.5 hours for 5-fold validation 
+    study.optimize(obj, n_trials=100, timeout=(60 * minutes))
 
     pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
     complete_trials = study.get_trials(deepcopy=False, states=[TrialState.COMPLETE])
