@@ -141,6 +141,13 @@ def setup_parser() -> argparse.Namespace:
         action="store",
         help="Deep Mutational Scanning dataset",
     )
+    
+    parser.add_argument(
+        "-c",
+        "--cluster",
+        action="store",
+        help="Clustering csv. use -r to specify which one to grab",
+    )
 
     return parser.parse_args()
 
@@ -187,6 +194,10 @@ if __name__ == "__main__":
         aln = st.read_aln_file(settings["alignment"])
     else:
         aln = pd.read_pickle(settings["alignment"])
+
+    if args.cluster:
+        reps = pd.read_csv(args.cluster)[f"rep_{args.replicate}"]
+        aln = aln.loc[reps]
 
     start = time.time()
 
