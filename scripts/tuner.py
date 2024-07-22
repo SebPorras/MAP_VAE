@@ -192,7 +192,7 @@ def objective(trial, input_dims, train_loader, val_loader):
 
     model = model.to(device)
 
-    weight_decay = trial.suggest_float("weight_decay", 1e-4, 1e-1, log=True)
+    weight_decay = trial.suggest_float("weight_decay",0.0 ,1e-4)
     optimiser = model.configure_optimiser(
         learning_rate=settings["learning_rate"], weight_decay=weight_decay
     )
