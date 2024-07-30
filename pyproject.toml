@@ -26,6 +26,7 @@ dependencies = [
 [tool.setuptools.packages.find]
 include = ["evoVAE", "evoVAE.*"]
 
-[tool.jupytext.formats]
-"notebooks/" = "ipynb"
-"notebooks/" = "py:percent"
+#[tool.jupytext.formats]
+#"notebooks/" = "ipynb"
+#"notebooks/" = "py:percent"
+

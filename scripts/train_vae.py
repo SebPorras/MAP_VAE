@@ -143,8 +143,8 @@ def setup_parser() -> argparse.Namespace:
     )
     
     parser.add_argument(
-        "-c",
-        "--cluster",
+        "-s",
+        "--subset",
         action="store",
         help="Clustering csv. use -r to specify which one to grab",
     )
@@ -195,8 +195,8 @@ if __name__ == "__main__":
     else:
         aln = pd.read_pickle(settings["alignment"])
 
-    if args.cluster:
-        reps = pd.read_csv(args.cluster)[f"rep_{args.replicate}"]
+    if args.subset:
+        reps = pd.read_csv(args.subset)[f"rep_{args.replicate}"]
         aln = aln.loc[reps]
 
     start = time.time()
@@ -218,7 +218,7 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # get the sequence length from first sequence
-    seq_len = len(aln["sequence"][0])
+    seq_len = len(aln["sequence"].values[0])
     num_seq = aln.shape[0]
     input_dims = seq_len * st.GAPPY_ALPHABET_LEN
 

@@ -3,7 +3,7 @@
 import torch.utils
 from evoVAE.utils.datasets import MSA_Dataset
 from evoVAE.models.seqVAE import SeqVAE
-from evoVAE.trainer.seq_trainer import seq_train
+from evoVAE.trainer.seq_trainer import seq_train, sample_latent_space
 import pandas as pd
 import evoVAE.utils.seq_tools as st
 from datetime import datetime
@@ -271,19 +271,19 @@ for fold in range(args.folds):
     )
 
     # plot the loss for visualtion of learning
-    plot_losses(unique_id_path, fold)
-    logger.info("Loss plotted")
+    #plot_losses(unique_id_path, fold)
+    #logger.info("Loss plotted")
 
-    torch.save(
-        trained_model.state_dict(),
-        f"{unique_id_path}_fold_{fold + 1}_model_state.pt",
-    )
-    logger.info("Model saved")
+    #torch.save(
+    #    trained_model.state_dict(),
+    #    f"{unique_id_path}_fold_{fold + 1}_model_state.pt",
+    #)
+    #logger.info("Model saved")
 
 
-    ### Estimate marginal probability assigned to validation sequences. ###
     # need to use batch size of one to allow for multiple samples of each data point
     recon_loader = torch.utils.data.DataLoader(val_dataset, batch_size=1, shuffle=False)
+
     logger.info("Estimating marginal probability")
     trained_model.eval()
     with torch.no_grad():
@@ -298,12 +298,25 @@ for fold in range(args.folds):
         # get average log ELBO for the validation set
         mean_elbo = np.mean(elbos)
         fold_elbos.append(mean_elbo)
+    
+    logger.info("Reconstructing validation seqs")
+
+    ids, x_hats = sample_latent_space(
+        model=trained_model, data_loader=recon_loader, num_samples=100
+    )
+    # save for later as we don't need the GPU
+    recon = pd.DataFrame(
+        {
+            "id": ids,
+            "sequence": aln[aln["id"].isin(ids)]["sequence"],
+            "reconstruction": x_hats,
+        }
+    )
+    recon.to_pickle(f"{unique_id_path}_fold_{fold + 1}_val_recons.pkl")
 
     logger.info(f"Elapsed time: {(time.time() - start) / 60} minutes")
 
 # store our metrics
-unique_name.extend(["mean", "std"]),
-fold_elbos.extend([np.mean(fold_elbos), np.std(fold_elbos)])
 all_metrics = pd.DataFrame(
     {
         "unique_id": unique_name,
