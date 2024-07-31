@@ -135,3 +135,78 @@ final_metrics = pd.DataFrame({"id": args.output, "pearson": [correlation_coeffic
 final_metrics.to_csv(args.output + "_pearson.csv", index=False)
 
 print(f"Elapsed minutes: {(time.time() - start) / 60}")
+
+
+# import pandas as pd
+# import numpy as np
+# from evoVAE.trainer.seq_trainer import (
+#     calc_covariances,
+# )
+# CPUS = 10
+# path = "/Users/sebs_mac/uni_OneDrive/honours/data/optimised_model_metrics/reconstruction_validation/k_fold_val/"
+# protein = ["mafg"]
+# data = ["e"]#, "e"]
+# labels = ["Extants"]#, "Extants"]
+
+# for protein in protein:
+#     for d, label in zip(data, labels):
+#         f = open(f"{protein}_{d}_fold_covariances.csv", "w")
+#         f.write("unique_id,pearson,category,family\n")
+#         for fold in range(1, 6):
+
+#             #file = f"{path}{protein}_{d}_5_fold_r1_fold_{fold}_val_recons.pkl"
+#             file = f"{path}{protein}_{d}_r1_fold_{fold}_val_recons.pkl"
+
+#             actual_and_recons = pd.read_pickle(file)
+#             actual = actual_and_recons[["id", "sequence"]]
+#             recon = actual_and_recons[["id", "reconstruction"]]
+#             recon = recon.rename(columns={"reconstruction": "sequence"})
+
+#             id = f"{protein}_{d}_fold_{fold}"
+
+#             actual_covar, predicted_covar = calc_covariances(recon, actual, CPUS)
+#             correlation_coefficient = np.corrcoef(actual_covar, predicted_covar)[0, 1]
+#             f.write(f"{id},{correlation_coefficient},{label},{protein.upper()}\n")
+#             f.flush()
+
+#         f.close()
+
+### CALC HAMMING ###
+
+# import pandas as pd
+# import numpy as np
+# import evoVAE.utils.seq_tools as st
+# import evoVAE.utils.metrics as mt
+
+# CPUS = 10
+
+# path = "/Users/sebs_mac/uni_OneDrive/honours/data/optimised_model_metrics/reconstruction_validation/k_fold_val/"
+# proteins = ["a4"]#, "mafg", "gfp", "gb1", "a4"]
+# categories = ["ae", "a", "e"]
+# labels = ["Ancestors/Extants", "Ancestors", "Extants"]
+
+
+# for protein in proteins:
+#     f = open(f"{protein}_k_fold_hamming.csv", "w")
+#     f.write("unique_id,hamming,category,family\n")
+#     for cat, lab in zip(categories, labels):
+#         for fold in range(1, 5):
+
+#             file = f"{path}{protein}_{cat}_5_fold_r1_fold_{fold}_val_recons.pkl"
+
+#             actual_and_recons = pd.read_pickle(file)
+#             actual = actual_and_recons[["id", "sequence"]]
+#             recon = actual_and_recons[["id", "reconstruction"]]
+#             recon = recon.rename(columns={"reconstruction": "sequence"})
+
+#             a_msa, _, _ = st.convert_msa_numpy_array(actual)
+#             r_msa, _, _ = st.convert_msa_numpy_array(recon)
+#             hams = [mt.hamming_distance(a, r)/r_msa.shape[1] for a,r in zip(a_msa, r_msa)]
+#             mean_difference = np.mean(hams)
+
+#             id = f"{protein}_{cat}_fold_{fold}"
+
+#             f.write(f"{id},{mean_difference},{lab},{protein.upper()}\n")
+#             f.flush()
+
+# f.close()

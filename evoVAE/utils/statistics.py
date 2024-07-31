@@ -69,7 +69,7 @@ def calc_position_prob_matrix(seqs: pd.DataFrame):
     SEQ_COUNT = 0
     ppm = pfm / seqs.shape[SEQ_COUNT]
 
-    # makes columns positoins in the sequence
+    # makes columns positins in the sequence
     return ppm
 
 
@@ -111,6 +111,7 @@ def safe_log(x, eps=1e-10):
     # save the result, avoiding zeros or negatives
     np.log(result, out=result, where=result > 0)
     return result
+
 
 
 def calc_shannon_entropy(seqs: pd.DataFrame) -> np.ndarray:

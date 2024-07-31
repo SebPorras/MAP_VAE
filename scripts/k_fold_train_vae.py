@@ -26,8 +26,9 @@ ALL_VARIANTS = 0
 SUCCESS = 0
 INVALID_FILE = 2
 
+
 def plot_losses(unique_id_path: str, fold: int):
-  # plot the loss for visualtion of learning
+    # plot the loss for visualtion of learning
     losses = pd.read_csv(f"{unique_id_path}_fold_{fold + 1}_loss.csv")
 
     plt.figure(figsize=(12, 8))
@@ -40,6 +41,7 @@ def plot_losses(unique_id_path: str, fold: int):
     plt.legend()
     plt.title(f"{unique_id_path}_fold_{fold + 1}")
     plt.savefig(f"{unique_id_path}_fold_{fold + 1}_loss.png", dpi=300)
+
 
 def prepare_dataset(
     original_aln: pd.DataFrame, subset_indices: np.array, device: torch.device
@@ -133,7 +135,6 @@ def setup_parser() -> argparse.Namespace:
         help="Number of k-folds. Defaults to 5 if not specified",
     )
 
- 
     parser.add_argument(
         "-w",
         "--weight-decay",
@@ -152,14 +153,11 @@ def setup_parser() -> argparse.Namespace:
         help="Latent dims. Defaults to 3",
     )
 
-
-
     return parser.parse_args()
 
 
 ### MAIN PROGRAM ###
 args = setup_parser()
-
 
 
 # read in the config file
@@ -271,15 +269,14 @@ for fold in range(args.folds):
     )
 
     # plot the loss for visualtion of learning
-    #plot_losses(unique_id_path, fold)
-    #logger.info("Loss plotted")
+    # plot_losses(unique_id_path, fold)
+    # logger.info("Loss plotted")
 
-    #torch.save(
+    # torch.save(
     #    trained_model.state_dict(),
     #    f"{unique_id_path}_fold_{fold + 1}_model_state.pt",
-    #)
-    #logger.info("Model saved")
-
+    # )
+    # logger.info("Model saved")
 
     # need to use batch size of one to allow for multiple samples of each data point
     recon_loader = torch.utils.data.DataLoader(val_dataset, batch_size=1, shuffle=False)
@@ -298,7 +295,7 @@ for fold in range(args.folds):
         # get average log ELBO for the validation set
         mean_elbo = np.mean(elbos)
         fold_elbos.append(mean_elbo)
-    
+
     logger.info("Reconstructing validation seqs")
 
     ids, x_hats = sample_latent_space(

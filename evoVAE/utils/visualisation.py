@@ -6,6 +6,12 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
+import evoVAE.utils.statistics as stats
+from matplotlib.patches import Patch
+from typing import List, Optional
+from matplotlib.patches import Patch
+import numpy as np
+import seaborn as sns 
 
 
 @torch.no_grad()
@@ -241,11 +247,10 @@ def vis_tree(
         fig, (ax) = plt.subplots(1, 1, figsize=(12, 8))
         tree_vis_2d(latent, wt_id, rgb=rgb, ax=ax)
     else:
-
         fig, (ax) = plt.subplots(1, 1, figsize=(12, 8), subplot_kw={"projection": "3d"})
         tree_vis_3d(latent, wt_id, rgb=rgb, ax=ax)
 
-    # ax.view_init(elev=30, azim=40)  # Change these values to get the desired orientation
+    #ax.view_init(elev=30, azim=40)  # Change these values to get the desired orientation
     ax.set_title(f"{title}")
     ax.legend()
     plt.show()
@@ -281,6 +286,7 @@ def tree_vis_3d(data, wt_id, rgb, ax):
 
         an_rgb = [
             (
+        
                 (r - min_r) / (max_r - min_r),
                 (g - min_g) / (max_g - min_g),
                 (b - min_b) / (max_b - min_b),
@@ -291,11 +297,11 @@ def tree_vis_3d(data, wt_id, rgb, ax):
                 np.stack(an_zs)[:, 2],
             )
         ]
+     
         # an_rgb = np.array([rgb_to_hex_normalized(*x) for x in scaled_an_rgb])
-
         ex_rgb = np.array(
             [
-                (
+                (  
                     (r - min_r) / (max_r - min_r),
                     (g - min_g) / (max_g - min_g),
                     (b - min_b) / (max_b - min_b),
@@ -366,6 +372,7 @@ def tree_vis_2d(data, wt_id, rgb, ax):
 
     if rgb:
 
+
         min_r = np.min(np.stack(data["mu"])[:, 0])
         max_r = np.max(np.stack(data["mu"])[:, 0])
         min_g = np.min(np.stack(data["mu"])[:, 1])
@@ -435,3 +442,245 @@ def tree_vis_2d(data, wt_id, rgb, ax):
 
     ax.set_xlabel(f"PC1: {np.round(pca.explained_variance_ratio_[0] * 100, 2)}%")
     ax.set_ylabel(f"PC2 {np.round(pca.explained_variance_ratio_[1] * 100, 2)}%")
+
+
+
+
+def visualise_variants(settings, variant_data, state_dict, title, seqs=None, wt_id=None, vis_2D=False, frac=1, aln=False):
+
+ 
+
+    if aln:
+        variants = st.read_aln_file(variant_data)
+        variants.rename(columns={"sequence": "mutated_sequence", "id": "mutant"}, inplace=True)
+    else: 
+        variants = pd.read_csv(variant_data)
+
+    variants = variants.sample(frac=frac, random_state=42)
+
+    variants["encoding"] = variants["mutated_sequence"].apply(st.seq_to_one_hot)
+    
+    if wt_id is not None:
+        tree_seqs = st.read_aln_file(seqs)
+        tree_seqs["encoding"] = tree_seqs["sequence"].apply(st.seq_to_one_hot)
+        tree_seqs.rename(columns={"sequence": "mutated_sequence", "id": "mutant"}, inplace=True)
+        tree_seqs = tree_seqs[tree_seqs["mutant"] == wt_id]
+        
+        variants = pd.concat([variants, tree_seqs])
+    
+
+    num_seqs = len(variants["mutated_sequence"])
+    device = torch.device("mps")
+
+    var_dataset = MSA_Dataset(
+        variants["encoding"],
+        np.arange(len(variants["encoding"])),
+        variants["mutant"],
+        device=device,
+    )
+
+    loader = torch.utils.data.DataLoader(var_dataset, batch_size=num_seqs, shuffle=False)
+    seq_len = var_dataset[0][0].shape[0]
+
+    input_dims = seq_len * settings["AA_count"]
+
+    model = SeqVAE(
+        dim_latent_vars=settings["latent_dims"],
+        dim_msa_vars=input_dims,
+        num_hidden_units=settings["hidden_dims"],
+        settings=settings,
+        num_aa_type=settings["AA_count"],
+    )
+
+    model.load_state_dict(torch.load(state_dict, map_location=device))
+    model = model.to(device)
+
+    if vis_2D:
+        vis_variants_2d(model, title, variants, loader, wt_id)
+    else:
+        vis_variants_3d(model, title, variants, loader, wt_id)
+
+
+
+def vis_variants_3d(model, title, variant_data, variant_loader, wt_id):
+
+    id_to_mu = get_mu(model, variant_loader)
+    id_to_mu.rename(columns={"id": "mutant"}, inplace=True)
+    merged = variant_data.merge(id_to_mu, on="mutant")
+
+    vars = merged[~merged["mutant"].str.contains(wt_id)]
+    wt = merged[merged["mutant"].str.contains(wt_id)]
+
+
+    variant_mus = np.stack(vars["mu"])
+    wt_mus = np.stack(wt["mu"])
+
+    fig, (ax) = plt.subplots(1, 1, figsize=(12, 8), subplot_kw={"projection": "3d"})
+    scatter = ax.scatter(variant_mus[:, 0], variant_mus[:, 1], variant_mus[:, 2], 
+                         c=vars["DMS_score"], cmap='inferno', alpha=0.8)
+    
+    wt_scatter = ax.scatter(wt_mus[:, 0], wt_mus[:, 1], wt_mus[:, 2], 
+                    c="black",
+                    label="WT",
+                    s=200,
+                    marker="*",
+                    alpha=1,)
+
+
+    ax.set_title(title)
+    ax.set_xlabel("Z1")
+    ax.set_ylabel("Z2")
+    ax.set_zlabel("Z3")
+    # Add color bar
+    cbar = fig.colorbar(scatter, ax=ax, pad=0.1)
+    cbar.set_label('Fitness Score')
+    ax.legend()
+
+
+    plt.show()
+
+
+def vis_variants_2d(model, title, variant_data, variant_loader, wt_id):
+
+    id_to_mu = get_mu(model, variant_loader)
+    id_to_mu.rename(columns={"id": "mutant"}, inplace=True)
+    merged = variant_data.merge(id_to_mu, on="mutant")
+
+    pca = PCA(n_components=2)
+
+    zs_2d = pca.fit_transform(np.vstack(merged["mu"].values))
+
+    vars = merged[~merged["mutant"].str.contains(wt_id)]
+    wt = merged[merged["mutant"].str.contains(wt_id)]
+    merged["pca"] = list(zs_2d)
+
+    #scaler = MinMaxScaler()
+    #dms_values = scaler.fit_transform(merged["DMS_score"].values.reshape(-1, 1))
+
+    fig, (ax) = plt.subplots(1, 1, figsize=(12, 8))
+    scatter = ax.scatter(
+        np.vstack(merged["pca"].values)[:, 0],
+        np.vstack(merged["pca"].values)[:, 1],
+        c=merged["DMS_score"],
+        cmap='inferno'
+    )
+
+    ax.set_title(title)
+    ax.set_xlabel(f"PCA1 ({round(pca.explained_variance_[0] * 100, 2)}%)")
+    ax.set_ylabel(f"PCA2 ({round(pca.explained_variance_[1] * 100, 2)}%)")
+
+    # Add color bar
+    cbar = fig.colorbar(scatter, ax=ax, pad=0.1)
+    cbar.set_label('Fitness Score')
+
+    plt.show()
+ 
+
+import matplotlib.pyplot as plt
+
+
+def plot_entropy(
+    ancestors: List[str],
+    extants: List[str],
+    anc_count: int,
+    ext_count: int,
+    mutations: List[int],
+    protein: str,
+    title: str,
+    ax: plt.Axes,
+    start: int = 0,
+    end: Optional[int] = None,
+    max_entropy: float = 3,
+) -> None:
+    """
+    Plots the entropy of ancestors and extants over a sequence.
+
+    Args:
+        ancestors (list): List of ancestor sequences.
+        extants (list): List of extant sequences.
+        anc_count (int): Number of ancestor sequences.
+        ext_count (int): Number of extant sequences.
+        mutations (list): List of mutation positions.
+        protein (str): Name of the protein.
+        title (str): Title of the plot.
+        ax (matplotlib.axes.Axes): The axes on which to plot.
+        start (int, optional): Starting position of the sequence. Defaults to 0.
+        end (int, optional): Ending position of the sequence. Defaults to None.
+        max_entropy (float, optional): Maximum entropy value for the y-axis. Defaults to 3.
+
+    Returns:
+        None
+    """
+    e_col_entropy = stats.calc_shannon_entropy(extants)
+    a_col_entropy = stats.calc_shannon_entropy(ancestors)
+
+    if end is not None:
+        # across entire sequence
+        xticks = range(start, end)
+        e_col_entropy = e_col_entropy[start:end]
+        a_col_entropy = a_col_entropy[start:end]
+    else:
+        xticks = range(start, len(a_col_entropy))
+
+    fig = plt.figure(figsize=(12, 8))
+    ax.plot(xticks, a_col_entropy, alpha=1, color="orange")
+    ax.plot(xticks, e_col_entropy, alpha=1, color="blue")
+    ax.set_xlabel("Sequence position")
+    ax.set_ylabel("Entropy")
+    ax.set_ylim(0, max_entropy)
+
+    legend_elements = [
+        Patch(
+            facecolor="r", edgecolor="black", linestyle="--", label="mutagenesis sites"
+        ),
+        Patch(
+            facecolor="orange",
+            edgecolor="black",
+            label=f"{protein} ancestors ({anc_count} seqs)",
+        ),
+        Patch(
+            facecolor="blue",
+            edgecolor="black",
+            label=f"{protein} extants ({ext_count} seqs)",
+        ),
+    ]
+
+    ax.legend(
+        handles=legend_elements,
+    )
+
+    for mutation in mutations:
+        ax.axvline(x=mutation, color="r", linestyle="--", linewidth=1, alpha=0.7)
+
+    ax.set_title(f"{protein}: {title}")
+
+def plot_ppm_difference(extants, ancestors,fig, ax, xmax=None, xmin=0, ymin=0, ymax=21):
+    """
+    Plot the difference between two position probability matrices (PPMs).
+
+    Parameters:
+    - extants (list): List of extant sequences.
+    - ancestors (list): List of ancestor sequences.
+    - xmax (int, optional): Maximum x-axis value. Defaults to None.
+    - xmin (int, optional): Minimum x-axis value. Defaults to 0.
+    - ymin (int, optional): Minimum y-axis value. Defaults to 0.
+    - ymax (int, optional): Maximum y-axis value. Defaults to 21.
+
+    Returns:
+    None
+    """
+
+    extant_ppm = stats.calc_position_prob_matrix(extants)
+    ancestor_ppm = stats.calc_position_prob_matrix(ancestors)
+    out = extant_ppm - ancestor_ppm
+
+    cmap = sns.diverging_palette(240, 20, as_cmap=True,)
+    # get this to work with an axis being supplied 
+
+    cax = ax.pcolor(out, cmap=cmap, vmin=-0.25, vmax=0.25)
+    fig.colorbar(cax, ax=ax)
+    if xmax is None:
+        xmax = extant_ppm.shape[1]
+    ax.set_xlim(xmin, xmax)
+    ax.set_ylim(ymin, ymax)
+    ax.set_yticks(range(21), st.GAPPY_PROTEIN_ALPHABET)
