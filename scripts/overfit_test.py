@@ -393,19 +393,18 @@ if __name__ == "__main__":
         train_marg_loader = torch.utils.data.DataLoader(
             train_dataset, batch_size=1, shuffle=False
         )
-        train_marg = estimate_marginal(model, train_marg_loader, num_samples=200)
+        train_marg = estimate_marginal(model, train_marg_loader, num_samples=5000)
 
         anc_test_marg_loader = torch.utils.data.DataLoader(
             anc_test_dataset, batch_size=1, shuffle=False
         )
-        anc_marg = estimate_marginal(model, anc_test_marg_loader, num_samples=200)
+        anc_marg = estimate_marginal(model, anc_test_marg_loader, num_samples=5000)
 
         ext_test_marg_loader = torch.utils.data.DataLoader(
             ext_test_dataset, batch_size=1, shuffle=False
         )
-        ext_marg = estimate_marginal(model, ext_test_marg_loader, num_samples=200)
+        ext_marg = estimate_marginal(model, ext_test_marg_loader, num_samples=5000)
 
-        ## TODO append these to lists
         train_margs.append(train_marg)
         anc_margs.append(anc_marg)
         ext_margs.append(ext_marg)
