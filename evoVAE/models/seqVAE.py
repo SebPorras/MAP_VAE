@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from typing import Tuple, List, Dict
 from evoVAE.models.types_ import *
+from evoVAE.utils.seq_tools import GAPPY_ALPHABET_LEN
 
 
 class SeqVAE(nn.Module):
@@ -130,7 +131,7 @@ class SeqVAE(nn.Module):
         kld = anneal_schedule[epoch] * torch.sum(
             0.5 * (sigma**2 + mu**2 - 2 * torch.log(sigma) - 1), -1
         )
-        
+
         """
         kld = torch.sum(
             0.5 * (sigma**2 + mu**2 - 2 * torch.log(sigma) - 1), -1
@@ -197,10 +198,79 @@ class SeqVAE(nn.Module):
             log_weight = log_weight - log_weight_max
             weight = torch.exp(log_weight)
 
-            # note this is log(elbo)
             elbo = torch.log(torch.mean(weight, 0)) + log_weight_max
 
             return elbo
+
+    @torch.no_grad()
+    def reconstruct(self, x: Tensor) -> Tensor:
+        """
+        Reconstructs the input tensor using the VAE model.
+
+        Args:
+            x (Tensor): The input tensor of shape (batch, columns, num_aa_type).
+
+        Returns:
+            Tensor: The reconstructed tensor of shape (batch, columns).
+        """
+        orig_shape = tuple(x.shape[1:])
+        x = torch.flatten(x, start_dim=1)
+        mu, sigma = self.encoder(x)
+        eps = torch.randn_like(mu)
+        z = mu + sigma * eps
+        log_p = self.decoder(z)
+
+        x_hat = torch.unsqueeze(log_p, -1)
+        x_hat = x_hat.view(-1, orig_shape[0], orig_shape[1])
+        indices = x_hat.argmax(dim=-1)
+
+        return indices
+
+    @torch.no_grad()
+    def get_log_p(self, x: Tensor) -> np.ndarray:
+        """
+        Calculates the log probability of the input tensor x.
+
+        Args:
+            x (Tensor): The input tensor.
+
+        Returns:
+            np.ndarray: The log probability tensor.
+
+        """
+        orig_shape = x.shape[1:]
+
+        x = torch.flatten(x, start_dim=1)
+        mu, sigma = self.encoder(x)
+        eps = torch.randn_like(mu)
+        z = mu + sigma * eps
+
+        log_p = self.decoder(z)
+        log_p = log_p.view(-1, orig_shape[0], orig_shape[1])
+
+        return log_p.cpu().numpy()
+
+    @torch.no_grad()
+    def latent_to_log_p(
+        self, zs: Tensor, seq_len: int, alphabet_size: int = GAPPY_ALPHABET_LEN
+    ) -> np.ndarray:
+        """
+        Converts the latent space to the log probability.
+
+        Args:
+            zs: Tensor: The latent space coordinates.
+            seq_len: int: The sequence length.
+            alphabet_size: int: The sequence alphabet size.
+
+        Returns:
+            np.ndarray: The log probability tensor.
+
+        """
+        orig_shape = tuple([seq_len, alphabet_size])
+        log_p = self.decoder(zs)
+        log_p = log_p.view(-1, orig_shape[0], orig_shape[1])
+
+        return log_p.cpu().numpy()
 
     def configure_optimiser(
         self, learning_rate: float = 1e-2, weight_decay: float = 0.0

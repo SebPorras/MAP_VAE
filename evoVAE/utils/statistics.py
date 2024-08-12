@@ -51,7 +51,7 @@ def calc_average_residue_distribution(
     return averages
 
 
-def calc_position_prob_matrix(seqs: pd.DataFrame):
+def calc_position_prob_matrix(seqs: pd.DataFrame, pseudo: float = 0.0) -> np.ndarray:
     """
     Take in a DataFrame and create a position probabilty matrix.
 
@@ -63,7 +63,7 @@ def calc_position_prob_matrix(seqs: pd.DataFrame):
     """
 
     # position_freq_matrix(pfm)
-    pfm = calc_position_freq_matrix(seqs)
+    pfm = calc_position_freq_matrix(seqs, pseudo)
 
     # normalise
     SEQ_COUNT = 0
@@ -73,7 +73,7 @@ def calc_position_prob_matrix(seqs: pd.DataFrame):
     return ppm
 
 
-def calc_position_freq_matrix(seqs: pd.DataFrame) -> np.ndarray:
+def calc_position_freq_matrix(seqs: pd.DataFrame, pseudo: float = 0.0) -> np.ndarray:
     """
     Take in a DataFrame and create a position frequence matrix.
 
@@ -94,6 +94,9 @@ def calc_position_freq_matrix(seqs: pd.DataFrame) -> np.ndarray:
         for residue in range(st.GAPPY_ALPHABET_LEN):
             pfm[residue, j] = np.where(col_j == residue)[0].shape[SEQ_COUNT]
 
+    if pseudo > 0:
+        pfm += pseudo
+
     return pfm
 
 
@@ -111,7 +114,6 @@ def safe_log(x, eps=1e-10):
     # save the result, avoiding zeros or negatives
     np.log(result, out=result, where=result > 0)
     return result
-
 
 
 def calc_shannon_entropy(seqs: pd.DataFrame) -> np.ndarray:
