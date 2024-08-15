@@ -262,19 +262,7 @@ class demo():
             logo = logomaker.Logo(logo_df, color_scheme='skylign_protein', font_name='Arial Rounded MT Bold', show_spines=False)
             plt.show()
 
-        with self.graph_panel:
-            clear_output(wait=True)
-            fig = plt.figure(figsize=(12, 8))
-            ax = fig.add_subplot(111, projection='3d')
-            #fig, (ax) = plt.subplots(1, 1, figsize=(12, 8), subplot_kw={"projection": "3d"})
-            ax.scatter(self.latent_space[:, 0], self.latent_space[:, 1], self.latent_space[:, 2])
-            ax.scatter(self.reference_slider_1.value, self.reference_slider_2.value, self.reference_slider_3.value, marker='*', s=100, c='r')
-            
-            ax.set_xlabel("Z1")
-            ax.set_ylabel("Z2")
-            ax.set_zlabel("Z3", rotation=90, labelpad=0.5)
-
-            plt.show()
+       
         
         return
     
@@ -312,11 +300,42 @@ class demo():
         df = self.update_datagrid(p)
         self.datagrid.data = df
 
+        with self.graph_panel:
+            clear_output(wait=True)
+            fig = plt.figure(figsize=(12, 8))
+            ax = fig.add_subplot(111, projection='3d')
+            #fig, (ax) = plt.subplots(1, 1, figsize=(12, 8), subplot_kw={"projection": "3d"})
+            ax.scatter(self.latent_space[:, 0], self.latent_space[:, 1], self.latent_space[:, 2])
+            ax.scatter(self.reference_slider_1.value, self.reference_slider_2.value, self.reference_slider_3.value, marker='*', s=100, c='r')
+            
+            ax.set_xlabel("Z1")
+            ax.set_ylabel("Z2")
+            ax.set_zlabel("Z3", rotation=90, labelpad=0.5)
+
+            plt.show()
+
      
-        
     
 demo(df, latent_space=latent)
 
+
+# +
+import ipywidgets as widgets
+from IPython.display import display
+
+# Create a Text widget
+text_input = widgets.Text(
+    value='',  # Default value
+    placeholder='Type something',  # Placeholder text
+    description='Input:',  # Label next to the text box
+    disabled=False  # Enable input
+)
+
+# Display the widget
+display(text_input)
+# -
+
+text_input.value
 
 # +
 from ipywidgets import interact, HBox, VBox, Output, HTML, Dropdown, Button, Layout, Label, Box
@@ -372,6 +391,9 @@ class demo():
         self.prob_panel = Output(layout=Layout(width='800px'))
         self.graph_panel = Output(layout=Layout(width='800px'))
 
+        self.sequnce_panel = Output(layout=Layout(width='800px'))
+
+
         # # data grid setup 
         hbox = HBox((self.reference_slider_1, self.reference_slider_2, 
                      self.reference_slider_3, self.operator_dropdown, self.highlight, self.output_colorpicker))
@@ -379,7 +401,8 @@ class demo():
 
         button_box = VBox([self.button_panel, self.prob_panel])
 
-        scene = VBox([HBox([button_box, Box(layout=Layout(width='400px')), self.graph_panel]), self.datagrid_output])
+        scene = VBox([HBox([button_box, Box(layout=Layout(width='400px')), self.graph_panel]), 
+                      self.datagrid_output, self.sequnce_panel])
         
         display(scene)
         
@@ -403,6 +426,22 @@ class demo():
             ax.set_zlabel("Z3", rotation=90, labelpad=0.5)
 
             plt.show()
+
+        with self.sequnce_panel:
+
+            self.seq_input = widgets.Textarea(
+            value='', 
+            placeholder='Enter sequence', 
+            description='Input:',  
+            disabled=False 
+            )
+
+            self.seq_btn = Button(description='Update')
+            self.seq_btn.on_click(self.update_sequence)
+            
+            display(HBox([self.seq_input, self.seq_btn]))
+
+
     def generate_logo(self, x):
         
         with self.prob_panel:
@@ -415,8 +454,50 @@ class demo():
             plt.show()
 
        
-        
         return
+    
+    def update_sequence(self, x):
+        
+        cleaned = self.seq_input.value.replace("\n", "")        
+        df = pd.DataFrame({"id": ["new"], "sequence": [cleaned]})
+        encodings = df["sequence"].apply(st.seq_to_one_hot)
+
+        dataset = MSA_Dataset(encodings, np.arange(df.shape[0]), df["id"], device)
+        loader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False)
+
+        with torch.no_grad():
+            for x, _, id in loader:
+                x = torch.flatten(x, start_dim=1)
+                print(x)
+                mu, sigma = model.encoder(x)
+                eps = torch.randn_like(mu)
+                z = mu + sigma * eps
+                z = z.detach().cpu().numpy()[0]
+
+        self.reference_slider_1.value = z[0]
+        self.reference_slider_2.value = z[1]    
+        self.reference_slider_3.value = z[2]    
+
+        log_p = model.latent_to_log_p(torch.Tensor([self.reference_slider_1.value, 
+                                                    self.reference_slider_2.value,
+                                                    self.reference_slider_3.value]).to(device), 238, 21)
+        p = np.exp(log_p)
+        df = self.update_datagrid(p)
+        self.datagrid.data = df
+
+        with self.graph_panel:
+            clear_output(wait=True)
+            fig = plt.figure(figsize=(12, 8))
+            ax = fig.add_subplot(111, projection='3d')
+            #fig, (ax) = plt.subplots(1, 1, figsize=(12, 8), subplot_kw={"projection": "3d"})
+            ax.scatter(self.latent_space[:, 0], self.latent_space[:, 1], self.latent_space[:, 2])
+            ax.scatter(self.reference_slider_1.value, self.reference_slider_2.value, self.reference_slider_3.value, marker='*', s=100, c='r')
+            
+            ax.set_xlabel("Z1")
+            ax.set_ylabel("Z2")
+            ax.set_zlabel("Z3", rotation=90, labelpad=0.5)
+
+            plt.show()
     
  
     # Function to update the expression and DataGrid
@@ -467,7 +548,16 @@ class demo():
             plt.show()
 
      
-        
     
 demo(df, latent_space=latent)
+
+# -
+
+MSKGEELFTGVVPILVELDGDVNGHKFSVSGEGEGDATYGKLTLKFICTTGKLPVPWPTL
+VTTLSYGVQCFSRYPDHMKQHDFFKSAMPEGYVQERTIFFKDDGNYKTRAEVKFEGDTLV
+NRIELKGIDFKEDGNILGHKLEYNYNSHNVYIMADKQKNGIKVNFKIRHNIEDGSVQLAD
+HYQQNTPIGDGPVLLPDNHYLSTQSALSKDPNEKRDHMVLLEFVTAAGITHGMDELYK
+
+type(encodings)
+
 
