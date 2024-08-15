@@ -1,10 +1,11 @@
 # ---
 # jupyter:
 #   jupytext:
+#     formats: ipynb,py
 #     text_representation:
 #       extension: .py
-#       format_name: percent
-#       format_version: '1.3'
+#       format_name: light
+#       format_version: '1.5'
 #       jupytext_version: 1.16.3
 #   kernelspec:
 #     display_name: Python 3
@@ -12,7 +13,7 @@
 #     name: python3
 # ---
 
-# %%
+# +
 import evoVAE.utils.seq_tools as st
 from evoVAE.utils.datasets import MSA_Dataset
 import evoVAE.utils.statistics as stats
@@ -29,7 +30,7 @@ from Bio import Align, AlignIO
 pd.set_option("display.max_rows", None)
 
 
-# %%
+# +
 
 def trim_aln(aln : Align.MultipleSeqAlignment, cols):
     """ Trim indices in cols from a multiple sequence alignment. """
@@ -212,31 +213,27 @@ def smart_trim(in_file, out_file=None, format='fasta', base_threshold=0.05, p_th
 
 
 
+# -
 
-# %%
 infile = "/Users/sebs_mac/uni_OneDrive/honours/data/gb1/profile_creation/alns/gb1_30%_sim_nr90_high_acc.aln"
 trimmed = smart_trim(in_file=infile, base_threshold=0.3) #, out_file="gb1_30%_sim_nr90_high_acc_trimmed_0.05.aln")
 
-# %%
 orig_aln = st.read_aln_file("/Users/sebs_mac/uni_OneDrive/honours/data/gb1/profile_creation/alns/gb1_30%_sim_nr90_high_acc.aln")
 orig_aln.head()
 
-# %%
 wt = orig_aln["sequence"][0] # grab the wild type as well 
 # columns that have been removed by smart_trim from the original alignment. 
 trimmed = [0, 3, 39, 45, 46, 47, 52, 57, 64, 71, 72, 86, 87, 88, 89, 90, 98, 100, 101, 102, 104, 107, 108, 109, 110, 111, 112, 113, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 131, 132, 133, 134, 135, 136, 137, 138, 153, 155, 160, 161, 163, 164, 174, 179, 180, 181, 186, 187, 198, 199, 200, 242, 243, 276, 297, 298, 307, 308, 328, 329, 339, 357, 358, 365, 366, 372, 373, 374, 376, 384, 385, 386, 389, 396, 399, 404, 406, 414, 426, 427, 428, 430, 433, 434, 435, 436, 447, 449, 469, 525, 526, 528, 533, 552, 581, 582, 583, 596, 602, 603, 630, 631, 660, 669, 701, 712, 713, 723, 739, 754, 755, 756, 798, 799, 806, 810, 816, 817, 818, 821, 823, 831, 832, 833, 892, 915, 916, 917, 924, 932, 933, 934, 965, 1022, 1024, 1025, 1026, 1027, 1028, 1031, 1032, 1033, 1034, 1088, 1109, 1110, 1111, 1130, 1131, 1214, 1215, 1216, 1222, 1230, 1265, 1266, 1273, 1295, 1296, 1297, 1347, 1348, 1354, 1365, 1374, 1393, 1402, 1404, 1410, 1417, 1418, 1424, 1447, 1463, 1473, 1486]
 
-# %%
 # read in the variants
 vars = pd.read_csv("/Users/sebs_mac/git_repos/dms_data/DMS_ProteinGym_substitutions/SPG1_STRSG_Wu_2016.csv")
 vars.head()
 
-# %%
 # make into a numpy msa
 vars.rename(columns={"mutant": "id", "mutated_sequence": "sequence"}, inplace=True)
 vars_msa, _, _ = st.convert_msa_numpy_array(vars)
 
-# %%
+# +
 # we need to resize our variants to match the WT in the original alignment 
 resized_variants = np.zeros((vars_msa.shape[0], len(wt)))
 
@@ -250,7 +247,7 @@ for idx, residue in enumerate(wt):
 
 resized_variants.shape
 
-# %%
+# +
 from evoVAE.utils.seq_tools import IDX_TO_AA
 
 # save the aligned variants before trimming 
@@ -264,7 +261,7 @@ for i in range(resized_variants.shape[0]):
 var_fasta = pd.DataFrame({"id": ids, "sequence": seqs})
 st.write_fasta_file("gb1_variants.aln", var_fasta)
 
-# %%
+# +
 
 # now trim the variants to match the alignment produced by smart_trim
 non_trimmed_indices = [x for x in range(resized_variants.shape[1]) if x not in trimmed]
@@ -279,5 +276,6 @@ for i in range(trimmed_variants.shape[0]):
 
 var_fasta = pd.DataFrame({"id": ids, "sequence": seqs})
 st.write_fasta_file("gb1_variants_trimmed.aln", var_fasta)
+# -
 
-# %%
+

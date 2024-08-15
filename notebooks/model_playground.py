@@ -1,10 +1,11 @@
 # ---
 # jupyter:
 #   jupytext:
+#     formats: ipynb,py
 #     text_representation:
 #       extension: .py
-#       format_name: percent
-#       format_version: '1.3'
+#       format_name: light
+#       format_version: '1.5'
 #       jupytext_version: 1.16.3
 #   kernelspec:
 #     display_name: embed
@@ -12,7 +13,6 @@
 #     name: python3
 # ---
 
-# %%
 import evoVAE.utils.seq_tools as st
 import evoVAE.utils.metrics as mt
 from evoVAE.models.seqVAE import SeqVAE
@@ -25,10 +25,9 @@ import yaml
 from evoVAE.loss.standard_loss import KL_divergence, sequence_likelihood, elbo_importance_sampling
 
 
-# %% [markdown]
 # This notebook can be used to test new features for a model without having to use the WandB service
 
-# %%
+# +
 with open("../data/dummy_config.yaml", "r") as stream:
     settings = yaml.safe_load(stream)
 seq_len = 770 # A4 Human length 
@@ -46,19 +45,16 @@ model = SeqVAE(
 # device = "cpu"
 # model.load_state_dict(torch.load("a4_extants_r1_model_state.pt", map_location=device))
 # model
+# -
 
-# %%
 metadata = pd.read_csv("../data/DMS_substitutions.csv")
 dms_data = pd.read_csv("A4_HUMAN_Seuma_2022.csv")
 one_hot = dms_data["mutated_sequence"].apply(st.seq_to_one_hot)
 dms_data["encoding"] = one_hot
 
-
-
-# %% [markdown]
 #
 
-# %%
+# +
 from evoVAE.utils.datasets import DMS_Dataset, MSA_Dataset
 device = torch.device("cpu")
 
@@ -78,7 +74,7 @@ train_loader = torch.utils.data.DataLoader(
     )
 
 
-# %%
+# +
 num_samples = 10
 ebls = []
 with torch.no_grad():
@@ -90,5 +86,6 @@ with torch.no_grad():
 
 
 np.mean(ebls)
+# -
 
-# %%
+

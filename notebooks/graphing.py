@@ -1,10 +1,11 @@
 # ---
 # jupyter:
 #   jupytext:
+#     formats: ipynb,py
 #     text_representation:
 #       extension: .py
-#       format_name: percent
-#       format_version: '1.3'
+#       format_name: light
+#       format_version: '1.5'
 #       jupytext_version: 1.16.3
 #   kernelspec:
 #     display_name: embed
@@ -12,7 +13,6 @@
 #     name: python3
 # ---
 
-# %%
 import evoVAE.utils.visualisation as vs 
 import evoVAE.utils.seq_tools as st
 import yaml
@@ -24,14 +24,12 @@ import numpy as np
 import igraph as ig
 from igraph import Graph
 
-# %%
 with open("../data/dummy_config.yaml", "r") as stream:
     settings = yaml.safe_load(stream)
 
-# %% [markdown]
 # Cassowary 
 
-# %%
+# +
 path = "/Users/sebs_mac/uni_OneDrive/honours/data/cassowary/vis/"
 cass_tree = path + "tree_1_ancestors_extants.fasta"
 a_state_dict=  "/Users/sebs_mac/uni_OneDrive/honours/data/standard_test_results/raw_data/cassowary_standard/cassowary_a_r1/cassowary_a_r1_model_state.pt"
@@ -43,7 +41,7 @@ vs.vis_tree(None, cass_tree, e_state_dict, settings, "RNAseZ - Extant model", rg
 vs.vis_tree(None, cass_tree, a_state_dict, settings, "RNAseZ - Ancestor model", rgb=True)
 vs.vis_tree(None, cass_tree, e_state_dict, settings, "RNAseZ - Extant model", rgb=True)
 
-# %%
+# +
 vs.latent_tree_to_itol("RNAseZ_ancestor_model", 
                        state_dict="/Users/sebs_mac/uni_OneDrive/honours/data/standard_test_results/raw_data/cassowary_standard/cassowary_a_r1/cassowary_a_r1_model_state.pt",
                        tree_seq_path=cass_tree,
@@ -54,7 +52,7 @@ vs.latent_tree_to_itol("RNAseZ_extant_model",
                        tree_seq_path=cass_tree,
                        settings=settings)
 
-# %%
+# +
 
 tree = st.read_aln_file(cass_tree)
 tree
@@ -89,8 +87,8 @@ state_dict = "/Users/sebs_mac/uni_OneDrive/honours/data/standard_test_results/ra
 model.load_state_dict(torch.load(state_dict, map_location=device))
 model = model.to(device)
 
+# -
 
-# %%
 model.eval()
 ids = []
 mus = [] 
@@ -102,14 +100,12 @@ with torch.no_grad():
         mus.extend(mu.cpu().numpy())
         sigmas.extend(sigma.cpu().numpy())
         ids.extend(name)
-    
 
-# %%
+
 coordinates = pd.DataFrame({"id": ids, "mu": mus, "sigma": sigmas})
 coordinates
 
 
-# %%
 def wasserstein_2_distance(mu1: float, sig1: float, mu2: float, sig2: float) -> float:
     """
     Calculates the Wasserstein-2 distance for 2 Gaussians.
@@ -134,7 +130,7 @@ def wasserstein_2_distance(mu1: float, sig1: float, mu2: float, sig2: float) -> 
 
 
 
-# %%
+# +
 ids_to_idx = {id: idx for idx, id in enumerate(coordinates["id"])}
 idx_to_ids = {idx: id for idx, id in enumerate(coordinates["id"])}
 
@@ -147,29 +143,27 @@ for i in range(dist_mat.shape[0] - 1):
         dist = np.sqrt(np.sum([wasserstein_2_distance(mu_i, sig_i, mu_j, sig_j) for mu_i, sig_i, mu_j, sig_j in zip(mus[i], sigmas[i],  mus[j], sigmas[j])]))
         #dist = np.mean([wasserstein_2_distance(mu_i, sig_i, mu_j, sig_j) for mu_i, sig_i, mu_j, sig_j in zip(mus[i], sigmas[i],  mus[j], sigmas[j])])
         dist_mat[i, j] = dist_mat[j, i] = dist
+# -
 
-# %%
 plt.figure(figsize=(10, 8))  # Set the figure size
 plt.imshow(dist_mat, cmap='viridis')
 plt.colorbar()  # Add a colorbar to show the scale
 plt.show()
 
-# %%
 g = Graph.Weighted_Adjacency(dist_mat.tolist(), mode="undirected", attr="weight")
 
-# %%
 print("test")
 commmunities = g.community_walktrap(weights=g.es['weight'])
 for_plot = commmunities.as_clustering()
 
-# %%
+# +
 
 for i, community in enumerate(for_plot):
     print(f"Community {i}:")
     for v in community:
         print(v)
 
-# %%
+# +
 import igraph as ig
 import matplotlib.pyplot as plt
 
@@ -212,5 +206,6 @@ ax.legend(
 )
 plt.show()
 
+# -
 
-# %%
+

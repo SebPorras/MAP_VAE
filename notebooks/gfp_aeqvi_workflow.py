@@ -1,10 +1,11 @@
 # ---
 # jupyter:
 #   jupytext:
+#     formats: ipynb,py
 #     text_representation:
 #       extension: .py
-#       format_name: percent
-#       format_version: '1.3'
+#       format_name: light
+#       format_version: '1.5'
 #       jupytext_version: 1.16.3
 #   kernelspec:
 #     display_name: Python 3
@@ -12,10 +13,9 @@
 #     name: python3
 # ---
 
-# %% [markdown]
 # ### GFP_AEQV processing
 
-# %%
+# +
 import evoVAE.utils.seq_tools as st
 from evoVAE.utils.webservice import get_sequence_batch
 import numpy as np
@@ -27,14 +27,13 @@ from sequence import *
 DATA_DIR = '/Users/sebs_mac/uni_OneDrive/honours/data/gb1/'
 
 aln = st.read_aln_file(DATA_DIR + 'SPG1_STRSG_full_b0.1.fasta', encode=False)
+# -
 
-# %% [markdown]
 #
 
-# %% [markdown]
 # # Reading in alignment 
 
-# %%
+# +
 
 #st.write_fasta_file(f"../data/alignments/gfp_alns/GFP_AEQVI_full_04-29-2022_b08.aln", aln)
 
@@ -45,11 +44,11 @@ aln = st.read_aln_file(DATA_DIR + 'SPG1_STRSG_full_b0.1.fasta', encode=False)
 #for i, seqs in enumerate(draws):
 #    st.write_fasta_file(f"../data/alignments/gfp_alns/GFP_AEQVI_full_04-29-2022_b08_rand_subset_{i}.aln", seqs)
 #aln
+# -
 
-# %% [markdown]
 # # Collecting annotations about sequences
 
-# %%
+# +
 ids = aln['id']
 ids = [x for x in ids.apply(lambda x: x.split('/')[0]).values]
 
@@ -105,11 +104,11 @@ ingroup_query = get_sequence_batch(ingroup, uniprot_cols, query_field = "id", da
 
 outgroup_species = pd.Series([x[SPECIES] for x in outgroup_query]).value_counts()
 ingroup_species = pd.Series([x[SPECIES] for x in ingroup_query]).value_counts()
+# -
 
-# %% [markdown]
 # # Removing synthetic sequences
 
-# %%
+# +
 synthetic_seqs = [x for x,y in ingroup_query if y == 'synthetic construct']
 
 no_syn_aln_seqs = []
@@ -126,7 +125,7 @@ for name, seq in zip(aln['id'], aln['sequence']):
 print(len(no_syn_aln_seqs), len(all_seqs))
 writeFastaFile(filename='no_synthetic_GFP_AEQVI_full_04-29-2022_b08.aln', seqs=no_syn_aln_seqs)
 
-# %%
+# +
 all_aln = Alignment(all_seqs)
 no_syn_aln = Alignment(no_syn_aln_seqs)
 
@@ -140,23 +139,19 @@ for x, y in zip(no_syn_con, con_all):
 
     count += 1
 
+# -
 
-# %%
 outgroup_species
 
-# %%
 ingroup_species
 
-# %% [markdown]
 # # Rooting tree
 
-# %% [markdown]
 # Minimum ancestor deviation (MAD) will be used to root the tree as all sequences are assumed to be homologs. 
 
-# %% [markdown]
 # # Placing ancestors and extants in one file
 
-# %%
+# +
 ANC_DIR = '/Users/sebs_mac/OneDrive - The University of Queensland/honours/data/gfp_alns/independent_runs/no_synthetic/ancestors/auto_rooted/'
 DATA_DIR = '/Users/sebs_mac/OneDrive - The University of Queensland/honours/data/gfp_alns/independent_runs/no_synthetic/alns/'
 

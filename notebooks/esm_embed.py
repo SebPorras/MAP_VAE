@@ -1,18 +1,18 @@
 # ---
 # jupyter:
 #   jupytext:
+#     formats: ipynb,py
 #     text_representation:
 #       extension: .py
-#       format_name: percent
-#       format_version: '1.3'
+#       format_name: light
+#       format_version: '1.5'
 #       jupytext_version: 1.16.3
 #   kernelspec:
-#     display_name: seb_rocm
+#     display_name: embed
 #     language: python
-#     name: seb_rocm
+#     name: python3
 # ---
 
-# %%
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
@@ -31,11 +31,70 @@ from sklearn.linear_model import LassoLars, Ridge
 from typing import Tuple
 #dms_path = "/Users/sebs_mac/git_repos/dms_data/DMS_ProteinGym_substitutions/"
 
-# %%
+# +
+import evoVAE.utils.metrics as mt
+import torch
+from sklearn.model_selection import GridSearchCV, train_test_split
+import scipy
+import evoVAE.utils.seq_tools as st
+import evoVAE.utils.metrics as mt
+import yaml
+import evoVAE.utils.visualisation as vs 
+import pandas as pd
+import numpy as np
+from sklearn.metrics import roc_auc_score
+
+cls_list, param_grid_list, pipe = instantiate_top_models_and_pipe()
+
+
+xs_train = np.array([st.seq_to_one_hot(x).flatten() for x in  train_data["mutated_sequence"]])
+ys_train = np.array([float(y) for y in train_data["DMS_score"]])
+xs_test = np.array([st.seq_to_one_hot(x).flatten() for x in  test_data["mutated_sequence"]])
+ys_test = np.array([float(y) for y in test_data["DMS_score"]])
+
+cls_list, param_grid_list, pipe = instantiate_top_models_and_pipe()
+
+
+results, grids = perform_grid_search(mafg_oh_xs_train, mafg_oh_ys_train, cls_list, param_grid_list, pipe)
+spear = {}
+for grid in grids:
+    model_name = str(grid.best_estimator_.get_params()['model']).split("(")[0]
+    model_alpha = grid.best_estimator_.get_params()["model__alpha"]
+    spear[model_name] = {}
+    spear[model_name]["alpha"] = model_alpha
+
+    # TEST DATA
+    preds = grid.predict(Xs_test)
+    spearmanr = scipy.stats.spearmanr(ys_test, preds).statistic
+    k_recall = mt.top_k_recall(preds, ys_test)
+    ndcg = mt.calc_ndcg(ys_test, preds)
+    roc_auc = roc_auc_score(ys_test_bin, preds)
+    spear[model_name]["test_spearmanr"] = spearmanr
+    spear[model_name]["test_k_recall"] = k_recall
+    spear[model_name]["test_ndcg"] = ndcg
+    spear[model_name]["test_roc_auc"] = roc_auc
+
+    # TRAIN DATA
+    preds = grid.predict(Xs_train)
+    spearmanr = scipy.stats.spearmanr(ys_train, preds).statistic
+    k_recall = mt.top_k_recall(preds, ys_train)
+    ndcg = mt.calc_ndcg(ys_train, preds)
+    roc_auc = roc_auc_score(ys_train_bin, preds)
+    spear[model_name]["train_spearmanr"] = spearmanr
+    spear[model_name]["train_k_recall"] = k_recall
+    spear[model_name]["train_ndcg"] = ndcg
+    spear[model_name]["train_roc_auc"] = roc_auc
+
+# Ridge results
+#results[0].sort_values('rank_test_score')[:5]
+# LassoLARS results
+#results[1].sort_values('rank_test_score')[:5]
+
+# -
+
 torch.cuda.is_available()
 
 
-# %% [markdown]
 # This notebook uses the ESM2 package to get sequence embeddings and then fits a regressor to this data
 #
 # I have to use the unaligned sequences because gaps are not included as tokens. 
@@ -47,7 +106,7 @@ torch.cuda.is_available()
 #
 # Supervised learning pipeline: https://colab.research.google.com/github/facebookresearch/esm/blob/main/examples/sup_variant_prediction.ipynb#scrollTo=8MpZ87vEbo4b
 
-# %%
+# +
 def get_transformer_embeddings(model, alphabet, batch_converter, data, device, model_layer=-1) -> pd.DataFrame:
     """Get mean representation of sequence"""
 
@@ -168,26 +227,24 @@ def one_hot_top_model(train_data, test_data):
     return results, grids
 
 
-# %% [markdown]
+# -
+
 # # MAFG
 
-# %%
 dms_path = "/scratch/user/s4646506/mafg/dms_data/"
 mafg_variants = pd.read_csv(dms_path + "MAFG_MOUSE_Tsuboyama_2023_1K1V.csv")
 mafg_variants["one_hot"] = mafg_variants["mutated_sequence"].apply(st.seq_to_one_hot)
 mafg_variants
 
-# %%
 mafg_train, mafg_test = train_test_split(mafg_variants, train_size=0.8, random_state=42)
 mafg_train.shape, mafg_test.shape
 
-# %% [markdown]
 # ### ESM2
 #
 # Using the smallest model with 8M parameters, 6 layers trained on UniRef50.
 # Has 320 embedding dimensions.
 
-# %%
+# +
 ### GET MEAN EMBEDDINGS ###
 device = torch.device("cuda")
 model, alphabet = esm.pretrained.esm2_t6_8M_UR50D()
@@ -200,7 +257,7 @@ mafg_train = mafg_train.merge(train_mafg_esm, on="mutant")
 test_mafg_esm = get_transformer_embeddings(model, alphabet, batch_converter, mafg_test, model_layer=6, device=device)
 mafg_test = mafg_test.merge(test_mafg_esm, on="mutant")
 
-# %%
+# +
 ### Turn into arrays for learning/visualisation ###
 
 
@@ -213,7 +270,7 @@ mafg_Xs_test = np.stack(mafg_train["embedding"])
 mafg_ys_test = np.array([float(y) for y in mafg_train["DMS_score"]])
 
 
-# %%
+# +
 ### Visualise what information the embeddings have captured ###
 num_pca_components = 50
 pca = PCA(num_pca_components)
@@ -226,7 +283,7 @@ ax.set_xlabel('PCA first principal component')
 ax.set_ylabel('PCA second principal component')
 plt.colorbar(sc, label='Variant Effect')
 
-# %%
+# +
 ### Perform grid search for Lasso and Ridge regression ### 
 cls_list, param_grid_list, pipe = instantiate_top_models_and_pipe()
 
@@ -242,13 +299,24 @@ for grid in grids:
 #results[0].sort_values('rank_test_score')[:5]
 # LassoLARS results
 #results[1].sort_values('rank_test_score')[:5]
+# -
 
-# %% [markdown]
 # ### One-hot encodings
 
-# %%
-cls_list, param_grid_list, pipe = instantiate_top_models_and_pipe()
+# +
+import evoVAE.utils.metrics as mt
+import torch
+from sklearn.model_selection import GridSearchCV, train_test_split
+import scipy
+import evoVAE.utils.seq_tools as st
+import evoVAE.utils.metrics as mt
+import yaml
+import evoVAE.utils.visualisation as vs 
+import pandas as pd
+import numpy as np
+from sklearn.metrics import roc_auc_score
 
+cls_list, param_grid_list, pipe = instantiate_top_models_and_pipe()
 
 mafg_oh_xs_train = np.array([st.seq_to_one_hot(x).flatten() for x in  mafg_train["mutated_sequence"]])
 print(mafg_oh_xs_train.shape)
@@ -261,23 +329,45 @@ mafg_oh_ys_test = np.array([float(y) for y in mafg_test["DMS_score"]])
 print(mafg_oh_ys_test.shape)
 
 results, grids = perform_grid_search(mafg_oh_xs_train, mafg_oh_ys_train, cls_list, param_grid_list, pipe)
+spear = {}
 for grid in grids:
-    print(grid.best_estimator_.get_params()["steps"][0][1]) # get the model details from the estimator
-    print()
-    preds = grid.predict(mafg_oh_xs_test)
-    print(f'{scipy.stats.spearmanr(mafg_oh_ys_test, preds)}')
-    print('\n', '-' * 80, '\n')
+    model_name = str(grid.best_estimator_.get_params()['model']).split("(")[0]
+    model_alpha = grid.best_estimator_.get_params()["model__alpha"]
+    spear[model_name] = {}
+    spear[model_name]["alpha"] = model_alpha
+
+    # TEST DATA
+    preds = grid.predict(Xs_test)
+    spearmanr = scipy.stats.spearmanr(ys_test, preds).statistic
+    k_recall = mt.top_k_recall(preds, ys_test)
+    ndcg = mt.calc_ndcg(ys_test, preds)
+    roc_auc = roc_auc_score(ys_test_bin, preds)
+    spear[model_name]["test_spearmanr"] = spearmanr
+    spear[model_name]["test_k_recall"] = k_recall
+    spear[model_name]["test_ndcg"] = ndcg
+    spear[model_name]["test_roc_auc"] = roc_auc
+
+    # TRAIN DATA
+    preds = grid.predict(Xs_train)
+    spearmanr = scipy.stats.spearmanr(ys_train, preds).statistic
+    k_recall = mt.top_k_recall(preds, ys_train)
+    ndcg = mt.calc_ndcg(ys_train, preds)
+    roc_auc = roc_auc_score(ys_train_bin, preds)
+    spear[model_name]["train_spearmanr"] = spearmanr
+    spear[model_name]["train_k_recall"] = k_recall
+    spear[model_name]["train_ndcg"] = ndcg
+    spear[model_name]["train_roc_auc"] = roc_auc
 
 # Ridge results
 #results[0].sort_values('rank_test_score')[:5]
 # LassoLARS results
 #results[1].sort_values('rank_test_score')[:5]
 
+# -
 
-# %% [markdown]
 # ### VAE-MAP 
 
-# %%
+# +
 def pca_vis(xs, ys, title, num_pca_components = 2):
     ### Visualise the a PCA of the VAE latent space
     pca = PCA(num_pca_components)
@@ -313,37 +403,68 @@ def create_vae_data(model, loader, orig_data):
     return Xs_train, ys_train
 
 
-def train_and_fit_vae_top_model(train_data, test_data, states, labels, protein, cls_list, param_grid_list, pipe, settings):
+def train_and_fit_vae_top_model(train_data, test_data, state, label, protein, cls_list, param_grid_list, pipe, settings):
     
     device = torch.device("mps")
     train_loader = setup_loader(train_data, device)
     test_loader = setup_loader(test_data, device)
 
-    for state, label in zip(states, labels): 
-        print(label)
-        seq_len = len(train_data["mutated_sequence"].values[0])
-        model = instantiate_model(seq_len, device, state, settings)
+    print(label)
+    seq_len = len(train_data["mutated_sequence"].values[0])
+    model = instantiate_model(seq_len, device, state, settings)
 
-        Xs_train, ys_train = create_vae_data(model, train_loader, train_data)
-        Xs_test,  ys_test = create_vae_data(model, test_loader, test_data)
+    Xs_train, ys_train = create_vae_data(model, train_loader, train_data)
+    Xs_test,  ys_test = create_vae_data(model, test_loader, test_data)
 
-        pca_vis(Xs_train, ys_train, f"{protein} {label} model")
+    pca_vis(Xs_train, ys_train, f"{protein} {label} model")
 
-        results, grids = perform_grid_search(Xs_train, ys_train, cls_list, param_grid_list, pipe)
-        for grid in grids:
-            print(grid.best_estimator_.get_params()["steps"][0][1]) # get the model details from the estimator
-            print()
-            preds = grid.predict(Xs_test)
-            print(f'{scipy.stats.spearmanr(ys_test, preds)}')
-            print('\n', '-' * 80, '\n')
+    results, grids = perform_grid_search(Xs_train, ys_train, cls_list, param_grid_list, pipe)
+    for grid in grids:
+        print(grid.best_estimator_.get_params()["steps"][0][1]) # get the model details from the estimator
+        print()
+        preds = grid.predict(Xs_test)
+        print(f'{scipy.stats.spearmanr(ys_test, preds)}')
+        print('\n', '-' * 80, '\n')
 
     return results, grids
 
 
-# %% [markdown]
+# +
+protein = ["a4", "gcn4", "gfp", "mafg", "gb1"]
+data = ["ae", "a", "e"]
+labels = ["Ancestor/Extant", "Ancestor", "Extant"]
+latent_dims = [7, 5, 3, 4, 8]
+
+datasets = ["/Users/sebs_mac/git_repos/dms_data/DMS_ProteinGym_substitutions/A4_HUMAN_Seuma_2022.csv",
+            "/Users/sebs_mac/git_repos/dms_data/DMS_ProteinGym_substitutions/GCN4_YEAST_Staller_2018.csv",
+            "/Users/sebs_mac/git_repos/dms_data/DMS_ProteinGym_substitutions/GFP_AEQVI_Sarkisyan_2016.csv",
+            "/Users/sebs_mac/git_repos/dms_data/DMS_ProteinGym_substitutions/MAFG_MOUSE_Tsuboyama_2023_1K1V.csv", 
+            "/Users/sebs_mac/git_repos/dms_data/DMS_ProteinGym_substitutions/SPG1_STRSG_Wu_2016.csv"]
+
+
+for p, v, dims in zip(protein, datasets, latent_dims):
+    for d, lab, in zip(data, labels):
+        
+        with open("../data/dummy_config.yaml", "r") as stream:
+            settings = yaml.safe_load(stream)
+        settings["latent_dims"] = dims
+        state_dict = f"/Users/sebs_mac/uni_OneDrive/honours/data/optimised_model_metrics/zero_shot_tasks/zero_shot_1/model_states/{p}_{d}_r1_model_state.pt"
+        variants = pd.read_csv(v)
+        variants["one_hot"] = variants["mutated_sequence"].apply(st.seq_to_one_hot)
+        train, test = train_test_split(mafg_variants, train_size=0.8, random_state=42)
+        
+
+        cls_list, param_grid_list, pipe = instantiate_top_models_and_pipe()
+        results, grids = train_and_fit_vae_top_model(train, test, state_dict, lab, p,
+                                                      cls_list, param_grid_list, pipe)
+        
+# -
+
+#
+
 # ### MAFG ancestors/extant models
 
-# %%
+# +
 # read in dummy config with correct dimensions 
 with open("../data/dummy_config_50_latent.yaml", "r") as stream:
     settings = yaml.safe_load(stream)
@@ -358,11 +479,11 @@ labels = ["Ancestors", "Extants"]
 results, grids = train_and_fit_vae_top_model(mafg_train, mafg_test, states, labels, "MAFG",
                                               cls_list, param_grid_list, pipe, settings)
 
+# -
 
-# %% [markdown]
 # ### MAFG clusters
 
-# %%
+# +
 with open("../data/dummy_config.yaml", "r") as stream:
     settings = yaml.safe_load(stream)
 
@@ -377,25 +498,22 @@ states = [data_path + f"mafg_{prop}/mafg_{prop}_r1/mafg_{prop}_r1_model_state.pt
 results, grids = train_and_fit_vae_top_model(mafg_train, mafg_test, states, labels, "MAFG",
                                                cls_list, param_grid_list, pipe, settings)
 
+# -
 
-# %% [markdown]
 # # GCN4 
 #
 
-# %%
 dms_path = "/scratch/user/s4646506/gcn4/dms_data/"
 gcn4_variants = pd.read_csv(dms_path + "GCN4_YEAST_Staller_2018.csv")
 gcn4_variants["one_hot"] = gcn4_variants["mutated_sequence"].apply(st.seq_to_one_hot)
 gcn4_variants.head()
 
-# %%
 gcn4_train, gcn4_test = train_test_split(gcn4_variants, train_size=0.8, random_state=42)
 gcn4_train.shape, gcn4_test.shape
 
-# %% [markdown]
 # ### ESM2
 
-# %%
+# +
 gnc4_model, alphabet = esm.pretrained.esm2_t6_8M_UR50D()
 batch_converter = alphabet.get_batch_converter()
 gnc4_model = gnc4_model.to(device)
@@ -407,7 +525,7 @@ gcn4_train = gcn4_train.merge(train_gcn4_esm, on="mutant")
 test_gcn4_esm = get_transformer_embeddings(gnc4_model, alphabet, batch_converter, gcn4_test, model_layer=6, device=device)
 gcn4_test = gcn4_test.merge(test_gcn4_esm, on="mutant")
 
-# %%
+# +
 ### Turn into arrays for learning/visualisation ###
 
 print("Train data created")
@@ -419,7 +537,7 @@ gcn4_Xs_test = np.stack(gcn4_train["embedding"])
 gcn4_ys_test = np.array([float(y) for y in gcn4_train["DMS_score"]])
 
 
-# %%
+# +
 ### Visualise what information the embeddings have captured ###
 num_pca_components = 50
 pca = PCA(num_pca_components)
@@ -432,7 +550,7 @@ ax.set_xlabel('PCA first principal component')
 ax.set_ylabel('PCA second principal component')
 plt.colorbar(sc, label='Variant Effect')
 
-# %%
+# +
 
 cls_list, param_grid_list, pipe = instantiate_top_models_and_pipe()
 
@@ -444,11 +562,11 @@ for grid in grids:
     print(f'{scipy.stats.spearmanr(gcn4_ys_test, preds)}')
     print('\n', '-' * 80, '\n')
 
+# -
 
-# %% [markdown]
 # ### One-Hot
 
-# %%
+# +
 gcn4_oh_xs_train = np.array([st.seq_to_one_hot(x).flatten() for x in  gcn4_train["mutated_sequence"]])
 gcn4_oh_ys_train = np.array([float(y) for y in gcn4_train["DMS_score"]])
 
@@ -456,7 +574,7 @@ gcn4_oh_xs_test = np.array([st.seq_to_one_hot(x).flatten() for x in  gcn4_test["
 gcn4_oh_ys_test = np.array([float(y) for y in gcn4_test["DMS_score"]])
 
 
-# %%
+# +
 cls_list, param_grid_list, pipe = instantiate_top_models_and_pipe()
 
 results, grids = perform_grid_search(gcn4_oh_xs_train, gcn4_oh_ys_train, cls_list, param_grid_list, pipe)
@@ -466,14 +584,13 @@ for grid in grids:
     preds = grid.predict(gcn4_oh_xs_test)
     print(f'{scipy.stats.spearmanr(gcn4_oh_ys_test, preds)}')
     print('\n', '-' * 80, '\n')
+# -
 
-# %% [markdown]
 # ### VAE-MAP
 
-# %% [markdown]
 # ### Ancestor/extant models
 
-# %%
+# +
 # read in dummy config with correct dimensions 
 with open("../data/dummy_config_50_latent.yaml", "r") as stream:
     settings = yaml.safe_load(stream)
@@ -492,11 +609,11 @@ labels = ["Ancestors", "Extants"]
 results, grids = train_and_fit_vae_top_model(gcn4_train, gcn4_test, states, labels, "GCN4",
                                               cls_list, param_grid_list, pipe, settings)
 
+# -
 
-# %% [markdown]
 # ### GCN4 clusters
 
-# %%
+# +
 with open("../data/dummy_config.yaml", "r") as stream:
     settings = yaml.safe_load(stream)
 
@@ -509,24 +626,21 @@ states = [data_path + f"gcn4_{prop}/gcn4_{prop}_extants_r1/gcn4_{prop}_extants_r
 results, grids = train_and_fit_vae_top_model(gcn4_train, gcn4_test, states, labels, "GCN4",
                                                cls_list, param_grid_list, pipe, settings)
 
+# -
 
-# %% [markdown]
 # # GFP 
 
-# %%
 dms_path = "/scratch/user/s4646506/gfp/dms_data/"
 gfp_variants = pd.read_csv(dms_path + "GFP_AEQVI_Sarkisyan_2016.csv")
 gfp_variants["one_hot"] = gfp_variants["mutated_sequence"].apply(st.seq_to_one_hot)
 gfp_variants.head()
 
-# %%
 gfp_train, gfp_test = train_test_split(gfp_variants, train_size=0.8, random_state=42)
 gfp_train.shape, gfp_test.shape
 
-# %% [markdown]
 # ### ESM2
 
-# %%
+# +
 model, alphabet = esm.pretrained.esm2_t6_8M_UR50D()
 batch_converter = alphabet.get_batch_converter()
 model = model.to(device)
@@ -537,7 +651,7 @@ gfp_train = gfp_train.merge(train_mafg_esm, on="mutant")
 test_gfp_esm = get_transformer_embeddings(model, alphabet, batch_converter, gfp_test, model_layer=6, device=device)
 gfp_test = gfp_test.merge(test_gfp_esm, on="mutant")
 
-# %%
+# +
 print("Train data created")
 gfp_Xs_train = np.stack(gfp_train["embedding"])
 gfp_ys_train = np.array([float(y) for y in gfp_train["DMS_score"]])
@@ -556,7 +670,7 @@ for grid in grids:
     print(f'{scipy.stats.spearmanr(gcn4_ys_test, preds)}')
     print('\n', '-' * 80, '\n')
 
-# %%
+# +
 ### Visualise what information the embeddings have captured ###
 num_pca_components = 50
 pca = PCA(num_pca_components)
@@ -568,17 +682,15 @@ sc = ax.scatter(Xs_train_pca[:,0], Xs_train_pca[:,1], c=gcn4_ys_train, marker='.
 ax.set_xlabel('PCA first principal component')
 ax.set_ylabel('PCA second principal component')
 plt.colorbar(sc, label='Variant Effect')
+# -
 
-# %% [markdown]
 # ### One-hot
 
-# %%
 results, grids = one_hot_top_model(gfp_train, gfp_test)
 
-# %% [markdown]
 # ### GFP ancestors/extant models
 
-# %%
+# +
 # read in dummy config with correct dimensions 
 with open("../data/dummy_config_50_latent.yaml", "r") as stream:
     settings = yaml.safe_load(stream)
@@ -593,11 +705,11 @@ labels = ["Ancestors", "Extants"]
 results, grids = train_and_fit_vae_top_model(gfp_train, gfp_test, states, labels, "GFP",
                                               cls_list, param_grid_list, pipe, settings)
 
+# -
 
-# %% [markdown]
 # ### GFP Clustering
 
-# %%
+# +
 with open("../data/dummy_config.yaml", "r") as stream:
     settings = yaml.safe_load(stream)
 
@@ -610,24 +722,21 @@ labels = [0.0, 0.05, 0.1, 0.15, 0.2]
 states = [data_path + f"gfp_{prop}/gfp_{prop}_extants_r1/gfp_{prop}_extants_r1_model_state.pt" for prop in labels]
 results, grids = train_and_fit_vae_top_model(gfp_train, gfp_test, states, labels, "GFP",
                                                cls_list, param_grid_list, pipe, settings)
+# -
 
-# %% [markdown]
 # # A4
 
-# %%
 dms_path = "/scratch/user/s4646506/a4/dms_data/"
 a4_variants = pd.read_csv(dms_path + "A4_HUMAN_Seuma_2022.csv")
 a4_variants["one_hot"] = a4_variants["mutated_sequence"].apply(st.seq_to_one_hot)
 a4_variants.head()
 
-# %%
 a4_train, a4_test = train_test_split(a4_variants, train_size=0.8, random_state=42)
 a4_train.shape, a4_test.shape
 
-# %% [markdown]
 # ### ESM2
 
-# %%
+# +
 model, alphabet = esm.pretrained.esm2_t6_8M_UR50D()
 batch_converter = alphabet.get_batch_converter()
 model.eval()
@@ -638,7 +747,7 @@ a4_train = a4_train.merge(train_a4_esm, on="mutant")
 test_a4_esm = get_transformer_embeddings(model, alphabet, batch_converter, a4_test, model_layer=6, device=device)
 a4_test = a4_test.merge(test_a4_esm, on="mutant")
 
-# %%
+# +
 
 a4_Xs_train = np.stack(a4_train["embedding"])
 a4_ys_train = np.array([float(y) for y in a4_train["DMS_score"]])
@@ -654,17 +763,15 @@ for grid in grids:
     preds = grid.predict(a4_Xs_test)
     print(f'{scipy.stats.spearmanr(a4_ys_test, preds)}')
     print('\n', '-' * 80, '\n')
+# -
 
-# %% [markdown]
 # ### One-hot
 
-# %%
 results, grids = one_hot_top_model(a4_train, a4_test)
 
-# %% [markdown]
 # ### A4 ancestors/extant models
 
-# %%
+# +
 # read in dummy config with correct dimensions 
 with open("../data/dummy_config_50_latent.yaml", "r") as stream:
     settings = yaml.safe_load(stream)
@@ -678,11 +785,11 @@ labels = ["Ancestors", "Extants"]
 
 results, grids = train_and_fit_vae_top_model(a4_train, a4_test, states, labels, "A4",
                                               cls_list, param_grid_list, pipe, settings)
+# -
 
-# %% [markdown]
 # ### A4 clustering
 
-# %%
+# +
 with open("../data/dummy_config.yaml", "r") as stream:
     settings = yaml.safe_load(stream)
 
@@ -695,23 +802,20 @@ labels = [0.0, 0.05, 0.1, 0.15, 0.2]
 states = [data_path + f"a4_{prop}/a4_{prop}_extants_r1/a4_{prop}_extants_r1_model_state.pt" for prop in labels]
 results, grids = train_and_fit_vae_top_model(a4_train, a4_test, states, labels, "A4",
                                                cls_list, param_grid_list, pipe, settings)
+# -
 
-# %% [markdown]
 # # GB1
 
-# %%
 gb1_variants = pd.read_csv(dms_path + "SPG1_STRSG_Wu_2016.csv")
 gb1_variants["one_hot"] = gb1_variants["mutated_sequence"].apply(st.seq_to_one_hot)
 gb1_variants.head()
 
-# %%
 gb1_train, gb1_test = train_test_split(gb1_variants, train_size=0.8, random_state=42)
 gb1_train.shape, gb1_test.shape
 
-# %% [markdown]
 # ### ESM2
 
-# %%
+# +
 model, alphabet = esm.pretrained.esm2_t6_8M_UR50D()
 batch_converter = alphabet.get_batch_converter()
 model.eval()
@@ -721,7 +825,7 @@ gb1_train = gb1_train.merge(train_gb1_esm, on="mutant")
 test_gb1_esm = get_transformer_embeddings(model, alphabet, batch_converter, gb1_test, model_layer=6)
 gb1_test = gb1_test.merge(test_gb1_esm, on="mutant")
 
-# %%
+# +
 gb1_Xs_train = np.stack(a4_train["embedding"])
 gb1_ys_train = np.array([float(y) for y in gb1_train["DMS_score"]])
 gb1_Xs_test = np.stack(a4_train["embedding"])
@@ -736,17 +840,15 @@ for grid in grids:
     preds = grid.predict(gb1_Xs_test)
     print(f'{scipy.stats.spearmanr(gb1_ys_test, preds)}')
     print('\n', '-' * 80, '\n')
+# -
 
-# %% [markdown]
 # ### One-hot
 
-# %%
 results, grids = one_hot_top_model(gb1_train, gb1_test)
 
-# %% [markdown]
 # ### GB1 ancestors/extant models
 
-# %%
+# +
 # read in dummy config with correct dimensions 
 with open("../data/dummy_config_50_latent.yaml", "r") as stream:
     settings = yaml.safe_load(stream)
@@ -760,11 +862,11 @@ labels = ["Ancestors", "Extants"]
 
 results, grids = train_and_fit_vae_top_model(gb1_train, gb1_test, states, labels, "GB1",
                                               cls_list, param_grid_list, pipe, settings)
+# -
 
-# %% [markdown]
 # ### GB1 clustering 
 
-# %%
+# +
 with open("../data/dummy_config.yaml", "r") as stream:
     settings = yaml.safe_load(stream)
 
@@ -777,3 +879,22 @@ labels = [0.0, 0.05, 0.1, 0.15]
 states = [data_path + f"gb1_{prop}/gb1_{prop}_r1/gb1_{prop}_r1_model_state.pt" for prop in labels]
 results, grids = train_and_fit_vae_top_model(gb1_train, gb1_test, states, labels, "GB1",
                                                cls_list, param_grid_list, pipe, settings)
+# -
+
+import pandas as pd
+df = pd.read_pickle("/Users/sebs_mac/uni_OneDrive/honours/data/esm2_embeddings/gcn4_variants_embeddings.pkl")
+vars = pd.read_csv("/Users/sebs_mac/git_repos/dms_data/DMS_ProteinGym_substitutions/GCN4_YEAST_Staller_2018.csv")
+vars.rename(columns={"mutant": "id"}, inplace=True)
+m = df.merge(vars, on="id", how="inner")
+
+m
+
+# +
+import numpy as np
+Xs_train = np.stack(m["embeddings"])
+
+Xs_train.shape
+
+# -
+
+

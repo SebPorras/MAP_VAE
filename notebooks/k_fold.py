@@ -1,10 +1,11 @@
 # ---
 # jupyter:
 #   jupytext:
+#     formats: ipynb,py
 #     text_representation:
 #       extension: .py
-#       format_name: percent
-#       format_version: '1.3'
+#       format_name: light
+#       format_version: '1.5'
 #       jupytext_version: 1.16.3
 #   kernelspec:
 #     display_name: embed
@@ -12,7 +13,6 @@
 #     name: python3
 # ---
 
-# %%
 import pandas as pd 
 import numpy as np 
 import evoVAE.utils.metrics as mt 
@@ -24,10 +24,9 @@ import random
 import os
 
 
-# %% [markdown]
 # ### GB1
 
-# %%
+# +
 path = "/Users/sebs_mac/k_fold_results/gb1/"
 
 metric_paths = ["_".join(subdir.split("_")[:2]) + "_5_fold_" + "_".join(subdir.split("_")[2:]) for subdir in os.listdir(path) if subdir != ".DS_Store"]
@@ -43,7 +42,7 @@ gb1_a = all_metrics[all_metrics["dataset"] == "a"]
 gb1_e = all_metrics[all_metrics["dataset"] == "e"]
 
 
-# %%
+# +
 
 def summary_data(data: pd.DataFrame):
     marginal_results = {}
@@ -68,7 +67,7 @@ gb1_a_marginal_results, gb1_a_spear_results = summary_data(gb1_a)
 gb1_e_marginal_results, gb1_e_spear_results = summary_data(gb1_e)
 
 
-# %%
+# +
 
 
 def plot(marginal_results: dict, spear_results: dict, title):
@@ -103,11 +102,11 @@ plot(gb1_ae_marginal_results, gb1_ae_spear_results, "GB1 AE")
 plot(gb1_a_marginal_results, gb1_a_spear_results, "GB1 A")
 plot(gb1_e_marginal_results, gb1_e_spear_results, "GB1 E")
 
+# -
 
-# %% [markdown]
 # ### A4
 
-# %%
+# +
 path = "/Users/sebs_mac/k_fold_results/a4/"
 
 metric_paths = ["_".join(subdir.split("_")[:2]) + "_5_fold_" + "_".join(subdir.split("_")[2:]) for subdir in os.listdir(path) if subdir != ".DS_Store"]
@@ -122,7 +121,7 @@ a4_ae = all_metrics[all_metrics["dataset"] == "ae"]
 a4_a = all_metrics[all_metrics["dataset"] == "a"]
 a4_e = all_metrics[all_metrics["dataset"] == "e"]
 
-# %%
+# +
 
 a4_ae_marginal_results, a4_ae_spear_results = summary_data(a4_ae)
 a4_a_marginal_results, a4_a_spear_results = summary_data(a4_a)
@@ -133,11 +132,11 @@ plot(a4_a_marginal_results, a4_a_spear_results, "A4 A")
 plot(a4_e_marginal_results, a4_e_spear_results, "A4 E")
 
 
+# -
 
-# %% [markdown]
 # ### GFP 
 
-# %%
+# +
 path = "/Users/sebs_mac/k_fold_results/gfp/"
 
 metric_paths = ["_".join(subdir.split("_")[:2]) + "_5_fold_" + "_".join(subdir.split("_")[2:]) for subdir in os.listdir(path) if subdir != ".DS_Store"]
@@ -160,11 +159,11 @@ gfp_e_marginal_results, gfp_e_spear_results = summary_data(gfp_e)
 plot(gfp_ae_marginal_results, gfp_ae_spear_results, "GFP AE")
 plot(gfp_a_marginal_results, gfp_a_spear_results, "GFP A")
 plot(gfp_e_marginal_results, gfp_e_spear_results, "GFP E")
+# -
 
-# %% [markdown]
 # ### MAFG
 
-# %%
+# +
 path = "/Users/sebs_mac/k_fold_results/mafg/"
 
 metric_paths = ["_".join(subdir.split("_")[:2]) + "_5_fold_" + "_".join(subdir.split("_")[2:]) for subdir in os.listdir(path) if subdir != ".DS_Store"]
@@ -185,11 +184,11 @@ mafg_e_marginal_results, mafg_e_spear_results =  summary_data(mafg_e)
 plot(mafg_ae_marginal_results, mafg_ae_spear_results, "MAFG AE")
 plot(mafg_a_marginal_results,  mafg_a_spear_results,  "MAFG A")
 plot(mafg_e_marginal_results,  mafg_e_spear_results,  "MAFG E")
+# -
 
-# %% [markdown]
 # ### GCN4
 
-# %%
+# +
 path = "/Users/sebs_mac/k_fold_results/gcn4/"
 
 metric_paths = ["_".join(subdir.split("_")[:2]) + "_5_fold_" + "_".join(subdir.split("_")[2:]) for subdir in os.listdir(path) if subdir != ".DS_Store"]
@@ -210,5 +209,6 @@ gcn4_e_marginal_results, gcn4_e_spear_results =  summary_data(gcn4_e)
 plot(gcn4_ae_marginal_results, gcn4_ae_spear_results, "GCN4 AE")
 plot(gcn4_a_marginal_results,  gcn4_a_spear_results,  "GCN4 A")
 plot(gcn4_e_marginal_results,  gcn4_e_spear_results,  "GCN4 E")
+# -
 
-# %%
+
