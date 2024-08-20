@@ -149,52 +149,29 @@ def get_model_embeddings(
     return ae_latent, a_latent, e_latent
 
 
-def latent_tree_to_itol(
-    filename,
-    tree_seq_path,
-    state_dict,
-    settings,
-) -> None:
+def latent_tree_to_itol(latent_data: pd.DataFrame, filename: str) -> None:
 
-    device = torch.device("mps")
-    tree_seqs = st.read_aln_file(tree_seq_path)
+    zs = np.array([z for z in latent_data["mu"]])
 
-    one_hot = tree_seqs["sequence"].apply(st.seq_to_one_hot)
-    tree_seqs["encoding"] = one_hot
+    min_r = np.min(np.stack(latent_data["mu"])[:, 0])
+    max_r = np.max(np.stack(latent_data["mu"])[:, 0])
 
-    tree_dataset = MSA_Dataset(
-        tree_seqs["encoding"],
-        pd.Series(np.arange(len(one_hot))),
-        tree_seqs["id"],
-        device=device,
-    )
+    min_g = np.min(np.stack(latent_data["mu"])[:, 1])
+    max_g = np.max(np.stack(latent_data["mu"])[:, 1])
 
-    tree_loader = torch.utils.data.DataLoader(
-        tree_dataset, batch_size=len(tree_dataset), shuffle=False
-    )
+    min_b = np.min(np.stack(latent_data["mu"])[:, 2])
+    max_b = np.max(np.stack(latent_data["mu"])[:, 2])
 
-    seq_len = tree_dataset[0][0].shape[0]
-    input_dims = seq_len * settings["AA_count"]
+    hex = []
+    for r, g, b in zs:
+        scaled_r = ((r - min_r) / (max_r - min_r),)
+        scaled_g = ((g - min_g) / (max_g - min_g),)
+        scaled_b = ((b - min_b) / (max_b - min_b),)
+        hex.append(rgb_to_hex_normalized(*scaled_r, *scaled_g, *scaled_b))
 
-    model = SeqVAE(
-        dim_latent_vars=settings["latent_dims"],
-        dim_msa_vars=input_dims,
-        num_hidden_units=settings["hidden_dims"],
-        settings=settings,
-        num_aa_type=settings["AA_count"],
-    )
-
-    model = model.to(device)
-
-    model.load_state_dict(torch.load(state_dict, map_location=device))
-    latent = get_mu(model, tree_loader)
-    ae_rgb = [
-        rgb_to_hex_normalized(*((z - np.min(z)) / (np.max(z) - np.min(z))))
-        for z in latent["mu"]
-    ]
-    latent["COLOR"] = ae_rgb
-    latent.drop(columns=["mu"], inplace=True)
-    write_itol_dataset_symbol(f"{filename}_itol.csv", latent)
+    latent_data["COLOR"] = hex
+    latent_data.drop(columns=["mu"], inplace=True)
+    write_itol_dataset_symbol(f"{filename}_itol.csv", latent_data)
 
 
 def vis_tree(
@@ -205,7 +182,27 @@ def vis_tree(
     title,
     rgb=True,
     lower_2d=False,
-) -> None:
+    save=False,
+    save_title="out.svg",
+) -> pd.DataFrame:
+    """
+    Visualizes a tree using a VAE model.
+
+    Args:
+        wt_id (str): The ID of the wildtype sequence.
+        tree_seq_path (str): The file path to the tree sequence file.
+        state_dict (str): The file path to the saved model state dictionary.
+        settings (dict): A dictionary containing various settings for the model.
+        title (str): The title of the visualization.
+        rgb (bool, optional): Whether to use RGB color encoding. Defaults to True.
+        lower_2d (bool, optional): Whether to visualize in 2D. Defaults to False.
+
+    Returns:
+        pd.DataFrame: The latent representation of the tree.
+
+    Raises:
+        FileNotFoundError: If the tree sequence file or the model state dictionary file is not found.
+    """
 
     tree_seqs = st.read_aln_file(tree_seq_path)
 
@@ -247,13 +244,16 @@ def vis_tree(
         fig, (ax) = plt.subplots(1, 1, figsize=(12, 8))
         tree_vis_2d(latent, wt_id, rgb=rgb, ax=ax)
     else:
-        fig, (ax) = plt.subplots(1, 1, figsize=(12, 8), subplot_kw={"projection": "3d"})
+        fig, (ax) = plt.subplots(1, 1, figsize=(18, 8), subplot_kw={"projection": "3d"})
         tree_vis_3d(latent, wt_id, rgb=rgb, ax=ax)
 
     # ax.view_init(elev=30, azim=40)  # Change these values to get the desired orientation
     ax.set_title(f"{title}")
     ax.legend()
+    plt.savefig(save_title, dpi=300) if save else None
     plt.show()
+
+    return latent
 
 
 def tree_vis_3d(data, wt_id, rgb, ax):
@@ -265,7 +265,7 @@ def tree_vis_3d(data, wt_id, rgb, ax):
 
     ax.set_xlabel("Z1")
     ax.set_ylabel("Z2")
-    ax.set_zlabel("Z3")
+    ax.set_zlabel("Z3", rotation=90)
 
     an_zs = np.array([z for z in ancestors["mu"]])
     ex_zs = np.array([z for z in extants["mu"]])
