@@ -51,7 +51,7 @@ def prepare_dataset(
     # add weights to the sequences
     numpy_aln, _, _ = st.convert_msa_numpy_array(train_aln)
     weights = st.position_based_seq_weighting(
-        numpy_aln, n_processes=int(os.getenv("SLURM_CPUS_PER_TASK"))
+        numpy_aln, n_processes=2  # int(os.getenv("SLURM_CPUS_PER_TASK"))
     )
     # weights = st.reweight_by_seq_similarity(numpy_aln, theta=0.2)
     train_aln["weights"] = weights

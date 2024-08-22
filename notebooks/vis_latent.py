@@ -255,13 +255,17 @@ plt.show()
 path = "/Users/sebs_mac/uni_OneDrive/honours/data/gcn4/ancestors/"
 gcn4_tree = path + "tree_0_ancestors_extants.aln"
 
-vs.latent_tree_to_itol("gcn4", 
-                 tree_seq_path=gcn4_tree, 
-                 ae_state_dict="/Users/sebs_mac/uni_OneDrive/honours/data/standard_test_results/gcn4_standard/gcn4_ae/gcn4_ae_r8/gcn4_ae_r8_model_state.pt",
-                 a_state_dict="/Users/sebs_mac/uni_OneDrive/honours/data/standard_test_results/gcn4_standard/gcn4_a/gcn4_a_r6/gcn4_a_r6_model_state.pt",
-                 e_state_dict="/Users/sebs_mac/uni_OneDrive/honours/data/standard_test_results/gcn4_standard/gcn4_e/gcn4_e_r1/gcn4_e_r1_model_state.pt",
-                 settings=settings
-                 )
+
+a_state_dict = "/Users/sebs_mac/uni_OneDrive/honours/data/vis_models/gcn4_a_r1_model_state.pt"
+e_state_dict = "/Users/sebs_mac/uni_OneDrive/honours/data/vis_models/gcn4_e_r1_model_state.pt"
+
+a_model = vs.vis_tree(None, gcn4_tree, a_state_dict, settings, "GCN4 - Ancestor model", rgb=True, save=True, save_title="gcn4_a_r1.svg")
+e_model = vs.vis_tree(None, gcn4_tree, e_state_dict, settings, "GCN4 - Extant model", rgb=True, save=True, save_title="gcn4_e_r1.svg")
+
+
+
+vs.latent_tree_to_itol(a_model, "gcn4_a_itol")
+vs.latent_tree_to_itol(e_model, "gcn4_e_itol")
 # -
 
 # # MAFG 
@@ -323,11 +327,14 @@ a_state_dict=  "/Users/sebs_mac/uni_OneDrive/honours/data/standard_test_results/
 e_state_dict = "/Users/sebs_mac/uni_OneDrive/honours/data/standard_test_results/raw_data/cassowary_standard/cassowary_e_r1/cassowary_e_r1_model_state.pt"
 
 
-vs.vis_tree(None, cass_tree, a_state_dict, settings, "RNAseZ - Ancestor model", rgb=True, lower_2d=True)
-vs.vis_tree(None, cass_tree, e_state_dict, settings, "RNAseZ - Extant model", rgb=True, lower_2d=True)
-vs.vis_tree(None, cass_tree, a_state_dict, settings, "RNAseZ - Ancestor model", rgb=True)
-vs.vis_tree(None, cass_tree, e_state_dict, settings, "RNAseZ - Extant model", rgb=True)
+##vs.vis_tree(None, cass_tree, a_state_dict, settings, "RNAseZ - Ancestor model", rgb=True, lower_2d=True)
+#vs.vis_tree(None, cass_tree, e_state_dict, settings, "RNAseZ - Extant model", rgb=True, lower_2d=True)
+a_model = vs.vis_tree(None, cass_tree, a_state_dict, settings, "RNAseZ - Ancestor model", rgb=True, save=True, save_title="cassowary_a_r1.svg")
+e_model = vs.vis_tree(None, cass_tree, e_state_dict, settings, "RNAseZ - Extant model", rgb=True, save=True, save_title="cassowary_e_r1.svg")
 # -
+
+vs.latent_tree_to_itol(a_model, "test")
+
 
 # ## GB1
 

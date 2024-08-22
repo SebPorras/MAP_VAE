@@ -123,7 +123,7 @@ recon = recon.rename(columns={"reconstruction": "sequence"})
 
 # find the pairwise covariances of each column in the MSAs
 actual_covar, predicted_covar = calc_covariances(
-    recon, actual, int(os.getenv("SLURM_CPUS_PER_TASK"))
+    recon, actual, 4  # int(os.getenv("SLURM_CPUS_PER_TASK"))
 )
 
 # Calculate correlation coefficient and save an image to file

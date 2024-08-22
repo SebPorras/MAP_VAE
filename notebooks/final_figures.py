@@ -84,18 +84,27 @@ for protein in datasets:
 thing = "/Users/sebs_mac/uni_OneDrive/honours/data/optimised_model_metrics/reconstruction_validation/"
 data = pd.read_csv(f"{thing}k_fold_covariances.csv")
 
+palette = sns.color_palette()
+palette = {
+    "Ancestors": palette[0],
+    "Extants": palette[2],
+    "Ancestors/Extants": palette[1]
+}
+
 g = sns.catplot(
 data=data,
 x="family",
 y="pearson",
 hue="category",
 kind="bar",
-height=6,  # Adjust height here
-aspect=1.5,  # Adjust aspect ratio here
+height=6,  
+aspect=1.5,
+palette=palette, 
 legend=False
 )
 
 handles, labels = g.ax.get_legend_handles_labels()
+print(labels)
 g.ax.legend(handles, ["Ancestors (5-fold cross val)", "Extants (5-fold cross val)", "Ancestors/Extants (20% test split)"], title="Training data", loc="center left", bbox_to_anchor=(1, 0.5))
 
 g.set_axis_labels("Protein Family")
@@ -356,9 +365,9 @@ for v, t in zip(vars, titles):
     ax.set_xticks(xticks)
     ax.set_xticklabels([f"{int(x*100)}%" for x in xticks])
     ax.set_xlabel("Percentage of extants in sample")
-    ax.set_xticklabels([f"{int(x*100)}%" for x in xticks])
-    ax.set_xlabel("Percentage of extants in sample")
 
+    ax.set_ylabel("Pearson correlation coefficient (r)")
+    
     plt.show()
 
 
@@ -611,5 +620,34 @@ g.add_legend()
 plt.show()      
 
 # -
+# ## Using a single tree to train
+
+
+# +
+data = pd.read_csv("/Users/sebs_mac/uni_OneDrive/honours/data/single_tree/output/single_tree_zero_shot_metrics.csv")
+metrics = ["spearman_rho", "top_k_recall", "ndcg", "roc_auc"]
+melted_data = pd.melt(data, id_vars=['Protein_family', 'data'], value_vars=metrics, var_name='metric', value_name='value')  
+
+for metric in metrics:
+    subset = melted_data[melted_data["metric"] == metric]
+    g = sns.catplot(
+    data=subset,    
+    x="Protein_family",
+    y="value",
+    hue="data",
+    kind="bar",
+    height=6,  # Adjust height here
+    aspect=1.5,  # Adjust aspect ratio here
+    legend=False
+    )
+    g.set_axis_labels("Protein Family")
+    g.set_titles("{col_name}")
+       #g.set(ylim=(0, None))
+    g.add_legend(title="Training data")
+    plt.title(" ".join(metric.upper().split("_")))
+    plt.show()  
+# -
+
+data.head()
 
 

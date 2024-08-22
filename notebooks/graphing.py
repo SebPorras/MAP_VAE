@@ -207,5 +207,20 @@ ax.legend(
 plt.show()
 
 # -
+import os
+path = "/Users/sebs_mac/uni_OneDrive/honours/data/single_tree/output/recon_metrics/"
+files = [pd.read_csv(path + x) for x in os.listdir(path) if x.endswith(".csv")] 
+files[0]
+
+
+all_data = pd.concat(files, ignore_index=True)
+all_data.head()
+
+protein_family = [x.upper() for x in all_data["unique_id"].str.split("_", expand=True)[0]]
+type = ["Extant" if x == "ext" else "Ancestor" for x in all_data["unique_id"].str.split("_", expand=True)[1]]
+all_data["Protein_family"] = protein_family
+all_data["data"] = type
+all_data
+all_data.to_csv("/Users/sebs_mac/uni_OneDrive/honours/data/single_tree/output/single_tree_marginal_metrics.csv", index=False)
 
 
