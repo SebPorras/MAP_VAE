@@ -8,6 +8,16 @@ from evoVAE.utils.seq_tools import GAPPY_ALPHABET_LEN
 
 
 class SeqVAE(nn.Module):
+    """
+    Initializes the SeqVAE model.
+
+    Args:
+        dim_latent_vars (int): Dimension of the latent space.
+        dim_msa_vars (int): Length of a flattened MSA sequence. i.e. seq_len * alphabet_size.
+        num_hidden_units (List[int]): A list of integers representing the number of hidden units in each layer of the encoder and decoder.
+        settings (Dict): A dictionary containing additional settings for the model. Refer to dummy_config.yaml for more info.
+        num_aa_type (int, optional): The number of amino acid types. Defaults to 21.
+    """
 
     def __init__(
         self,
@@ -132,12 +142,6 @@ class SeqVAE(nn.Module):
             0.5 * (sigma**2 + mu**2 - 2 * torch.log(sigma) - 1), -1
         )
 
-        """
-        kld = torch.sum(
-            0.5 * (sigma**2 + mu**2 - 2 * torch.log(sigma) - 1), -1
-        )
-        """
-
         # compute elbo.
         elbo = log_PxGz - kld
         weight = weight / torch.sum(weight)
@@ -168,20 +172,25 @@ class SeqVAE(nn.Module):
             x = x.expand(num_samples, -1, -1)
             x = torch.flatten(x, start_dim=1)
 
-            # estimate log_p using prob density function for a Gaussian normal
             mu, sigma = self.encoder(x)
             eps = torch.randn_like(mu)
             z = mu + sigma * eps
+            # estimate log_Pz using prob density function for a Gaussian normal
+            # remember that our distribution is isotropic (mean=0, std=1), so many terms cancel out
             log_Pz = torch.sum(
                 -0.5 * z**2 - 0.5 * torch.log(2 * z.new_tensor(np.pi)), -1
             )
             log_p = self.decoder(z)
+            # get the conditional distribution P(x|z)
             log_PxGz = torch.sum(x * log_p, -1)
 
-            # find the joint distribution P(x,z)
+            # find the joint distribution P(x,z)= P(x|z)P(z)
             log_Pxz = log_Pz + log_PxGz
 
             # now estimate q(z|x) using prob density function for a Gaussian normal
+            # log PDF of a Gaussian normal is given by:
+            # ln(1/(sigma*(2pi)^0.5))) - 0.5*((z - mu)^2 / sigma^2)
+            # ln(1/(sigma*(2pi)^0.5))) - 0.5*((mu + sigma * eps - mu)^2 / sigma^2)
             log_QzGx = torch.sum(
                 -0.5 * (eps) ** 2
                 - 0.5 * torch.log(2 * z.new_tensor(np.pi))
