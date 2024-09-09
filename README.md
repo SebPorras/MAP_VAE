@@ -13,7 +13,7 @@ Install with `pip install -e .`
 There are [Jupyter](https://jupyter.org/) notebooks distributed as plaintext Python files, which can be converted/synced with [`jupytext`](https://github.com/mwouts/jupytext).
 
 ```bash
-jupytext --sync ./scripts/*.py
+jupytext --sync ./notebooks/<file>.py
 ```
 
 
