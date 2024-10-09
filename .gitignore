@@ -13,10 +13,6 @@ scripts/wandb
 scripts/ancestor_random_sampling/gb1/training/wandb/
 
 # Non-important data 
-data/FashionMNIST
-data/
-data/dms_data
-data/alignments
 scripts/configs/
 
 # generated version file

@@ -1,0 +1,21 @@
+AA_count: 21
+alignment: ../data/example.aln
+architecture: SeqVAE
+batch_size: 128
+dms_file: A4_HUMAN_Seuma_2022.csv
+dms_id: A4_HUMAN_Seuma_2022
+dms_metadata: ../data/DMS_substitutions.csv
+epochs: 500
+extant_aln: ../data/example.aln
+hidden_dims:
+- 150
+- 150
+latent_dims: 3
+learning_rate: 0.0001
+max_mutation: 4
+patience: 3
+replicate_csv: null
+seq_theta: 0.2
+weight_decay: 0
+test_split: 0.2
+
