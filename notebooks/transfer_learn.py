@@ -13,10 +13,10 @@
 #     name: python3
 # ---
 
-import evoVAE.utils.visualisation as vs 
-import evoVAE.utils.seq_tools as st
-from evoVAE.models.seqVAE import SeqVAE
-from evoVAE.utils.datasets import MSA_Dataset
+import src.utils.visualisation as vs
+import src.utils.seq_tools as st
+from src.models.seqVAE import SeqVAE
+from src.utils.datasets import MSA_Dataset
 import pandas as pd
 import torch
 import numpy as np
@@ -35,7 +35,7 @@ variant_seqs[variant_seqs["mutant"] == "K3E"]
 
 # +
 
-variant_seqs["encoding"] =  variant_seqs["mutated_sequence"].apply(st.seq_to_one_hot)
+variant_seqs["encoding"] = variant_seqs["mutated_sequence"].apply(st.seq_to_one_hot)
 num_seqs = len(variant_seqs["mutated_sequence"])
 
 
@@ -96,7 +96,7 @@ oh = np.stack(gfp_train["mutated_sequence"].apply(st.seq_to_one_hot))
 
 data_tuples = oh.tolist()  # Convert to a list of lists of lists
 
-df = pd.DataFrame(data_tuples, columns=[f'column_{i}' for i in range(238)])
+df = pd.DataFrame(data_tuples, columns=[f"column_{i}" for i in range(238)])
 
 
 df
@@ -106,10 +106,10 @@ con = pd.concat([gfp_train, df], join="outer")
 con
 
 from sklearn.linear_model import RidgeCV
+
 ridge_model = RidgeCV(alphas=np.logspace(-6, 6, 1000), gcv_mode="auto")
 X = np.array([np.array(x) for x in gfp_train["mu"]])
 y = gfp_train["DMS_score"].values
-
 
 
 y.values
@@ -117,9 +117,7 @@ y.values
 # +
 
 
-
 ridge_model.fit(X, y)
-
 
 
 X_test = np.array([np.array(x) for x in gfp_test["mu"]])
@@ -131,7 +129,7 @@ plt.scatter(x_hat, y_test)
 plt.show()
 # -
 
-X = np.array([st.seq_to_one_hot(x) for x in  gfp_train["mutated_sequence"]])
+X = np.array([st.seq_to_one_hot(x) for x in gfp_train["mutated_sequence"]])
 y = gfp_train["DMS_score"].values
 
 X.shape, y.shape
@@ -144,13 +142,13 @@ df = pd.DataFrame(data)
 
 # +
 ridge_model_oh = RidgeCV(alphas=np.logspace(-6, 6, 1000), gcv_mode="auto")
-X = np.array([st.seq_to_one_hot(x).flatten() for x in  gfp_train["mutated_sequence"]])
+X = np.array([st.seq_to_one_hot(x).flatten() for x in gfp_train["mutated_sequence"]])
 y = gfp_train["DMS_score"]
 ridge_model_oh.fit(X, y)
 
 
 x_hat = ridge_model_oh.predict(X)
-print(np.corrcoef(x_hat, y)
+print(np.corrcoef(x_hat, y))
 
 plt.scatter(x_hat, y)
 plt.show()
@@ -158,6 +156,4 @@ plt.show()
 
 np.corrcoef(x_hat, y)
 
-len([st.seq_to_one_hot(x).flatten() for x in  gfp_train["mutated_sequence"]][0])
-
-
+len([st.seq_to_one_hot(x).flatten() for x in gfp_train["mutated_sequence"]][0])

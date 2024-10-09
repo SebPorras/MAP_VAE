@@ -18,10 +18,10 @@
 
 import pandas as pd
 import matplotlib.pyplot as plt
-import evoVAE.utils.seq_tools as st
+import src.utils.seq_tools as st
 import numpy as np
 import logomaker as lm
-import evoVAE.utils.statistics as stats
+import src.utils.statistics as stats
 from matplotlib.patches import Patch
 from scipy.stats import wasserstein_distance
 
@@ -334,7 +334,6 @@ plot_entropy(
 
 plt.show()
 # -
-
 
 
 # #### GB1 - Wasserstein distance
@@ -1603,23 +1602,25 @@ plt.title("Wasserstein distance per column between Ancestors and Extants (MAFG)"
 plt.show()
 # -
 
-# ## Model extant recons compared to actual 
+# ## Model extant recons compared to actual
 
-import evoVAE.utils.seq_tools as st
+import src.utils.seq_tools as st
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
-from evoVAE.utils.datasets import MSA_Dataset
-from evoVAE.models.seqVAE import SeqVAE
+from src.utils.datasets import MSA_Dataset
+from src.models.seqVAE import SeqVAE
 import yaml
-import torch 
-import evoVAE.utils.statistics as stats
-import evoVAE.utils.visualisation as vs
+import torch
+import src.utils.statistics as stats
+import src.utils.visualisation as vs
 
 
 # +
-def perform_reconstruction(sequences: pd.DataFrame, model: SeqVAE, device) -> pd.DataFrame:
+def perform_reconstruction(
+    sequences: pd.DataFrame, model: SeqVAE, device
+) -> pd.DataFrame:
     """
     Reconstructs sequences using a SeqVAE model.
 
@@ -1632,25 +1633,30 @@ def perform_reconstruction(sequences: pd.DataFrame, model: SeqVAE, device) -> pd
         pd.DataFrame: A DataFrame containing the reconstructed sequences and their corresponding IDs.
     """
     encodings = sequences["sequence"].apply(st.seq_to_one_hot)
-    dataset = MSA_Dataset(encodings, np.arange(sequences.shape[0]), extants["id"], device)
+    dataset = MSA_Dataset(
+        encodings, np.arange(sequences.shape[0]), extants["id"], device
+    )
     loader = torch.utils.data.DataLoader(dataset, batch_size=32, shuffle=False)
-    
+
     recons = []
     ids = []
     for x, _, id in loader:
         x = x.to(device)
         indices = model.reconstruct(x)
 
-        # how to have two loops in list comprehension 
-        sequences = ["".join([st.GAPPY_PROTEIN_ALPHABET[i] for i in seq]) for seq in indices]
+        # how to have two loops in list comprehension
+        sequences = [
+            "".join([st.GAPPY_PROTEIN_ALPHABET[i] for i in seq]) for seq in indices
+        ]
         recons.extend(sequences)
         ids.extend(id)
 
     df = pd.DataFrame({"id": ids, "sequence": recons})
     return df
 
+
 def prepare_model(sequences: pd.DataFrame, state_dict: str, settings: dict) -> SeqVAE:
-   
+
     seq_len = len(sequences["sequence"].values[0])
     input_dims = seq_len * st.GAPPY_ALPHABET_LEN
 
@@ -1660,7 +1666,7 @@ def prepare_model(sequences: pd.DataFrame, state_dict: str, settings: dict) -> S
         dim_msa_vars=input_dims,
         num_hidden_units=settings["hidden_dims"],
         settings=settings,
-        num_aa_type=21
+        num_aa_type=21,
     )
 
     model.load_state_dict(torch.load(state_dict, map_location=torch.device("cpu")))
@@ -1668,7 +1674,6 @@ def prepare_model(sequences: pd.DataFrame, state_dict: str, settings: dict) -> S
     model.eval()
 
     return model
-
 
 
 # +
@@ -1684,15 +1689,15 @@ device = torch.device("mps")
 
 for prot, mutations, dims in zip(proteins, mutation_positions, latent_dims):
 
-    extants = st.read_aln_file(aln_path +  f"{prot.upper()}_extants_no_dupes.aln")
-    
+    extants = st.read_aln_file(aln_path + f"{prot.upper()}_extants_no_dupes.aln")
+
     state_dict = f"/Users/sebs_mac/uni_OneDrive/honours/data/optimised_model_metrics/zero_shot_tasks/model_states/{prot}_ae_r1_model_state.pt"
     with open("../data/dummy_config.yaml", "r") as stream:
-            settings = yaml.safe_load(stream)
+        settings = yaml.safe_load(stream)
     settings["latent_dims"] = dims
 
     model = prepare_model(extants, state_dict, settings)
-    
+
     reconstructions = perform_reconstruction(extants, model, device)
     st.write_fasta_file(f"{prot}_ae_model_extant_reconstructions.aln", reconstructions)
 
@@ -1709,11 +1714,10 @@ for prot, mutations, dims in zip(proteins, mutation_positions, latent_dims):
         max_entropy=2.5,
     )
 
-    vs.plot_ppm_difference(extants, reconstructions,fig, ax2)
+    vs.plot_ppm_difference(extants, reconstructions, fig, ax2)
     ax2.set_title(f"{prot.upper()} Extant PPM - recons PPM ")
     ax2.set_xlabel("Sequence index")
     ax2.set_ylabel("Amino acid")
-    
 
     plt.show()
 
@@ -1725,17 +1729,17 @@ from ipydatagrid import DataGrid, TextRenderer, BarRenderer, Expr, ImageRenderer
 
 # +
 aln_path = "/Users/sebs_mac/uni_OneDrive/honours/data/all_alns/"
-extants = st.read_aln_file(aln_path +  "gfp_extants_no_dupes.aln")
+extants = st.read_aln_file(aln_path + "gfp_extants_no_dupes.aln")
 
 
 state_dict = f"/Users/sebs_mac/uni_OneDrive/honours/data/optimised_model_metrics/zero_shot_tasks/model_states/gfp_ae_r1_model_state.pt"
 with open("../data/dummy_config.yaml", "r") as stream:
-            settings = yaml.safe_load(stream)
+    settings = yaml.safe_load(stream)
 settings["latent_dims"] = 3
 
 model = prepare_model(extants, state_dict, settings)
 
-device = torch.device("mps")    
+device = torch.device("mps")
 encodings = extants["sequence"].apply(st.seq_to_one_hot)
 dataset = MSA_Dataset(encodings, np.arange(extants.shape[0]), extants["id"], device)
 loader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False)
@@ -1750,31 +1754,43 @@ from mpl_toolkits.mplot3d import Axes3D
 from ipywidgets import FloatSlider, Dropdown, ColorPicker, HBox, VBox, Output
 from IPython.display import display
 
+
 # Function to update the expression and DataGrid
 def on_change(*args, **kwargs):
 
-    conditional_expression.value = "'{color}' if cell.value {operator} {highlight} else default_value".format(
-        operator=operator_dropdown.value,
-        highlight=highlight.value,
-        color=output_colorpicker.value,
+    conditional_expression.value = (
+        "'{color}' if cell.value {operator} {highlight} else default_value".format(
+            operator=operator_dropdown.value,
+            highlight=highlight.value,
+            color=output_colorpicker.value,
+        )
     )
+
 
 def update_probs(*args, **kwargs):
 
-    log_p = model.latent_to_log_p(torch.Tensor([reference_slider_1.value, 
-                                                reference_slider_2.value,
-                                                reference_slider_3.value]).to(device), 238, 21)
-    
+    log_p = model.latent_to_log_p(
+        torch.Tensor(
+            [
+                reference_slider_1.value,
+                reference_slider_2.value,
+                reference_slider_3.value,
+            ]
+        ).to(device),
+        238,
+        21,
+    )
+
     p = np.exp(log_p)
     huge_data, huge_df = update_datagrid(p)
     conditional_huge_datagrid.data = huge_df
-    #update_3d_plot()
+    # update_3d_plot()
 
 
 def update_datagrid(sequence_log_p: np.ndarray):
-    
+
     to_plot = sequence_log_p[0, :, :]
-    # transpose so rows are AA, cols are seq positions 
+    # transpose so rows are AA, cols are seq positions
     to_plot = to_plot.T
 
     data = {"data": [], "schema": {}}
@@ -1782,9 +1798,11 @@ def update_datagrid(sequence_log_p: np.ndarray):
     data["data"] = to_plot.tolist()
 
     data["schema"]["fields"] = [
-        {"name": c, type: "number"} for c in st.GAPPY_PROTEIN_ALPHABET]
-        
+        {"name": c, type: "number"} for c in st.GAPPY_PROTEIN_ALPHABET
+    ]
+
     return data, pd.DataFrame(data["data"], index=st.GAPPY_PROTEIN_ALPHABET)
+
 
 # Define the rendering function
 def renderer_function(cell, default_value):
@@ -1828,21 +1846,27 @@ output_colorpicker.observe(on_change, "value")
 
 # 3D plot setup
 output_3d = Output()
-#fig = plt.figure()
-#ax = fig.add_subplot(111, projection='3d')
+# fig = plt.figure()
+# ax = fig.add_subplot(111, projection='3d')
 
 
 # Initial 3D plot
-#update_3d_plot()
+# update_3d_plot()
 
 # Layout
-hbox = HBox((operator_dropdown, reference_slider_1, reference_slider_2, reference_slider_3, highlight, output_colorpicker))
+hbox = HBox(
+    (
+        operator_dropdown,
+        reference_slider_1,
+        reference_slider_2,
+        reference_slider_3,
+        highlight,
+        output_colorpicker,
+    )
+)
 display(VBox([conditional_huge_datagrid, hbox]))
 
 # -
 
 
-
 log_p.shape
-
-

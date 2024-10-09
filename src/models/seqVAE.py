@@ -3,8 +3,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from typing import Tuple, List, Dict
-from evoVAE.models.types_ import *
-from evoVAE.utils.seq_tools import GAPPY_ALPHABET_LEN
+from src.models.types_ import *
+from src.utils.seq_tools import GAPPY_ALPHABET_LEN
 
 
 class SeqVAE(nn.Module):

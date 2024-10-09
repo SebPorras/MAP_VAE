@@ -1,12 +1,12 @@
-from evoVAE.utils.datasets import MSA_Dataset
-import evoVAE.utils.seq_tools as st
-from evoVAE.models.seqVAE import SeqVAE
+from src.utils.datasets import MSA_Dataset
+import src.utils.seq_tools as st
+from src.models.seqVAE import SeqVAE
 import pandas as pd
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
-import evoVAE.utils.statistics as stats
+import src.utils.statistics as stats
 from matplotlib.patches import Patch
 from typing import List, Optional
 from matplotlib.patches import Patch

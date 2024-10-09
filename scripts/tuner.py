@@ -7,18 +7,18 @@ to maximise the marginal probability of the validation set.
 """
 
 import torch.utils
-from evoVAE.utils.datasets import MSA_Dataset
-from evoVAE.models.seqVAE import SeqVAE
+from src.utils.datasets import MSA_Dataset
+from src.models.seqVAE import SeqVAE
 import pandas as pd
-import evoVAE.utils.seq_tools as st
+import src.utils.seq_tools as st
 import yaml, os, torch, argparse
 from pathlib import Path
 import numpy as np
 from sklearn.model_selection import train_test_split
 from torch.optim.lr_scheduler import CosineAnnealingLR
-from evoVAE.loss.standard_loss import frange_cycle_linear
+from src.loss.standard_loss import frange_cycle_linear
 import optuna
-from evoVAE.trainer.seq_trainer import train_loop
+from src.trainer.seq_trainer import train_loop
 from optuna.trial import TrialState
 from functools import partial
 import logging

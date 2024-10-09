@@ -1,5 +1,5 @@
-from evoVAE.models.seqVAE import SeqVAE
-from evoVAE.models.types_ import *
+from src.models.seqVAE import SeqVAE
+from src.models.types_ import *
 import torch
 import numpy as np
 

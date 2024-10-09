@@ -6,7 +6,7 @@ import pandas as pd
 from scipy.spatial import distance_matrix
 from scipy.spatial.distance import euclidean
 import matplotlib.pyplot as plt
-import evoVAE.utils.seq_tools as st
+import src.utils.seq_tools as st
 import os
 from joblib import dump, load, Parallel, delayed
 from numba import njit

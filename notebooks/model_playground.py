@@ -13,16 +13,20 @@
 #     name: python3
 # ---
 
-import evoVAE.utils.seq_tools as st
-import evoVAE.utils.metrics as mt
-from evoVAE.models.seqVAE import SeqVAE
+import src.utils.seq_tools as st
+import src.utils.metrics as mt
+from src.models.seqVAE import SeqVAE
 from typing import List, Tuple
 from sklearn.model_selection import train_test_split
 import pandas as pd
 import torch
 import numpy as np
 import yaml
-from evoVAE.loss.standard_loss import KL_divergence, sequence_likelihood, elbo_importance_sampling
+from src.loss.standard_loss import (
+    KL_divergence,
+    sequence_likelihood,
+    elbo_importance_sampling,
+)
 
 
 # This notebook can be used to test new features for a model without having to use the WandB service
@@ -30,17 +34,17 @@ from evoVAE.loss.standard_loss import KL_divergence, sequence_likelihood, elbo_i
 # +
 with open("../data/dummy_config.yaml", "r") as stream:
     settings = yaml.safe_load(stream)
-seq_len = 770 # A4 Human length 
+seq_len = 770  # A4 Human length
 input_dims = seq_len * settings["AA_count"]
 
 
 model = SeqVAE(
-         dim_latent_vars=settings["latent_dims"],
-         dim_msa_vars=input_dims,
-         num_hidden_units=settings["hidden_dims"],
-         settings=settings,
-         num_aa_type=settings["AA_count"],
-     )
+    dim_latent_vars=settings["latent_dims"],
+    dim_msa_vars=input_dims,
+    num_hidden_units=settings["hidden_dims"],
+    settings=settings,
+    num_aa_type=settings["AA_count"],
+)
 
 # device = "cpu"
 # model.load_state_dict(torch.load("a4_extants_r1_model_state.pt", map_location=device))
@@ -55,10 +59,13 @@ dms_data["encoding"] = one_hot
 #
 
 # +
-from evoVAE.utils.datasets import DMS_Dataset, MSA_Dataset
+from src.utils.datasets import DMS_Dataset, MSA_Dataset
+
 device = torch.device("cpu")
 
-aln = st.read_aln_file("/Users/sebs_mac/uni_OneDrive/honours/data/a4_human/alns/a4_extants_no_dupes.fasta")
+aln = st.read_aln_file(
+    "/Users/sebs_mac/uni_OneDrive/honours/data/a4_human/alns/a4_extants_no_dupes.fasta"
+)
 one_hot = aln["sequence"].apply(st.seq_to_one_hot)
 aln["encoding"] = one_hot
 
@@ -69,9 +76,7 @@ aln["weights"] = weights
 
 aln = aln.loc[range(10)]
 msas = MSA_Dataset(aln["encoding"], aln["weights"], aln["id"], device)
-train_loader = torch.utils.data.DataLoader(
-        msas, batch_size=1, shuffle=True
-    )
+train_loader = torch.utils.data.DataLoader(msas, batch_size=1, shuffle=True)
 
 
 # +
@@ -79,7 +84,11 @@ num_samples = 10
 ebls = []
 with torch.no_grad():
 
-    for x, _, id, in train_loader:
+    for (
+        x,
+        _,
+        id,
+    ) in train_loader:
 
         elbo = model.compute_elbo_with_multiple_samples(x, 5000)
         ebls.append(elbo)
@@ -87,5 +96,3 @@ with torch.no_grad():
 
 np.mean(ebls)
 # -
-
-

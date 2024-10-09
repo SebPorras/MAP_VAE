@@ -13,12 +13,13 @@
 #     name: python3
 # ---
 
-import pandas as pd 
-import numpy as np 
-import evoVAE.utils.metrics as mt 
-import evoVAE.utils.seq_tools as st
+import pandas as pd
+import numpy as np
+import src.utils.metrics as mt
+import src.utils.seq_tools as st
 import random
-#pd.set_option('display.max_rows', None)
+
+# pd.set_option('display.max_rows', None)
 import matplotlib.pyplot as plt
 import random
 import os
@@ -29,8 +30,17 @@ import os
 # +
 path = "/Users/sebs_mac/k_fold_results/gb1/"
 
-metric_paths = ["_".join(subdir.split("_")[:2]) + "_5_fold_" + "_".join(subdir.split("_")[2:]) for subdir in os.listdir(path) if subdir != ".DS_Store"]
-metrics = [pd.read_csv(f"{path}{'_'.join(subdir.split('_')[:2] + subdir.split('_')[-2:])}/{subdir}_r1_metrics.csv") for subdir in  metric_paths]
+metric_paths = [
+    "_".join(subdir.split("_")[:2]) + "_5_fold_" + "_".join(subdir.split("_")[2:])
+    for subdir in os.listdir(path)
+    if subdir != ".DS_Store"
+]
+metrics = [
+    pd.read_csv(
+        f"{path}{'_'.join(subdir.split('_')[:2] + subdir.split('_')[-2:])}/{subdir}_r1_metrics.csv"
+    )
+    for subdir in metric_paths
+]
 all_metrics = pd.concat(metrics)
 dataset = [x[1] for x in all_metrics["unique_id"].str.split("_")]
 decay = [x[5] for x in all_metrics["unique_id"].str.split("_")]
@@ -43,6 +53,7 @@ gb1_e = all_metrics[all_metrics["dataset"] == "e"]
 
 
 # +
+
 
 def summary_data(data: pd.DataFrame):
     marginal_results = {}
@@ -71,32 +82,49 @@ gb1_e_marginal_results, gb1_e_spear_results = summary_data(gb1_e)
 
 
 def plot(marginal_results: dict, spear_results: dict, title):
-    sorted_marginal_keys = sorted(marginal_results.keys(), key=lambda x: float(x.split("_")[-1]))
+    sorted_marginal_keys = sorted(
+        marginal_results.keys(), key=lambda x: float(x.split("_")[-1])
+    )
     sorted_marginal_values = [marginal_results[k] for k in sorted_marginal_keys]
 
     # Sort the data for the second subplot
-    sorted_spear_keys = sorted(spear_results.keys(), key=lambda x: float(x.split("_")[-1]))
+    sorted_spear_keys = sorted(
+        spear_results.keys(), key=lambda x: float(x.split("_")[-1])
+    )
     sorted_spear_values = [spear_results[k] for k in sorted_spear_keys]
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 8))
 
     # Create bar plot for the first subplot
-    bars = ax1.bar(sorted_marginal_keys, [x[0] for x in sorted_marginal_values], yerr=[x[1] for x in sorted_marginal_values])
-    ax1.set_xlabel('Weight decay')
-    ax1.set_ylabel('log(P(X))')
-    ax1.set_xticklabels([float(x.split("_")[-1]) for x in sorted_marginal_keys], rotation=45)
+    bars = ax1.bar(
+        sorted_marginal_keys,
+        [x[0] for x in sorted_marginal_values],
+        yerr=[x[1] for x in sorted_marginal_values],
+    )
+    ax1.set_xlabel("Weight decay")
+    ax1.set_ylabel("log(P(X))")
+    ax1.set_xticklabels(
+        [float(x.split("_")[-1]) for x in sorted_marginal_keys], rotation=45
+    )
 
     # Create bar plot for the second subplot
-    bars = ax2.bar(sorted_spear_keys, [x[0] for x in sorted_spear_values], yerr=[x[1] for x in sorted_spear_values])
-    ax2.set_xlabel('Weight decay')
-    ax2.set_ylabel('Spearman Rho')
-    ax2.set_xticklabels([float(x.split("_")[-1]) for x in sorted_spear_keys], rotation=45)
+    bars = ax2.bar(
+        sorted_spear_keys,
+        [x[0] for x in sorted_spear_values],
+        yerr=[x[1] for x in sorted_spear_values],
+    )
+    ax2.set_xlabel("Weight decay")
+    ax2.set_ylabel("Spearman Rho")
+    ax2.set_xticklabels(
+        [float(x.split("_")[-1]) for x in sorted_spear_keys], rotation=45
+    )
 
     # Set a title for the entire figure
     fig.suptitle(title)
 
     # Show plot
     plt.show()
+
 
 plot(gb1_ae_marginal_results, gb1_ae_spear_results, "GB1 AE")
 plot(gb1_a_marginal_results, gb1_a_spear_results, "GB1 A")
@@ -109,8 +137,17 @@ plot(gb1_e_marginal_results, gb1_e_spear_results, "GB1 E")
 # +
 path = "/Users/sebs_mac/k_fold_results/a4/"
 
-metric_paths = ["_".join(subdir.split("_")[:2]) + "_5_fold_" + "_".join(subdir.split("_")[2:]) for subdir in os.listdir(path) if subdir != ".DS_Store"]
-metrics = [pd.read_csv(f"{path}{'_'.join(subdir.split('_')[:2] + subdir.split('_')[-2:])}/{subdir}_r1_metrics.csv") for subdir in  metric_paths]
+metric_paths = [
+    "_".join(subdir.split("_")[:2]) + "_5_fold_" + "_".join(subdir.split("_")[2:])
+    for subdir in os.listdir(path)
+    if subdir != ".DS_Store"
+]
+metrics = [
+    pd.read_csv(
+        f"{path}{'_'.join(subdir.split('_')[:2] + subdir.split('_')[-2:])}/{subdir}_r1_metrics.csv"
+    )
+    for subdir in metric_paths
+]
 all_metrics = pd.concat(metrics)
 dataset = [x[1] for x in all_metrics["unique_id"].str.split("_")]
 decay = [x[5] for x in all_metrics["unique_id"].str.split("_")]
@@ -134,13 +171,22 @@ plot(a4_e_marginal_results, a4_e_spear_results, "A4 E")
 
 # -
 
-# ### GFP 
+# ### GFP
 
 # +
 path = "/Users/sebs_mac/k_fold_results/gfp/"
 
-metric_paths = ["_".join(subdir.split("_")[:2]) + "_5_fold_" + "_".join(subdir.split("_")[2:]) for subdir in os.listdir(path) if subdir != ".DS_Store"]
-metrics = [pd.read_csv(f"{path}{'_'.join(subdir.split('_')[:2] + subdir.split('_')[-2:])}/{subdir}_r1_metrics.csv") for subdir in  metric_paths]
+metric_paths = [
+    "_".join(subdir.split("_")[:2]) + "_5_fold_" + "_".join(subdir.split("_")[2:])
+    for subdir in os.listdir(path)
+    if subdir != ".DS_Store"
+]
+metrics = [
+    pd.read_csv(
+        f"{path}{'_'.join(subdir.split('_')[:2] + subdir.split('_')[-2:])}/{subdir}_r1_metrics.csv"
+    )
+    for subdir in metric_paths
+]
 all_metrics = pd.concat(metrics)
 dataset = [x[1] for x in all_metrics["unique_id"].str.split("_")]
 decay = [x[5] for x in all_metrics["unique_id"].str.split("_")]
@@ -166,8 +212,17 @@ plot(gfp_e_marginal_results, gfp_e_spear_results, "GFP E")
 # +
 path = "/Users/sebs_mac/k_fold_results/mafg/"
 
-metric_paths = ["_".join(subdir.split("_")[:2]) + "_5_fold_" + "_".join(subdir.split("_")[2:]) for subdir in os.listdir(path) if subdir != ".DS_Store"]
-metrics = [pd.read_csv(f"{path}{'_'.join(subdir.split('_')[:2] + subdir.split('_')[-2:])}/{subdir}_r1_metrics.csv") for subdir in  metric_paths]
+metric_paths = [
+    "_".join(subdir.split("_")[:2]) + "_5_fold_" + "_".join(subdir.split("_")[2:])
+    for subdir in os.listdir(path)
+    if subdir != ".DS_Store"
+]
+metrics = [
+    pd.read_csv(
+        f"{path}{'_'.join(subdir.split('_')[:2] + subdir.split('_')[-2:])}/{subdir}_r1_metrics.csv"
+    )
+    for subdir in metric_paths
+]
 all_metrics = pd.concat(metrics)
 dataset = [x[1] for x in all_metrics["unique_id"].str.split("_")]
 decay = [x[5] for x in all_metrics["unique_id"].str.split("_")]
@@ -177,13 +232,13 @@ all_metrics["weight_decay"] = decay
 mafg_ae = all_metrics[all_metrics["dataset"] == "ae"]
 mafg_a = all_metrics[all_metrics["dataset"] == "a"]
 mafg_e = all_metrics[all_metrics["dataset"] == "e"]
-mafg_ae_marginal_results,mafg_ae_spear_results = summary_data(mafg_ae)
-mafg_a_marginal_results, mafg_a_spear_results =  summary_data(mafg_a)
-mafg_e_marginal_results, mafg_e_spear_results =  summary_data(mafg_e)
+mafg_ae_marginal_results, mafg_ae_spear_results = summary_data(mafg_ae)
+mafg_a_marginal_results, mafg_a_spear_results = summary_data(mafg_a)
+mafg_e_marginal_results, mafg_e_spear_results = summary_data(mafg_e)
 
 plot(mafg_ae_marginal_results, mafg_ae_spear_results, "MAFG AE")
-plot(mafg_a_marginal_results,  mafg_a_spear_results,  "MAFG A")
-plot(mafg_e_marginal_results,  mafg_e_spear_results,  "MAFG E")
+plot(mafg_a_marginal_results, mafg_a_spear_results, "MAFG A")
+plot(mafg_e_marginal_results, mafg_e_spear_results, "MAFG E")
 # -
 
 # ### GCN4
@@ -191,8 +246,17 @@ plot(mafg_e_marginal_results,  mafg_e_spear_results,  "MAFG E")
 # +
 path = "/Users/sebs_mac/k_fold_results/gcn4/"
 
-metric_paths = ["_".join(subdir.split("_")[:2]) + "_5_fold_" + "_".join(subdir.split("_")[2:]) for subdir in os.listdir(path) if subdir != ".DS_Store"]
-metrics = [pd.read_csv(f"{path}{'_'.join(subdir.split('_')[:2] + subdir.split('_')[-2:])}/{subdir}_r1_metrics.csv") for subdir in  metric_paths]
+metric_paths = [
+    "_".join(subdir.split("_")[:2]) + "_5_fold_" + "_".join(subdir.split("_")[2:])
+    for subdir in os.listdir(path)
+    if subdir != ".DS_Store"
+]
+metrics = [
+    pd.read_csv(
+        f"{path}{'_'.join(subdir.split('_')[:2] + subdir.split('_')[-2:])}/{subdir}_r1_metrics.csv"
+    )
+    for subdir in metric_paths
+]
 all_metrics = pd.concat(metrics)
 dataset = [x[1] for x in all_metrics["unique_id"].str.split("_")]
 decay = [x[5] for x in all_metrics["unique_id"].str.split("_")]
@@ -202,13 +266,11 @@ all_metrics["weight_decay"] = decay
 gcn4_ae = all_metrics[all_metrics["dataset"] == "ae"]
 gcn4_a = all_metrics[all_metrics["dataset"] == "a"]
 gcn4_e = all_metrics[all_metrics["dataset"] == "e"]
-gcn4_ae_marginal_results,gcn4_ae_spear_results = summary_data(gcn4_ae)
-gcn4_a_marginal_results, gcn4_a_spear_results =  summary_data(gcn4_a)
-gcn4_e_marginal_results, gcn4_e_spear_results =  summary_data(gcn4_e)
+gcn4_ae_marginal_results, gcn4_ae_spear_results = summary_data(gcn4_ae)
+gcn4_a_marginal_results, gcn4_a_spear_results = summary_data(gcn4_a)
+gcn4_e_marginal_results, gcn4_e_spear_results = summary_data(gcn4_e)
 
 plot(gcn4_ae_marginal_results, gcn4_ae_spear_results, "GCN4 AE")
-plot(gcn4_a_marginal_results,  gcn4_a_spear_results,  "GCN4 A")
-plot(gcn4_e_marginal_results,  gcn4_e_spear_results,  "GCN4 E")
+plot(gcn4_a_marginal_results, gcn4_a_spear_results, "GCN4 A")
+plot(gcn4_e_marginal_results, gcn4_e_spear_results, "GCN4 E")
 # -
-
-

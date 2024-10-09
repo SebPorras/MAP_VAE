@@ -10,19 +10,19 @@ how much overfitting occurs on the ancestors.
 from random import shuffle
 from sklearn.model_selection import train_test_split
 import torch.utils
-from evoVAE.utils.datasets import MSA_Dataset
-from evoVAE.models.seqVAE import SeqVAE
-from evoVAE.trainer.seq_trainer import (
+from src.utils.datasets import MSA_Dataset
+from src.models.seqVAE import SeqVAE
+from src.trainer.seq_trainer import (
     train_loop,
     validation_loop,
 )
 import pandas as pd
-import evoVAE.utils.seq_tools as st
+import src.utils.seq_tools as st
 from datetime import datetime
 import yaml, time, os, torch, argparse
 from pathlib import Path
 import numpy as np
-from evoVAE.loss.standard_loss import frange_cycle_linear
+from src.loss.standard_loss import frange_cycle_linear
 import matplotlib.pyplot as plt
 import logging
 

@@ -2,11 +2,11 @@
 
 from sklearn.model_selection import train_test_split
 import torch.utils
-from evoVAE.utils.datasets import MSA_Dataset
-from evoVAE.models.seqVAE import SeqVAE
-from evoVAE.trainer.seq_trainer import seq_train
+from src.utils.datasets import MSA_Dataset
+from src.models.seqVAE import SeqVAE
+from src.trainer.seq_trainer import seq_train
 import pandas as pd
-import evoVAE.utils.seq_tools as st
+import src.utils.seq_tools as st
 from datetime import datetime
 import yaml, time, os, torch, argparse
 from pathlib import Path

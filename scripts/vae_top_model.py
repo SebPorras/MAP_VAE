@@ -9,12 +9,12 @@ import torch
 from sklearn.model_selection import GridSearchCV, train_test_split
 from sklearn.pipeline import Pipeline
 import scipy
-import evoVAE.utils.seq_tools as st
-import evoVAE.utils.metrics as mt
-from evoVAE.utils.datasets import MSA_Dataset
-from evoVAE.models.seqVAE import SeqVAE
+import src.utils.seq_tools as st
+import src.utils.metrics as mt
+from src.utils.datasets import MSA_Dataset
+from src.models.seqVAE import SeqVAE
 import yaml
-import evoVAE.utils.visualisation as vs
+import src.utils.visualisation as vs
 from sklearn.linear_model import LassoLars, Ridge
 from typing import Tuple
 import pandas as pd

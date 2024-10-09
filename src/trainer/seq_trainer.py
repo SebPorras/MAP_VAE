@@ -1,13 +1,13 @@
 """seq_trainer.py"""
 
 # Package modules
-from evoVAE.models.seqVAE import SeqVAE
-from evoVAE.loss.standard_loss import frange_cycle_linear
-import evoVAE.utils.metrics as mt
-import evoVAE.utils.seq_tools as st
-from evoVAE.utils.datasets import MSA_Dataset
-import evoVAE.utils.statistics as stats
-from evoVAE.utils.datasets import DMS_Dataset
+from src.models.seqVAE import SeqVAE
+from src.loss.standard_loss import frange_cycle_linear
+import src.utils.metrics as mt
+import src.utils.seq_tools as st
+from src.utils.datasets import MSA_Dataset
+import src.utils.statistics as stats
+from src.utils.datasets import DMS_Dataset
 
 # External libraries
 import numpy as np
@@ -171,7 +171,7 @@ def validation_loop(
     increasing, otherwise False.
     val_elbo,
     val_likelihood,
-    val_kl 
+    val_kl
     """
 
     epoch_val_elbo = 0

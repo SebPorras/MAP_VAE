@@ -1,4 +1,4 @@
-from evoVAE.trainer.seq_trainer import (
+from src.trainer.seq_trainer import (
     calc_covariances,
     plot_and_save_covariances,
 )
