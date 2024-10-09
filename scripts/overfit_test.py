@@ -1,4 +1,11 @@
-"""train_vae.py"""
+"""
+overfit.py
+
+This script will train a VAE with ancestors and extants. The model 
+is trained on a a combination of ancestors and extants, however, a 
+fold of ancestors and a fold of extants are held out for validation to check 
+how much overfitting occurs on the ancestors.  
+"""
 
 from random import shuffle
 from sklearn.model_selection import train_test_split

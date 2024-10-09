@@ -1,4 +1,11 @@
-"""train_vae.py"""
+"""
+zero_shot.py
+
+Will train a VAE with all available sequences and then predict fitness 
+of the variants using only the log odds score between the query sequence 
+and the wild-type. 
+
+"""
 
 import torch.utils
 from evoVAE.utils.datasets import MSA_Dataset

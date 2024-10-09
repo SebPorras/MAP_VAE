@@ -1,3 +1,11 @@
+"""
+esm_top_model.py
+
+This code is used to train a Ridge and LARS lasso regression to predict DMS fitness 
+using embeddings from the LASE model as well as ESM2. 5-fold hyperparameter tuning is
+used. Be careful with n_jobs=-1 in GridSearchCV as it will use all available cores.
+"""
+
 import torch
 from sklearn.model_selection import GridSearchCV, train_test_split
 from sklearn.pipeline import Pipeline

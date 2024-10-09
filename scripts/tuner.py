@@ -1,4 +1,10 @@
-"""tuner.py"""
+"""
+tuner.py
+
+Uses Optuna to find hyperparamter settings for the SeqVAE model.
+Does this with 5-fold cross validation and the training objective is 
+to maximise the marginal probability of the validation set.
+"""
 
 import torch.utils
 from evoVAE.utils.datasets import MSA_Dataset
@@ -34,7 +40,6 @@ SUCCESS = 0
 INVALID_FILE = 2
 
 
-
 def prepare_dataset(
     original_aln: pd.DataFrame, subset_indices: np.array, device: torch.device
 ) -> MSA_Dataset:
@@ -43,7 +48,7 @@ def prepare_dataset(
     # add weights to the sequences
     numpy_aln, _, _ = st.convert_msa_numpy_array(train_aln)
     weights = st.position_based_seq_weighting(
-        numpy_aln, n_processes=2 #int(os.getenv("SLURM_CPUS_PER_TASK"))
+        numpy_aln, n_processes=2  # int(os.getenv("SLURM_CPUS_PER_TASK"))
     )
     # weights = st.reweight_by_seq_similarity(numpy_aln, theta=0.2)
     train_aln["weights"] = weights
@@ -98,7 +103,7 @@ def setup_parser() -> argparse.Namespace:
         metavar="example.aln",
         help="The alignment to train on in FASTA format",
     )
-    
+
     parser.add_argument(
         "-o",
         "--output",
@@ -126,6 +131,7 @@ def setup_parser() -> argparse.Namespace:
 
     return parser.parse_args()
 
+
 def objective_cv(trial, aln, device, logger):
 
     # get the sequence length from first sequence
@@ -152,7 +158,7 @@ def objective_cv(trial, aln, device, logger):
     for fold in range(FOLDS):
         logger.info(f"Fold {fold + 1}")
         logger.info("-------")
-        
+
         val_idx = idx_subset[fold]
         train_idx = np.array(list(set(range(num_seq)) - set(val_idx)))
 
@@ -172,7 +178,6 @@ def objective_cv(trial, aln, device, logger):
         elbo = objective(trial, input_dims, train_loader, val_loader)
         fold_elbos.append(elbo)
 
-
     return np.mean(fold_elbos)
 
 
@@ -180,7 +185,7 @@ def objective(trial, input_dims, train_loader, val_loader):
 
     latent_dims = trial.suggest_int("latent_dims", 3, 10)
     settings["latent_dims"] = latent_dims
-   
+
     # instantiate the model
     model = SeqVAE(
         dim_latent_vars=latent_dims,
@@ -192,7 +197,7 @@ def objective(trial, input_dims, train_loader, val_loader):
 
     model = model.to(device)
 
-    weight_decay = trial.suggest_float("weight_decay",0.0 ,1e-4)
+    weight_decay = trial.suggest_float("weight_decay", 0.0, 1e-4)
     optimiser = model.configure_optimiser(
         learning_rate=settings["learning_rate"], weight_decay=weight_decay
     )
@@ -216,9 +221,7 @@ def objective(trial, input_dims, train_loader, val_loader):
     elbos = []
     with torch.no_grad():
         for x, _, _ in val_loader:
-            log_elbo = model.compute_elbo_with_multiple_samples(
-                x, num_samples=2000
-            )
+            log_elbo = model.compute_elbo_with_multiple_samples(x, num_samples=2000)
             elbos.append(log_elbo.item())
 
     return np.mean(elbos)
@@ -243,14 +246,14 @@ if __name__ == "__main__":
         aln = pd.read_pickle(settings["alignment"])
 
     # unique identifier for this experiment
-    unique_id_path = args.output 
+    unique_id_path = args.output
 
     logging.basicConfig(
-    level=logging.DEBUG,  # Set the logging level
-    format="%(asctime)s - %(message)s",  # Format the log messages
-    datefmt="%H:%M:%S",  # Date format
-    filename=f"{unique_id_path}.log",  # Log file name
-    filemode="w",  # Write mode (overwrites the log file each time the program runs)
+        level=logging.DEBUG,  # Set the logging level
+        format="%(asctime)s - %(message)s",  # Format the log messages
+        datefmt="%H:%M:%S",  # Date format
+        filename=f"{unique_id_path}.log",  # Log file name
+        filemode="w",  # Write mode (overwrites the log file each time the program runs)
     )
     logger = logging.getLogger(__name__)
     logger.info(f"Run_id: {unique_id_path}")
@@ -266,10 +269,10 @@ if __name__ == "__main__":
     logger.info(f"Using device: {device}\n")
 
     study = optuna.create_study(direction="maximize")
-    
+
     obj = partial(objective_cv, aln=train_val, device=device, logger=logger)
 
-    minutes = 90 # largest models take about 1.5 hours for 5-fold validation 
+    minutes = 90  # largest models take about 1.5 hours for 5-fold validation
     study.optimize(obj, n_trials=100, timeout=(60 * minutes))
 
     pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])

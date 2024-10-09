@@ -1,4 +1,8 @@
-"""train_vae.py"""
+"""
+train_vae.py
+
+Standard train/validation training for a VAE. 
+"""
 
 from sklearn.model_selection import train_test_split
 import torch.utils

@@ -1,8 +1,12 @@
+"""
+datasets.py
+Custom PyTorch Dataset classes for handling data.
+"""
+
 import numpy as np
-from typing import Tuple, Union
+from typing import Tuple
 import torch
 from torch.utils.data import Dataset
-import pandas as pd
 
 
 class MSA_Dataset(Dataset):
@@ -45,7 +49,23 @@ class MSA_Dataset(Dataset):
 
 
 class DMS_Dataset(Dataset):
-    """Holds data for a deep mutational scanning dataset"""
+    """
+    Holds data for a deep mutational scanning dataset.
+
+    Attributes:
+        encodings (torch.Tensor): Tensor containing the encoded data.
+        ids (np.ndarray): Array containing the identifiers for each data point.
+        fitness (torch.Tensor): Tensor containing the fitness values.
+        fitness_bin (torch.Tensor): Tensor containing the binned fitness values.
+        device (torch.device): The device on which tensors are stored.
+
+        Args:
+            encodings (np.ndarray): Array of encoded data.
+            ids (np.ndarray): Array of identifiers.
+            fitness (np.ndarray): Array of fitness values.
+            fitness_bin (np.ndarray): Array of binned fitness values.
+            device (torch.device): The device to store the tensors on.
+    """
 
     def __init__(
         self,

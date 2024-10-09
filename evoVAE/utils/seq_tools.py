@@ -49,7 +49,11 @@ NUM_SEQS = 0
 SEQ_LEN = 1
 
 
-def read_fasta_file(filename: str):
+def read_fasta_file(filename: str) -> List[List[str]]:
+    """
+    Reads a Fasta file  and returns a list of
+    tuples with the ID and sequence.
+    """
 
     with open(filename, "r") as file:
         lines = file.readlines()
@@ -82,11 +86,27 @@ def read_aln_file(
     filename: str,
     encode: bool = False,
 ) -> pd.DataFrame:
-    """Read in an alignment file in Fasta format and
+    """
+    Read in an alignment file in Fasta format and
     return a Pandas DataFrame with sequences and IDs. If encode
-    is true, a one-hot encoding will be made."""
+    is true, a one-hot encoding will be made.
 
-    print(f"Reading the alignment: {filename}")
+    Parameters:
+    -----------
+    filename: str
+        The path to the alignment file.
+
+    encode: bool
+        If true, one-hot encode the sequences.
+
+    Returns:
+    --------
+    df: pd.DataFrame
+        A DataFrame with columns "sequence" and
+        "id". Adds "encoding" if encode is True.
+    """
+
+    # print(f"Reading the alignment: {filename}")
 
     data = read_fasta_file(filename)
     columns = ["id", "sequence"]
@@ -99,7 +119,7 @@ def read_aln_file(
     df["sequence"] = df["sequence"].apply(remove_x)
 
     # remove sequences with bad characters using regular expressions
-    print(f"Checking for bad characters: {INVALID_PROTEIN_CHARS}")
+    # print(f"Checking for bad characters: {INVALID_PROTEIN_CHARS}")
     orig_size = len(df)
     df = df[~df["sequence"].str.contains(RE_INVALID_PROTEIN_CHARS)]
     if orig_size != len(df):
@@ -110,7 +130,7 @@ def read_aln_file(
         one_hot = df["sequence"].apply(seq_to_one_hot)
         df["encoding"] = one_hot
 
-    print(f"Number of seqs: {len(df)}")
+    # print(f"Number of seqs: {len(df)}")
     return df
 
 
@@ -202,41 +222,30 @@ def one_hot_to_seq(encoding: torch.Tensor, is_tensor: bool = True) -> str:
     return "".join(IDX_TO_AA[char] for char in aa_indices)
 
 
-def encode_and_weight_seqs(
-    aln: pd.DataFrame,
-    theta: float,
-    reweight=True,
-) -> Tuple[np.ndarray, np.ndarray]:
-    """
-
-    Return:
-    encodings, weights
-    """
-
-    print("Encoding the sequences and calculating weights")
-
-    # encodings = np.stack(seqs.apply(seq_to_one_hot))
-    encodings = aln["sequence"].apply(seq_to_one_hot)
-    print(f"The sequence encoding has size: {encodings.shape}\n")
-
-    msa, _, _ = convert_msa_numpy_array(aln)
-
-    weights = None
-    if reweight:
-        weights = reweight_by_seq_similarity(msa, theta=theta)
-        print(f"The sequence weight array has size: {weights.shape}\n")
-
-    return encodings, weights
-
-
 def convert_msa_numpy_array(aln: pd.DataFrame) -> Tuple[np.ndarray, List, List]:
     """
     Turn a group of aligned sequences into a numerical format to leverage
     functions in the numpy library.
 
+    Parameters:
+    -----------
+    aln: pd.DataFrame
+        A DataFrame with columns "id" and "sequence".
+
     Returns:
-    seq_msa, seq_key, seq_label
+    --------
+
+    seq_msa: np.ndarray
+        A numpy array with the sequences converted to integers. Each
+        sequence is a string of integers from the AA_TO_IDX dictionary.
+
+    seq_key: List
+        A list of the sequence indices that map to seq_msa.
+
+    seq_label: List
+        Arranged in same order as seq_key with the sequence ID
     """
+
     sequence_pattern_dict = {}
     seq_msa = []
     seq_key = []
@@ -390,12 +399,23 @@ def sample_clusters(
     is_ancestor: int,
     current_size: int,
 ) -> Tuple[int, int]:
+    """
+    The function is passed a list of DataFrames which contain sequences from each cluster.
+    The cluster to look at is determined by the clusters_seen variable which is a global counter
+    which allows clusters to be sampled in a round-robin fashion. It will terminate early if
+    the cluster contains no sequences or if all sequences in the cluster have been sampled.
 
+    Otherwise, randomly sample from the cluster until a unseen sequence is sampled.
+    """
+
+    # determine the cluster to sample from
     cluster_idx = clusters_seen % num_clusters
     current_cluster = clusters[cluster_idx]
+    # subset the cluster to either ancestors or extants
     current_cluster = current_cluster[current_cluster["is_ancestor"] == is_ancestor]
 
     # can't sample if there's no extants in this cluster
+    # or we've already sampled every sequence in this cluster
     if (
         current_cluster.shape[0] == 0
         or cluster_obs[cluster_idx] == current_cluster.shape[0]
@@ -403,11 +423,13 @@ def sample_clusters(
         clusters_seen += 1
         return current_size, clusters_seen
 
+    # sample a sequence from the cluster
     sample_idx = random.randint(0, current_cluster.shape[0] - 1)
     sample = current_cluster.iloc[sample_idx, 1:]
 
     while True:
 
+        # if we have sampled a unique sequence, we can finish sampling
         if sample["sequence"] not in sample_ids:
             sample_ids.add(sample["sequence"])
             current_size += 1
@@ -415,6 +437,7 @@ def sample_clusters(
             cluster_obs[cluster_idx] += 1
             break
 
+        # otherwise get a new index
         else:
             sample_idx = random.randint(0, current_cluster.shape[0] - 1)
             sample = current_cluster.iloc[sample_idx, 1:]
@@ -424,7 +447,26 @@ def sample_clusters(
 
 def sample_extant_ancestors(
     clusters: List[pd.DataFrame], sample_size: int, extant_proportion: float
-):
+) -> set:
+    """
+    Acts as a wrapper function for sample_clusters() to sample from both
+    extant and ancestor clusters.
+
+    Parameters:
+    -----------
+    clusters: List[pd.DataFrame]
+        A list of DataFrames containing sequences from each cluster.
+
+    sample_size: int
+        The number of sequences to sample.
+
+    extant_proportion: float
+        The proportion of extant sequences to sample.
+
+    Returns:
+    --------
+    A
+    """
 
     num_clusters = len(clusters)
     cluster_an_obs = {i: 0 for i in range(num_clusters)}

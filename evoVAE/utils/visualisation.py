@@ -16,6 +16,14 @@ import seaborn as sns
 
 @torch.no_grad()
 def get_mu(model: SeqVAE, data_loader) -> pd.DataFrame:
+    """
+    Use a pre-trained model to get the latent representation of the data.
+    Only get the mean value for each latent dimension.
+
+    Returns:
+        pd.DataFrame: A DataFrame containing the latent representation
+        of the data with columns "id" and "mu"
+    """
 
     ids = []
     model.eval()
@@ -31,7 +39,8 @@ def get_mu(model: SeqVAE, data_loader) -> pd.DataFrame:
     return id_to_mu
 
 
-def rgb_to_hex_normalized(r, g, b):
+def rgb_to_hex_normalized(r: float, g: float, b: float) -> str:
+
     # Scale the values from 0-1 to 0-255
     r_scaled = int(r * 255)
     g_scaled = int(g * 255)
@@ -50,6 +59,9 @@ def write_itol_dataset_symbol(
     position: float = 1.0,
     label: float = 0.5,
 ):
+    """
+    Create an ITOL annotation file for visualizing a tree with colours.
+    """
 
     ids = [x.split("_")[0] if "tree" in x else x for x in data["id"]]
     data["NODE_ID"] = ids

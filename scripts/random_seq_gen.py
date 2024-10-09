@@ -1,3 +1,10 @@
+"""
+random_seq_gen.py 
+
+Used to create random sequences as the same length of the 
+target MSA. 
+"""
+
 import evoVAE.utils.seq_tools as st
 import random
 import pandas as pd

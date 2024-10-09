@@ -1,4 +1,10 @@
-"""k_fold_train_vae.py"""
+"""
+k_fold_train_vae.py
+
+Performs k-fold cross validation on a VAE. The marginal probability of the 
+validation set is estimated when generating these statistics. Currently 
+uses an 80/20 split for train/validation. 
+"""
 
 import torch.utils
 from evoVAE.utils.datasets import MSA_Dataset
