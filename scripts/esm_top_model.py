@@ -132,9 +132,56 @@ if __name__ == "__main__":
     #              "/Users/sebs_mac/uni_OneDrive/honours/data/esm2_embeddings/mafg_variants_embeddings.pkl",
     #              "/Users/sebs_mac/uni_OneDrive/honours/data/esm2_embeddings/gb1_variants_embeddings.pkl"]
 
-    protein = ["a4"]
+    # protein = ["a4"]
+    # datasets = [
+    #     "/Users/sebs_mac/git_repos/dms_data/DMS_ProteinGym_substitutions/A4_HUMAN_Seuma_2022.csv",
+    # ]
+
+    # lase_paths = [
+    #     "/Users/sebs_mac/uni_OneDrive/honours/data/lase_results/lase_embeddings/"
+    # ]
+
+    # RIDGE = 0
+    # LASSO = 1
+    # #
+
+    # training_types = ["ae", "a", "e"]
+    # labels = ["Ancestor/Extant_LASE", "Ancestor_LASE", "Extant_LASE"]
+
+    # for p, v in zip(protein, datasets):
+    #     for trainingMode, lab in zip(training_types, labels):
+    #         with open(f"{p}_{trainingMode}_lase_top_model_results.csv", "w") as f:
+    #             f.write(
+    #                 "model,family,category,train_set,spearman,k_recall,ndcg,roc_auc\n"
+    #             )
+
+    #             e = f"/Users/sebs_mac/uni_OneDrive/honours/data/lase_results/lase_embeddings/{p}_{trainingMode}_representations.npy"
+    #             variants = pd.read_csv(v)
+    #             embeddings = np.load(e)
+
+    #             variants["embeddings"] = embeddings.tolist()
+
+    #             train, test = train_test_split(
+    #                 variants, train_size=0.8, random_state=42
+    #             )
+
+    #             results = train_and_fit_top_model(train, test)
+
+    #             models = ["Ridge", "LassoLars"]
+
+    #             training = ["train", "test"]
+    #             for model in models:
+    #                 print(model)
+    #                 for t in training:
+    #                     f.write(
+    #                         f"{model},{p},{lab},{t},{results[model][f'{t}_spearmanr']},{results[model][f'{t}_k_recall']},"
+    #                         f"{results[model][f'{t}_ndcg']},{results[model][f'{t}_roc_auc']}\n"
+    #                     )
+    #                     f.flush()
+
+    protein = ["gb1"]
     datasets = [
-        "/Users/sebs_mac/git_repos/dms_data/DMS_ProteinGym_substitutions/A4_HUMAN_Seuma_2022.csv",
+        "/Users/sebs_mac/git_repos/dms_data/DMS_ProteinGym_substitutions/SPG1_STRSG_Wu_2016.csv"
     ]
 
     lase_paths = [
@@ -145,8 +192,8 @@ if __name__ == "__main__":
     LASSO = 1
     #
 
-    training_types = ["ae", "a", "e"]
-    labels = ["Ancestor/Extant_LASE", "Ancestor_LASE", "Extant_LASE"]
+    training_types = ["e"]
+    labels = ["Extant_LASE"]
 
     for p, v in zip(protein, datasets):
         for trainingMode, lab in zip(training_types, labels):

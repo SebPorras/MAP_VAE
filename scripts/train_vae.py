@@ -134,14 +134,14 @@ def setup_parser() -> argparse.Namespace:
         type=int,
         help="Number of latent dimensions. Defaults to 3",
     )
-    
+
     parser.add_argument(
         "-d",
         "--dms",
         action="store",
         help="Deep Mutational Scanning dataset",
     )
-    
+
     parser.add_argument(
         "-s",
         "--subset",
@@ -205,11 +205,11 @@ if __name__ == "__main__":
     unique_id_path = f"{args.output}_r{args.replicate}"
 
     logging.basicConfig(
-    level=logging.DEBUG,  # Set the logging level
-    format="%(asctime)s - %(message)s",  # Format the log messages
-    datefmt="%H:%M:%S",  # Date format
-    filename=f"{unique_id_path}.log",  # Log file name
-    filemode="w",  # Write mode (overwrites the log file each time the program runs)
+        level=logging.DEBUG,  # Set the logging level
+        format="%(asctime)s - %(message)s",  # Format the log messages
+        datefmt="%H:%M:%S",  # Date format
+        filename=f"{unique_id_path}.log",  # Log file name
+        filemode="w",  # Write mode (overwrites the log file each time the program runs)
     )
     logger = logging.getLogger(__name__)
     logger.info(f"Run_id: {unique_id_path}")
@@ -223,7 +223,9 @@ if __name__ == "__main__":
     input_dims = seq_len * st.GAPPY_ALPHABET_LEN
 
     # subset the data
-    train, val = train_test_split(aln, test_size=settings["test_split"], random_state=42)
+    train, val = train_test_split(
+        aln, test_size=settings["test_split"], random_state=42
+    )
     logger.info(f"Train/Val shape: {train.shape}")
 
     logger.info(f"Alignment: {args.aln}")
@@ -268,10 +270,12 @@ if __name__ == "__main__":
 
     # plot the loss for visualtion of learning
     losses = pd.read_csv(f"{unique_id_path}_loss.csv")
-    logging.getLogger('matplotlib.font_manager').setLevel(logging.WARNING)
+    logging.getLogger("matplotlib.font_manager").setLevel(logging.WARNING)
     plt.figure(figsize=(12, 8))
     plt.plot(losses["epoch"], losses["elbo"], label="train", marker="o", color="b")
-    plt.plot(losses["epoch"], losses["val_elbo"], label="validation", marker="x", color="r")
+    plt.plot(
+        losses["epoch"], losses["val_elbo"], label="validation", marker="x", color="r"
+    )
     plt.xlabel("Epoch")
     plt.ylabel("ELBO")
     plt.legend()
@@ -328,7 +332,9 @@ if __name__ == "__main__":
     with torch.no_grad():
         # can reuse the recon loader with a single batch size for multiple samples
         for x, _, _ in recon_loader:
-            log_elbo = trained_model.compute_elbo_with_multiple_samples(x, num_samples=5000)
+            log_elbo = trained_model.compute_elbo_with_multiple_samples(
+                x, num_samples=5000
+            )
             elbos.append(log_elbo.item())
 
     # get average log ELBO for the validation set
@@ -356,7 +362,9 @@ if __name__ == "__main__":
         device,
     )
 
-    extant_loader = torch.utils.data.DataLoader(extant_dataset, batch_size=1, shuffle=False)
+    extant_loader = torch.utils.data.DataLoader(
+        extant_dataset, batch_size=1, shuffle=False
+    )
     ids, x_hats = sample_latent_space(
         model=trained_model, data_loader=extant_loader, num_samples=100
     )
@@ -370,7 +378,6 @@ if __name__ == "__main__":
     )
     recon.to_pickle(f"{unique_id_path}_extant_recons.pkl")
     logger.debug(f"Elapsed time: {(time.time() - start) / 60} minutes\n")
-
 
     # store our metrics
     all_metrics = pd.DataFrame(

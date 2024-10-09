@@ -244,13 +244,14 @@ def vis_tree(
         fig, (ax) = plt.subplots(1, 1, figsize=(12, 8))
         tree_vis_2d(latent, wt_id, rgb=rgb, ax=ax)
     else:
-        fig, (ax) = plt.subplots(1, 1, figsize=(18, 8), subplot_kw={"projection": "3d"})
+        fig, (ax) = plt.subplots(1, 1, figsize=(12, 8), subplot_kw={"projection": "3d"})
         tree_vis_3d(latent, wt_id, rgb=rgb, ax=ax)
 
     # ax.view_init(elev=30, azim=40)  # Change these values to get the desired orientation
     ax.set_title(f"{title}")
     ax.legend()
     plt.savefig(save_title, dpi=300) if save else None
+    plt.tight_layout()
     plt.show()
 
     return latent
@@ -265,7 +266,8 @@ def tree_vis_3d(data, wt_id, rgb, ax):
 
     ax.set_xlabel("Z1")
     ax.set_ylabel("Z2")
-    ax.set_zlabel("Z3", rotation=90)
+    ax.set_zlabel("Z3")
+    ax.zaxis.labelpad = -0.7
 
     an_zs = np.array([z for z in ancestors["mu"]])
     ex_zs = np.array([z for z in extants["mu"]])

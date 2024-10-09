@@ -117,7 +117,14 @@ def safe_log(x, eps=1e-10):
 
 
 def calc_shannon_entropy(seqs: pd.DataFrame) -> np.ndarray:
-    """ """
+    """
+    Take a dataframe of sequences and calculate the Shannon entropy by
+    counting observations of each residue at each position in the MSA.
+
+    Returns:
+    An array of which has the same length as the number of columns in the MSA
+    and contains the entropy for each column.
+    """
 
     msa, _, _ = st.convert_msa_numpy_array(seqs)
 
@@ -153,9 +160,9 @@ def pair_wise_covariances_parallel(
     improve this.
 
     Returns:
-    The covariance matrix (np.ndarray): This is a triangular matrix to save memory
+    The covariance matrix (np.ndarray): This is a upper triangular matrix to save memory
     In case you want to find a specific cov score based on column and residue indices in the upper tri matrix
-    col_combination_count = (num_cols*(num_cols-1)/2) - (num_cols-col_1_idx)*((num_cols-col_1_idx)-1)/2 + col_2_idx - col_1_idx - 1
+    col_combination_count = (num_cols * (num_cols-1) / 2) - (num_cols - col_1_idx) * ((num_cols-col_1_idx)-1)/2 + col_2_idx - col_1_idx - 1
     covar_index = int(col_combination_count * aa_combinations + a_idx * st.GAPPY_ALPHABET_LEN + b_idx)
     """
 
@@ -180,6 +187,7 @@ def pair_wise_covariances_parallel(
 
     # dump the MSA onto the file system to speed up process
     msa_filename_memmap = os.path.join(folder, "msa_memmap")
+    # add the array to the shared memory
     dump(msa, msa_filename_memmap)
     msa = load(msa_filename_memmap, mmap_mode="r")
 
@@ -224,23 +232,27 @@ def calc_columns_pair_covar(
     num_seqs = msa.shape[0]
     num_columns = msa.shape[1]
 
-    col_i = msa[:, i]
+    col_i = msa[:, i]  # grab our first column
     col_combination_count = start_idx
-    for j in range(i + 1, num_columns):
-        for a in range(st.GAPPY_ALPHABET_LEN):
-            for b in range(a + 1, st.GAPPY_ALPHABET_LEN):
+    for j in range(i + 1, num_columns):  # iterate over other columns
+        for a in range(st.GAPPY_ALPHABET_LEN):  # residue a
+            for b in range(a + 1, st.GAPPY_ALPHABET_LEN):  # residue b
 
                 col_j = msa[:, j]
+                # get joint and independent probabilities of residues a and b in col i and j
                 freq_Ai_Bj, freq_Ai, freq_Bj = calc_col_freqs(
                     col_i, col_j, a, b, num_seqs
                 )
 
+                # docstring of pair_wise_covariances_parallel() explains this,
+                # allows indexing into the upper triangular matrix
                 covar_index = (
                     col_combination_count * st.GAPPY_AA_COMBINATIONS
                     + a * st.GAPPY_ALPHABET_LEN
                     + b
                 )
 
+                # actual covariance calculation
                 output[covar_index] = freq_Ai_Bj - (freq_Ai * freq_Bj)
 
         # keep track of how many column combinations we've seen

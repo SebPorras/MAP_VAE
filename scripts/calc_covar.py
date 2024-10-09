@@ -38,44 +38,6 @@ def setup_parser() -> argparse.Namespace:
 
     parser = argparse.ArgumentParser(
         prog="Multiplxed Ancestral Phylogeny (MAP)",
-        description="Calculate pairwise covarance for reconstructions",
-    )
-
-    parser.add_argument(
-        "-r",
-        "--recon",
-        action="store",
-        metavar="example.aln",
-        help="The alignment to train on in FASTA format",
-    )
-
-    parser.add_argument(
-        "-o",
-        "--output",
-        default="output",
-        action="store",
-        help="output directory. If not \
-        specified, a directory called output will be created in the current working directory.",
-    )
-
-    parser.add_argument(
-        "-f",
-        "--folds",
-        action="store",
-        default=5,
-        type=int,
-        help="Number of k-folds. Defaults to 5 if not specified",
-    )
-
-    return parser.parse_args()
-
-
-def setup_parser() -> argparse.Namespace:
-    """use argpase to sort CLI arguments and
-    return the args."""
-
-    parser = argparse.ArgumentParser(
-        prog="Multiplxed Ancestral Phylogeny (MAP)",
         description="Calc covar",
     )
 
