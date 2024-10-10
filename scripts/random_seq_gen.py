@@ -5,7 +5,7 @@ Used to create random sequences as the same length of the
 target MSA. 
 """
 
-import src.utils.seq_tools as st
+import MAP_VAE.utils.seq_tools as st
 import random
 import pandas as pd
 

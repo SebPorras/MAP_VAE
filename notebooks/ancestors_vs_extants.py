@@ -18,10 +18,10 @@
 
 import pandas as pd
 import matplotlib.pyplot as plt
-import src.utils.seq_tools as st
+import MAP_VAE.utils.seq_tools as st
 import numpy as np
 import logomaker as lm
-import src.utils.statistics as stats
+import MAP_VAE.utils.statistics as stats
 from matplotlib.patches import Patch
 from scipy.stats import wasserstein_distance
 
@@ -1604,17 +1604,17 @@ plt.show()
 
 # ## Model extant recons compared to actual
 
-import src.utils.seq_tools as st
+import MAP_VAE.utils.seq_tools as st
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
-from src.utils.datasets import MSA_Dataset
-from src.models.seqVAE import SeqVAE
+from MAP_VAE.utils.datasets import MSA_Dataset
+from MAP_VAE.models.seqVAE import SeqVAE
 import yaml
 import torch
-import src.utils.statistics as stats
-import src.utils.visualisation as vs
+import MAP_VAE.utils.statistics as stats
+import MAP_VAE.utils.visualisation as vs
 
 
 # +

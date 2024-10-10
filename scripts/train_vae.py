@@ -6,12 +6,12 @@ Standard train/validation training for a VAE.
 
 from sklearn.model_selection import train_test_split
 import torch.utils
-from src.utils.datasets import MSA_Dataset
-from src.models.seqVAE import SeqVAE
-from src.trainer.seq_trainer import seq_train, fitness_prediction
+from MAP_VAE.utils.datasets import MSA_Dataset
+from MAP_VAE.models.seqVAE import SeqVAE
+from MAP_VAE.trainer.seq_trainer import seq_train, fitness_prediction
 import pandas as pd
-import src.utils.seq_tools as st
-from src.trainer.seq_trainer import sample_latent_space
+import MAP_VAE.utils.seq_tools as st
+from MAP_VAE.trainer.seq_trainer import sample_latent_space
 from datetime import datetime
 import yaml, time, os, torch, argparse
 from pathlib import Path

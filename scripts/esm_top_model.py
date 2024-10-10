@@ -10,11 +10,11 @@ import torch
 from sklearn.model_selection import GridSearchCV, train_test_split
 from sklearn.pipeline import Pipeline
 import scipy
-import src.utils.seq_tools as st
-import src.utils.metrics as mt
+import MAP_VAE.utils.seq_tools as st
+import MAP_VAE.utils.metrics as mt
 
 import yaml
-import src.utils.visualisation as vs
+import MAP_VAE.utils.visualisation as vs
 from sklearn.linear_model import LassoLars, Ridge
 from typing import Tuple
 import pandas as pd

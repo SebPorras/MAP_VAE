@@ -1,5 +1,5 @@
-from src.models.seqVAE import SeqVAE
-from src.models.types_ import *
+from MAP_VAE.models.seqVAE import SeqVAE
+from MAP_VAE.models.types_ import *
 import torch
 import numpy as np
 

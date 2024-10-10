@@ -22,25 +22,25 @@ from sklearn.model_selection import GridSearchCV, train_test_split
 from sklearn.decomposition import PCA
 from sklearn.pipeline import Pipeline
 import esm
-import src.utils.seq_tools as st
-from src.utils.datasets import MSA_Dataset
-from src.models.seqVAE import SeqVAE
+import MAP_VAE.utils.seq_tools as st
+from MAP_VAE.utils.datasets import MSA_Dataset
+from MAP_VAE.models.seqVAE import SeqVAE
 import yaml
-import src.utils.visualisation as vs
+import MAP_VAE.utils.visualisation as vs
 from sklearn.linear_model import LassoLars, Ridge
 from typing import Tuple
 
 # dms_path = "/Users/sebs_mac/git_repos/dms_data/DMS_ProteinGym_substitutions/"
 
 # +
-import src.utils.metrics as mt
+import MAP_VAE.utils.metrics as mt
 import torch
 from sklearn.model_selection import GridSearchCV, train_test_split
 import scipy
-import src.utils.seq_tools as st
-import src.utils.metrics as mt
+import MAP_VAE.utils.seq_tools as st
+import MAP_VAE.utils.metrics as mt
 import yaml
-import src.utils.visualisation as vs
+import MAP_VAE.utils.visualisation as vs
 import pandas as pd
 import numpy as np
 from sklearn.metrics import roc_auc_score
@@ -346,14 +346,14 @@ for grid in grids:
 # ### One-hot encodings
 
 # +
-import src.utils.metrics as mt
+import MAP_VAE.utils.metrics as mt
 import torch
 from sklearn.model_selection import GridSearchCV, train_test_split
 import scipy
-import src.utils.seq_tools as st
-import src.utils.metrics as mt
+import MAP_VAE.utils.seq_tools as st
+import MAP_VAE.utils.metrics as mt
 import yaml
-import src.utils.visualisation as vs
+import MAP_VAE.utils.visualisation as vs
 import pandas as pd
 import numpy as np
 from sklearn.metrics import roc_auc_score

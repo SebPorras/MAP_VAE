@@ -15,8 +15,8 @@
 
 # +
 
-import src.utils.visualisation as vs
-import src.utils.seq_tools as st
+import MAP_VAE.utils.visualisation as vs
+import MAP_VAE.utils.seq_tools as st
 import yaml
 
 # pd.set_option("display.max_rows", None)
@@ -26,8 +26,8 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.decomposition import PCA
 import torch
 import numpy as np
-from src.utils.datasets import MSA_Dataset
-from src.models.seqVAE import SeqVAE
+from MAP_VAE.utils.datasets import MSA_Dataset
+from MAP_VAE.models.seqVAE import SeqVAE
 
 # -
 
@@ -1086,10 +1086,10 @@ vis_variants_3d(
 
 # +
 import torch
-from src.utils.datasets import MSA_Dataset
-from src.models.seqVAE import SeqVAE
+from MAP_VAE.utils.datasets import MSA_Dataset
+from MAP_VAE.models.seqVAE import SeqVAE
 import yaml
-import src.utils.visualisation as vs
+import MAP_VAE.utils.visualisation as vs
 import matplotlib.pyplot as plt
 import seaborn as sns
 

@@ -7,7 +7,7 @@ before they are passed to the VAE.
 import numpy as np
 from typing import Tuple, List
 import pandas as pd
-import src.utils.metrics as mt
+import MAP_VAE.utils.metrics as mt
 import torch, re, math
 from numba import njit, prange
 from joblib import Parallel, delayed

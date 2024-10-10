@@ -13,11 +13,11 @@
 #     name: python3
 # ---
 
-import src.utils.visualisation as vs
-import src.utils.seq_tools as st
+import MAP_VAE.utils.visualisation as vs
+import MAP_VAE.utils.seq_tools as st
 import yaml
-from src.models.seqVAE import SeqVAE
-from src.utils.datasets import MSA_Dataset
+from MAP_VAE.models.seqVAE import SeqVAE
+from MAP_VAE.utils.datasets import MSA_Dataset
 import pandas as pd
 import torch
 import numpy as np

@@ -1,13 +1,13 @@
 """seq_trainer.py"""
 
 # Package modules
-from src.models.seqVAE import SeqVAE
-from src.loss.standard_loss import frange_cycle_linear
-import src.utils.metrics as mt
-import src.utils.seq_tools as st
-from src.utils.datasets import MSA_Dataset
-import src.utils.statistics as stats
-from src.utils.datasets import DMS_Dataset
+from MAP_VAE.models.seqVAE import SeqVAE
+from MAP_VAE.loss.standard_loss import frange_cycle_linear
+import MAP_VAE.utils.metrics as mt
+import MAP_VAE.utils.seq_tools as st
+from MAP_VAE.utils.datasets import MSA_Dataset
+import MAP_VAE.utils.statistics as stats
+from MAP_VAE.utils.datasets import DMS_Dataset
 
 # External libraries
 import numpy as np

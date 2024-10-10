@@ -15,8 +15,8 @@
 
 import pandas as pd
 import numpy as np
-import src.utils.metrics as mt
-import src.utils.seq_tools as st
+import MAP_VAE.utils.metrics as mt
+import MAP_VAE.utils.seq_tools as st
 from numba import njit, prange, jit
 import random
 
@@ -627,7 +627,7 @@ len(clusters)
 
 # +
 import random
-import src.utils.seq_tools as st
+import MAP_VAE.utils.seq_tools as st
 
 
 SAMPLE_SIZE = 5000

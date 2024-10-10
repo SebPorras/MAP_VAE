@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import torch
 from torch import Tensor
-import src.utils.metrics as mt
+import MAP_VAE.utils.metrics as mt
 from typing import Union, Tuple
 from sklearn.metrics import roc_auc_score
 from scipy.stats import spearmanr

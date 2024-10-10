@@ -13,16 +13,16 @@
 #     name: python3
 # ---
 
-import src.utils.seq_tools as st
-import src.utils.metrics as mt
-from src.models.seqVAE import SeqVAE
+import MAP_VAE.utils.seq_tools as st
+import MAP_VAE.utils.metrics as mt
+from MAP_VAE.models.seqVAE import SeqVAE
 from typing import List, Tuple
 from sklearn.model_selection import train_test_split
 import pandas as pd
 import torch
 import numpy as np
 import yaml
-from src.loss.standard_loss import (
+from MAP_VAE.loss.standard_loss import (
     KL_divergence,
     sequence_likelihood,
     elbo_importance_sampling,
@@ -59,7 +59,7 @@ dms_data["encoding"] = one_hot
 #
 
 # +
-from src.utils.datasets import DMS_Dataset, MSA_Dataset
+from MAP_VAE.utils.datasets import DMS_Dataset, MSA_Dataset
 
 device = torch.device("cpu")
 

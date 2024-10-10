@@ -7,24 +7,23 @@ requires = [
 ]
 
 [tool.setuptools_scm]
-version_file = "evoVAE/_version.py"
+version_file = "MAP_VAE/_version.py"
 
 [project]
-name = "evoVAE"
-version = "0.1.0"
+name = "MAP_VAE"
+version = "0.2.0"
 authors = [{name = "Sebastian Porras", email = "s.porras@uq.edu.au" }]
-description = "I like proteins"
+description = "Multiplexed Ancestral Phylogenetic Variational AutoEncoder"
 readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
     "pandas",
     "numpy >= 1.24.3",
     "scikit-learn >= 1.3.2"
-
 ]
 
 [tool.setuptools.packages.find]
-include = ["evoVAE", "evoVAE.*"]
+include = ["MAP_VAE", "MAP_VAE.*"]
 
 #[tool.jupytext.formats]
 #"notebooks/" = "ipynb"

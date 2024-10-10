@@ -13,12 +13,12 @@
 #     name: python3
 # ---
 
-import src.utils.seq_tools as st
+import MAP_VAE.utils.seq_tools as st
 import numpy as np
 from sequence import *
 from sym import *
 import pandas as pd
-from src.utils.seq_tools import write_fasta_file
+from MAP_VAE.utils.seq_tools import write_fasta_file
 
 
 def calc_pairwise_similarity(seq_path, wt_seq, wt_name):

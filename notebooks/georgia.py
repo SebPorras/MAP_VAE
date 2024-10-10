@@ -17,11 +17,11 @@
 #
 # This is Seb from the past
 
-import src.utils.seq_tools as st
+import MAP_VAE.utils.seq_tools as st
 import pandas as pd
 import matplotlib.pyplot as plt
-from src.utils.datasets import MSA_Dataset
-from src.models.seqVAE import SeqVAE
+from MAP_VAE.utils.datasets import MSA_Dataset
+from MAP_VAE.models.seqVAE import SeqVAE
 import yaml
 import torch
 from ipydatagrid import DataGrid, TextRenderer, Expr

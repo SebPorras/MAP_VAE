@@ -18,7 +18,7 @@ import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 import matplotlib.pyplot as plt
-import src.utils.seq_tools as st
+import MAP_VAE.utils.seq_tools as st
 
 # +
 

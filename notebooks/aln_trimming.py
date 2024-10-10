@@ -14,9 +14,9 @@
 # ---
 
 # +
-import src.utils.seq_tools as st
-from src.utils.datasets import MSA_Dataset
-import src.utils.statistics as stats
+import MAP_VAE.utils.seq_tools as st
+from MAP_VAE.utils.datasets import MSA_Dataset
+import MAP_VAE.utils.statistics as stats
 import pandas as pd
 import torch
 import numpy as np
@@ -474,7 +474,7 @@ for idx, residue in enumerate(wt):
 resized_variants.shape
 
 # +
-from src.utils.seq_tools import IDX_TO_AA
+from MAP_VAE.utils.seq_tools import IDX_TO_AA
 
 # save the aligned variants before trimming
 seqs = []

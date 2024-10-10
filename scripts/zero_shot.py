@@ -8,12 +8,12 @@ and the wild-type.
 """
 
 import torch.utils
-from src.utils.datasets import MSA_Dataset
-from src.models.seqVAE import SeqVAE
-from src.trainer.seq_trainer import fitness_prediction
+from MAP_VAE.utils.datasets import MSA_Dataset
+from MAP_VAE.models.seqVAE import SeqVAE
+from MAP_VAE.trainer.seq_trainer import fitness_prediction
 import pandas as pd
-import src.utils.seq_tools as st
-from src.trainer.seq_trainer import sample_latent_space
+import MAP_VAE.utils.seq_tools as st
+from MAP_VAE.trainer.seq_trainer import sample_latent_space
 from datetime import datetime
 import yaml, time, os, torch, argparse
 from pathlib import Path
@@ -21,7 +21,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from torch.optim.lr_scheduler import CosineAnnealingLR
 import logging
-from src.trainer.seq_trainer import frange_cycle_linear, train_loop
+from MAP_VAE.trainer.seq_trainer import frange_cycle_linear, train_loop
 
 CONFIG_FILE = 1
 ARRAY_ID = 2

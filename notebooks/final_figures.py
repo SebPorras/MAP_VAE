@@ -15,8 +15,8 @@
 
 import pandas as pd
 import numpy as np
-import src.utils.metrics as mt
-import src.utils.seq_tools as st
+import MAP_VAE.utils.metrics as mt
+import MAP_VAE.utils.seq_tools as st
 import random
 
 # pd.set_option('display.max_rows', None)
@@ -28,8 +28,8 @@ import pandas as pd
 import numpy as np
 from sklearn.decomposition import PCA
 import seaborn as sns
-import src.utils.statistics as stats
-import src.utils.visualisation as vs
+import MAP_VAE.utils.statistics as stats
+import MAP_VAE.utils.visualisation as vs
 import yaml
 
 # ### 5-fold validation hyperparamter tuning

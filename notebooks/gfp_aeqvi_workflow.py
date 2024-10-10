@@ -16,8 +16,8 @@
 # ### GFP_AEQV processing
 
 # +
-import src.utils.seq_tools as st
-from src.utils.webservice import get_sequence_batch
+import MAP_VAE.utils.seq_tools as st
+from MAP_VAE.utils.webservice import get_sequence_batch
 import numpy as np
 import pandas as pd
 

@@ -15,8 +15,8 @@
 
 import pandas as pd
 import numpy as np
-import src.utils.metrics as mt
-import src.utils.seq_tools as st
+import MAP_VAE.utils.metrics as mt
+import MAP_VAE.utils.seq_tools as st
 import random
 
 # pd.set_option('display.max_rows', None)
