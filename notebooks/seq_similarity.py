@@ -1,7 +1,7 @@
 # ---
 # jupyter:
 #   jupytext:
-#     formats: ipynb,py
+#     formats: ipynb,py:light
 #     text_representation:
 #       extension: .py
 #       format_name: light
@@ -73,7 +73,6 @@ for seq in seqs:
             count += 1
 
     results.append(count / len(wt_aln))
-# -
 
 
 # +

@@ -1,7 +1,7 @@
 # ---
 # jupyter:
 #   jupytext:
-#     formats: ipynb,py
+#     formats: ipynb,py:light
 #     text_representation:
 #       extension: .py
 #       format_name: light
@@ -250,9 +250,6 @@ def update_datagrid(sequence_log_p: np.ndarray):
 
 def renderer_function(cell, default_value):
     return "#fc8403" if cell.value > 0.2 else default_value
-
-
-# -
 
 
 # +

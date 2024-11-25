@@ -1,7 +1,7 @@
 # ---
 # jupyter:
 #   jupytext:
-#     formats: ipynb,py
+#     formats: ipynb,py:light
 #     text_representation:
 #       extension: .py
 #       format_name: light
@@ -1109,4 +1109,3 @@ Xs_train = np.stack(m["embeddings"])
 
 Xs_train.shape
 
-# -

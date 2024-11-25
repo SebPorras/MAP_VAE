@@ -1,7 +1,7 @@
 # ---
 # jupyter:
 #   jupytext:
-#     formats: ipynb,py
+#     formats: ipynb,py:light
 #     text_representation:
 #       extension: .py
 #       format_name: light
@@ -296,5 +296,3 @@ ext_to_ext /= num_experiments * SAMPLE_SIZE
 print(anc_to_anc, ext_to_anc, ext_to_ext)
 print(rand_anc_to_anc, rand_ext_to_anc, rand_ext_to_ext)
 
-
-# -

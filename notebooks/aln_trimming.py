@@ -1,7 +1,7 @@
 # ---
 # jupyter:
 #   jupytext:
-#     formats: ipynb,py
+#     formats: ipynb,py:light
 #     text_representation:
 #       extension: .py
 #       format_name: light
@@ -502,4 +502,3 @@ for i in range(trimmed_variants.shape[0]):
 
 var_fasta = pd.DataFrame({"id": ids, "sequence": seqs})
 st.write_fasta_file("gb1_variants_trimmed.aln", var_fasta)
-# -

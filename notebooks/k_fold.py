@@ -1,7 +1,7 @@
 # ---
 # jupyter:
 #   jupytext:
-#     formats: ipynb,py
+#     formats: ipynb,py:light
 #     text_representation:
 #       extension: .py
 #       format_name: light
@@ -273,4 +273,3 @@ gcn4_e_marginal_results, gcn4_e_spear_results = summary_data(gcn4_e)
 plot(gcn4_ae_marginal_results, gcn4_ae_spear_results, "GCN4 AE")
 plot(gcn4_a_marginal_results, gcn4_a_spear_results, "GCN4 A")
 plot(gcn4_e_marginal_results, gcn4_e_spear_results, "GCN4 E")
-# -
