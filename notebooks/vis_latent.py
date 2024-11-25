@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: light
 #       format_version: '1.5'
-#       jupytext_version: 1.16.3
+#       jupytext_version: 1.16.4
 #   kernelspec:
 #     display_name: Python 3
 #     language: python
@@ -41,9 +41,24 @@ from MAP_VAE.models.seqVAE import SeqVAE
 
 # # Model init
 
-with open("../data/dummy_config.yaml", "r") as stream:
+with open("../data/example_config.yaml", "r") as stream:
     settings = yaml.safe_load(stream)
 
+
+# +
+model = SeqVAE(
+        dim_latent_vars=settings["latent_dims"],
+        dim_msa_vars=448*21,
+        num_hidden_units=settings["hidden_dims"],
+        settings=settings,
+        num_aa_type=settings["AA_count"],
+    )
+
+
+total_params = sum(p.numel() for p in model.parameters())
+# -
+
+total_params
 
 # # Visualising training data
 #

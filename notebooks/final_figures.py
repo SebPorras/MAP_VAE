@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: light
 #       format_version: '1.5'
-#       jupytext_version: 1.16.3
+#       jupytext_version: 1.16.4
 #   kernelspec:
 #     display_name: embed
 #     language: python
@@ -32,7 +32,27 @@ import MAP_VAE.utils.statistics as stats
 import MAP_VAE.utils.visualisation as vs
 import yaml
 
+# # Entropy calcs
+
+# +
+import seaborn as sns
+
+data = pd.read_csv("/Users/sebs_mac/uni_OneDrive/honours/data/DMS_substitutions_entropy.csv")
+
+print(data.columns)
+plt.figure(figsize=(10, 8))
+sns.scatterplot(data=data, x="MSA_num_seqs", y="entropy", size="DMS_total_number_mutants", )#, sizes=(20, 1000), legend=False)
+# plot a coloured point for the GB1 family
+sns.scatterplot(data[data["DMS_id"] == "SPG1_STRSG_Wu_2016"]["MSA_num_seqs"], data[data["DMS_id"] == "SPG1_STRSG_Wu_2016"]["entropy"], color="red", size=data[data["DMS_id"] == "SPG1_STRSG_Wu_2016"]["DMS_total_number_mutants"], label="GB1")
+plt.xlabel("MSA Number of Sequences")
+plt.ylabel("Entropy")
+plt.title("Scatter plot of MSA Number of Sequences vs Entropy")
+plt.show()
+# -
+
 # ### 5-fold validation hyperparamter tuning
+
+
 
 # +
 #### Model settings ####
